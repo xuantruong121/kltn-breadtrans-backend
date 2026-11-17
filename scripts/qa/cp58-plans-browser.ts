@@ -21,14 +21,13 @@ void (async () => {
     /69\.000/.test(text) && /149\.000/.test(text),
   );
   check(
-    'PLUS card: Listening/Reading Intermediate+, and says it excludes S/W B1+ and courses',
+    'PLUS card: Listening/Reading Intermediate+, and says it excludes S/W B1+',
     text.includes('Mở bài Nghe và Đọc Trung cấp, Nâng cao') &&
-      text.includes('Không gồm Nói, Viết Trung cấp trở lên và khóa học'),
+      text.includes('Không gồm Nói, Viết'),
   );
   check(
-    'PRO card: S/W Intermediate+ and all courses',
-    text.includes('Bài Nói và Viết Trung cấp, Nâng cao') &&
-      text.includes('Mở khóa toàn bộ khóa học'),
+    'PRO card: S/W Intermediate+',
+    text.includes('Bài Nói và Viết Trung cấp, Nâng cao'),
   );
   check(
     'no stale claim that PLUS opens Speaking/Writing',

@@ -146,3 +146,20 @@ R2_COVER=200
 The first attempt exposed a wrong column, fixed in step 5: `CONTENT_ACCESS` belongs in `unit`, not `scope`.
 
 In Git Bash, do not export `MSYS_NO_PATHCONV=1` for a whole script. It breaks `cmd //c` and `taskkill //PID`. Set it on the `docker` command only.
+
+## QA scripts removed with the courses (2026-11-17)
+
+Eight browser and API QA scripts tested only courses or classes, and stopped working once the `Course`,
+`Enrollment` and `Class` tables were gone. They were deleted from `scripts/qa`. To bring them back after a
+restore, take them from commit `f86c56e`, the last commit that still has them:
+
+```bash
+git checkout f86c56e -- scripts/qa/cp601-course-domain-regression.ts scripts/qa/cp601-admin-course-browser.ts \
+  scripts/qa/cp601-probe-legacy-class-bypass.ts scripts/qa/cp60-probe-class.ts \
+  scripts/qa/finalization-course-api.ts scripts/qa/finalization-course-browser.ts \
+  scripts/qa/finalization-course-journey-api.ts scripts/qa/finalization-course-journey-browser.ts
+```
+
+Shared scripts lost their course checks in the same commit (`cp58-*`, `cp59-*`, `cp60-probe-learner-ownership`,
+`cp602-owner-postmerge-api`, `finalization-subscription-browser`, the route lists of `ui-text-audit`,
+`ui-copy-shots`, `peek-back-restoration`, `global-security-phase`); `git show` on that commit lists them.

@@ -30,8 +30,6 @@ const LEARNER = [
   '/toeic/assessments',
   '/toeic/history',
   '/toeic/stats',
-  '/courses',
-  '/my-courses',
   '/flashcard',
   '/grammar',
   '/vocabulary/saved',
@@ -51,14 +49,11 @@ const LEARNER = [
   '/writing/17',
   '/exams/1',
   '/toeic/1',
-  '/courses/1',
-  '/my-courses/1',
 ];
 const ADMIN = [
   '/admin',
   '/admin/assignments',
   '/admin/costs',
-  '/admin/courses',
   '/admin/currency',
   '/admin/enroll',
   '/admin/exams',

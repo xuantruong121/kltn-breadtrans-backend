@@ -48,46 +48,11 @@ void (async () => {
   };
   check('three owner accounts log in', Object.values(tokens).every(Boolean));
 
-  const catalog = await get('/public/courses');
-  const courseIds: number[] = (catalog.data ?? []).map((c: any) => c.id);
-  check(
-    'public catalog lists published courses',
-    catalog.status === 200 && courseIds.length > 0,
-    `(${courseIds.join(',')})`,
-  );
-  const leaks = JSON.stringify([
-    catalog.data,
-    (await get(`/public/courses/${courseIds[0]}`)).data,
-    (await get('/courses', tokens.PRO)).data,
-  ]);
-  check(
-    'course responses carry no classes, enrollments or tuition',
-    !/tuitionFeeVnd|"classes"|upcomingClassCount|remainingSeats|enrollment/i.test(
-      leaks,
-    ),
-  );
-
-  for (const id of courseIds) {
-    const s = await Promise.all(
-      (['FREE', 'PLUS', 'PRO'] as const).map(
-        async (p) => (await get(`/courses/${id}/learning`, tokens[p])).status,
-      ),
-    );
-    check(
-      `course ${id}: FREE/PLUS 403, PRO 200`,
-      s[0] === 403 && s[1] === 403 && s[2] === 200,
-      `(${s.join('/')})`,
-    );
-  }
-  const overview = await get(`/courses/${courseIds[0]}/learning`, tokens.PRO);
-  check(
-    'PRO learning overview reports progress (read only)',
-    overview.status === 200 &&
-      typeof overview.data?.progress?.completedLessons === 'number',
-    JSON.stringify(overview.data?.progress ?? {}),
-  );
-
+  // Courses, classes and tuition were removed on 2026-11-01.
   const retired = [
+    '/public/courses',
+    '/courses',
+    '/courses/1/learning',
     '/classes',
     '/classes/my-classes',
     '/classes/1',
@@ -102,7 +67,7 @@ void (async () => {
     retired.map(async (p) => `${p}=${(await get(p, tokens.PRO)).status}`),
   );
   check(
-    'retired classroom/tuition GET routes answer 404',
+    'retired course/classroom/tuition GET routes answer 404',
     statuses.every((s) => s.endsWith('=404')),
     statuses.filter((s) => !s.endsWith('=404')).join(' '),
   );

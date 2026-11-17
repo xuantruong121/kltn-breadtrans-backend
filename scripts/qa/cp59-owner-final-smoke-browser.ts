@@ -166,7 +166,6 @@ void (async () => {
     ['arena', '/arena', (t) => /Đấu trường|Arena|Bánh/i.test(t)],
     ['TOEIC', '/toeic', (t) => /TOEIC/.test(t)],
     ['diagnostic', '/diagnostic', (t) => /đầu vào|Kiểm tra/i.test(t)],
-    ['courses', '/my-courses', (t) => /Khóa học|khóa học/.test(t)],
   ];
   for (const [name, path, ok] of pages) {
     const text = await visit(p, path);
@@ -248,11 +247,6 @@ void (async () => {
     const t = await visit(pro.page, path);
     check(`PRO ${path}: nothing locked`, !t.includes('Mở khóa với'));
   }
-  const courses = await visit(pro.page, '/my-courses');
-  check(
-    'PRO: courses page renders',
-    /Khóa học|khóa học/.test(courses) && !INTERNAL.test(courses),
-  );
   check(
     'PRO: no write request, no error',
     pro.blocked.length === 0 && pro.errors.length === 0,
@@ -266,10 +260,10 @@ void (async () => {
   const tPlus = await apiToken(...ACCOUNTS.PLUS);
   const tPro = await apiToken(...ACCOUNTS.PRO);
   check(
-    'courses: FREE 403, PLUS 403, PRO 200',
-    (await apiStatus(tFree, '/courses/1/learning')) === 403 &&
-      (await apiStatus(tPlus, '/courses/1/learning')) === 403 &&
-      (await apiStatus(tPro, '/courses/1/learning')) === 200,
+    'removed course route answers 404 for every plan (courses gone 2026-11-01)',
+    (await apiStatus(tFree, '/courses/1/learning')) === 404 &&
+      (await apiStatus(tPlus, '/courses/1/learning')) === 404 &&
+      (await apiStatus(tPro, '/courses/1/learning')) === 404,
   );
   check(
     'Listening B1 (quiz 11): FREE 403, PLUS 200',

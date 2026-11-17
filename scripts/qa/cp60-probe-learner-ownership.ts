@@ -206,24 +206,14 @@ void (async () => {
     ),
   );
 
-  // Class assignments were retired in CP60.1 (self-paced courses, no
-  // classrooms); a class member and a stranger both get 404.
+  // Class assignments were retired in CP60.1 and the tables went with the
+  // courses on 2026-11-01; the routes answer 404 for anyone.
   console.log('\n== Class assignments (retired)');
-  const classId = Number(
-    harnessQuery(`select id from "Class" order by id limit 1`)[0][0],
-  );
-  harnessExec(
-    `insert into "Enrollment" ("userId","classId","status","progress","joinedAt") values (${a.userId}, ${classId}, 'ACTIVE', 0, now())`,
-  );
-  const assignmentId =
-    harnessQuery(
-      `select id from "Assignment" where "classId" = ${classId} order by id limit 1`,
-    )[0]?.[0] ?? 1;
   const retired = [
-    await call('GET', `/courses/classes/${classId}/assignments`, a.token),
-    await call('GET', `/courses/classes/${classId}/assignments`, b.token),
-    await call('GET', `/courses/assignments/${assignmentId}`, a.token),
-    await call('POST', `/courses/assignments/${assignmentId}/submit`, b.token, {
+    await call('GET', '/courses/classes/1/assignments', a.token),
+    await call('GET', '/courses/classes/1/assignments', b.token),
+    await call('GET', '/courses/assignments/1', a.token),
+    await call('POST', '/courses/assignments/1/submit', b.token, {
       content: 'CP60 probe',
     }),
     await call('PUT', '/courses/submissions/1/grade', a.token, { score: 10 }),

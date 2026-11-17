@@ -22,11 +22,6 @@ const marker = makeMarker('back');
 
 const CASES = [
   {
-    list: '/courses',
-    click: /Xem chi tiết|Vào học|Chi tiết|Bắt đầu/i,
-    detail: /\/courses\/\d+/,
-  },
-  {
     list: '/listening',
     click: /Bắt đầu|Luyện nghe|Vào bài/i,
     detail: /\/listening\/\d+/,

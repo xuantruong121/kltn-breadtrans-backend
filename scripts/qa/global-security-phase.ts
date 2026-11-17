@@ -208,7 +208,6 @@ async function main() {
       { label: 'zero published grammar', path: '/grammar' },
       { label: 'empty notifications', path: '/notifications' },
       { label: 'empty toeic history', path: '/toeic/history' },
-      { label: 'invalid course id', path: '/courses/99999' },
       { label: 'invalid exam id', path: '/exams/99999' },
       { label: 'invalid listening id', path: '/listening/99999' },
     ];
