@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const phase = process.argv.find((arg) => arg.startsWith('--phase='))?.slice(8);
 if (!['p2-audio', 'p3-audio', 'p4-audio', 'part-navigation'].includes(phase ?? '')) throw new Error('Use --phase=p2-audio|p3-audio|p4-audio|part-navigation');
@@ -36,6 +37,6 @@ async function main() {
       if (!playback.started) throw new Error(`PART_${part}_AUDIO_DID_NOT_START`);
       await log({ test:`p${part}-audio-runtime`, route:page.url(), examId:1, attemptType:'PRACTICE', attemptId:practiceAttemptId, result:'PASS', part, header:await header.textContent(), playback });
     }
-  } finally { await browser?.close(); if (userId) await prisma.user.delete({ where:{id:userId} }); const orphans=await prisma.user.count({where:{email:{startsWith:'qa-toeic-lr-'}}}); await log({test:'cleanup',result:orphans===0?'PASS':'FAIL',orphanRecords:orphans,userId:userId??null}); await prisma.$disconnect(); }
+  } finally { await browser?.close(); if (userId) await deleteQaUsers(prisma, { where:{id:userId} }); const orphans=await prisma.user.count({where:{email:{startsWith:'qa-toeic-lr-'}}}); await log({test:'cleanup',result:orphans===0?'PASS':'FAIL',orphanRecords:orphans,userId:userId??null}); await prisma.$disconnect(); }
 }
 main().catch(async (error) => { await log({test:'fatal',result:'FAIL',failure:error instanceof Error?error.message:String(error)}); console.error(error); process.exitCode=1; });

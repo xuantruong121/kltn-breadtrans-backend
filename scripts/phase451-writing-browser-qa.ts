@@ -9,6 +9,7 @@ import {
   Role,
   TopicCategory,
 } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const api = process.env.WRITING_QA_BACKEND_ORIGIN ?? 'http://127.0.0.1:3028';
 const web = process.env.WRITING_QA_FRONTEND_ORIGIN ?? 'http://127.0.0.1:3128';
@@ -47,7 +48,7 @@ async function cleanup() {
   await prisma.practiceTopic.deleteMany({
     where: { name: { startsWith: prefix } },
   });
-  await prisma.user.deleteMany({ where: { email: { startsWith: prefix } } });
+  await deleteQaUsers(prisma, { where: { email: { startsWith: prefix } } });
 }
 
 function assert(condition: unknown, message: string): asserts condition {

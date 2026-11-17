@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const apiBase = process.env.QA_API_BASE_URL ?? 'http://localhost:3001';
@@ -75,7 +76,7 @@ async function main() {
       TRANSCRIPT_REVEAL_USER_ISOLATION_PASS: true,
     }));
   } finally {
-    await Promise.all(userIds.map((id) => prisma.user.delete({ where: { id } }).catch(() => undefined)));
+    await Promise.all(userIds.map((id) => deleteQaUsers(prisma, { where: { id } }).catch(() => undefined)));
     await prisma.$disconnect();
   }
 }

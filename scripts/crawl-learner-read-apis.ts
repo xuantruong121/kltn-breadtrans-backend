@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const apiBase = process.env.RECOVERY_API_BASE_URL ?? 'http://localhost:3001';
@@ -113,7 +114,7 @@ async function main() {
     const ids = sessions.map((session) => session.userId);
     if (ids.length) {
       await prisma.subscription.deleteMany({ where: { userId: { in: ids } } });
-      await prisma.user.deleteMany({ where: { id: { in: ids } } });
+      await deleteQaUsers(prisma, { where: { id: { in: ids } } });
     }
   }
 }

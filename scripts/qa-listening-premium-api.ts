@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const quizId = Number(process.argv[2]);
 const prisma = new PrismaClient();
@@ -71,7 +72,7 @@ async function createSession(tier: Session['tier'], marker: string): Promise<Ses
     }
     return { tier, userId: user.id, token };
   } catch (error) {
-    await prisma.user.delete({ where: { id: user.id } }).catch(() => undefined);
+    await deleteQaUsers(prisma, { where: { id: user.id } }).catch(() => undefined);
     throw error;
   }
 }
@@ -164,7 +165,7 @@ async function main() {
       Q25_TIMELINE_MAPPING_PASS: true,
     }));
   } finally {
-    await Promise.all(sessions.map((session) => prisma.user.delete({ where: { id: session.userId } }).catch(() => undefined)));
+    await Promise.all(sessions.map((session) => deleteQaUsers(prisma, { where: { id: session.userId } }).catch(() => undefined)));
     await prisma.$disconnect();
   }
 }

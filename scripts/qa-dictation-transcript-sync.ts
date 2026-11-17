@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const quizId = Number(process.argv.find((arg) => arg.startsWith('--quiz='))?.slice(7));
 if (!Number.isInteger(quizId)) throw new Error('Usage: --quiz=<id>');
@@ -28,5 +29,5 @@ async function main(){const email=`${marker}@breadtrans.local`, password=`Qa-${r
  const select=page.locator('select').filter({has:page.locator('option[value="none"]')}).first();if(await select.count()){await select.selectOption('vi');await snapshot('translation-vi');await select.selectOption('none');await snapshot('translation-none');}
  await page.getByRole('button',{name:/^Nghe chép$/}).click();await page.waitForTimeout(200);await log({test:'dictation-mode-transition',result:'PASS',route:page.url(),note:'Switched Full transcript to Dictation after sync checks'});
  await log({test:'dictation-transcript-sync-summary',result:'PASS',route:page.url(),expectedCount:expected.length});
- }finally{await browser?.close();if(userId){await prisma.subscription.deleteMany({where:{userId}});await prisma.user.delete({where:{id:userId}}).catch(()=>undefined);}const orphans=await prisma.user.count({where:{email:{startsWith:'qa-dictation-sync-'}}});await log({test:'cleanup',result:orphans===0?'PASS':'FAIL',orphanRecords:orphans});await prisma.$disconnect();}}
+ }finally{await browser?.close();if(userId){await prisma.subscription.deleteMany({where:{userId}});await deleteQaUsers(prisma, {where:{id:userId}}).catch(()=>undefined);}const orphans=await prisma.user.count({where:{email:{startsWith:'qa-dictation-sync-'}}});await log({test:'cleanup',result:orphans===0?'PASS':'FAIL',orphanRecords:orphans});await prisma.$disconnect();}}
 main().catch(async e=>{await log({test:'fatal',result:'FAIL',failure:e instanceof Error?e.message:String(e)});console.error(e);process.exitCode=1;});

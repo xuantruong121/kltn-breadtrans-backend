@@ -33,6 +33,7 @@ import { UploadService } from '../src/modules/upload/upload.service';
 import { SpeakingService } from '../src/modules/speaking/speaking.service';
 import { R2CleanupService } from '../src/modules/upload/r2-cleanup.service';
 import { MockSpeakingEvaluator } from '../src/modules/speaking/mock-speaking-evaluator';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 // In-memory S3-compatible storage record
 interface StoredObject {
@@ -731,7 +732,7 @@ async function main() {
   // Clean up quotaUser
   await prisma.speakingUploadIntent.deleteMany({ where: { userId: quotaUser.id } });
   await prisma.speakingSubmission.deleteMany({ where: { userId: quotaUser.id } });
-  await prisma.user.delete({ where: { id: quotaUser.id } });
+  await deleteQaUsers(prisma, { where: { id: quotaUser.id } });
 
   // --------------------------------------------------------------------------
   // TEST 8 — LOGGER REDACTION VERIFICATION (Section 11)
@@ -899,7 +900,7 @@ async function main() {
   await redis.quit();
   await prisma.speakingUploadIntent.deleteMany({ where: { userId: user.id } });
   await prisma.speakingSubmission.deleteMany({ where: { userId: user.id } });
-  await prisma.user.delete({ where: { id: user.id } });
+  await deleteQaUsers(prisma, { where: { id: user.id } });
   await prisma.$disconnect();
   mockS3.server.close();
 

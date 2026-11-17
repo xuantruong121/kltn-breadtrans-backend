@@ -144,7 +144,8 @@
     "roots": [
       "<rootDir>",
       "<rootDir>/../prisma",
-      "<rootDir>/../test/safety"
+      "<rootDir>/../test/safety",
+      "<rootDir>/../scripts/qa"
     ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {

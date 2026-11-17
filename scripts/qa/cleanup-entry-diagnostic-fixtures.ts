@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
 import { assertIsolatedTargets, readIsolatedTargets } from './qa-target-guard';
+import { deleteQaUsers } from './delete-qa-users';
 
 // Creates/deletes users: explicit, verified isolated target only (CP60.2);
 // never the backend .env (kltn_db).
@@ -19,12 +20,10 @@ async function main() {
     where: { email: { startsWith: prefix } },
     select: { id: true, email: true },
   });
-  for (const user of users) {
-    await prisma.subscription.deleteMany({ where: { userId: user.id } });
-    // QA junk: the ledger keeps a Restrict key to User (soft-delete rule).
-    await prisma.banhTransaction.deleteMany({ where: { userId: user.id } });
-    await prisma.user.delete({ where: { id: user.id } });
-  }
+  // QA junk: payments, orders and the ledger go first (soft-delete rule).
+  await deleteQaUsers(prisma, {
+    where: { id: { in: users.map((user) => user.id) } },
+  });
   console.log(JSON.stringify({ prefix, deleted: users }, null, 2));
 }
 main()

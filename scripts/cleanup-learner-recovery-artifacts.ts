@@ -1,6 +1,7 @@
 /** Removes only an identified strict-runtime smoke-test account. */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const apply = process.argv.includes('--apply');
@@ -12,7 +13,7 @@ async function main() {
   });
   if (apply && artifacts.length) {
     await prisma.$transaction(async (tx) => {
-      await tx.user.deleteMany({ where: { id: { in: artifacts.map((user) => user.id) } } });
+      await deleteQaUsers(tx, { where: { id: { in: artifacts.map((user) => user.id) } } });
     });
   }
   console.log(JSON.stringify({ mode: apply ? 'APPLY' : 'CHECK', artifacts, remaining: await prisma.user.count() }, null, 2));

@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const marker = `qa-toeic-lr-${randomUUID()}`;
@@ -123,6 +124,6 @@ async function main() {
     const practiceNavigationPass = allPartNavigation.every(({ visible }) => visible);
     await log({ test: 'practice-listening-and-navigation', route: page.url(), result: listeningRuntimePass && practiceNavigationPass ? 'PASS' : 'FAIL', practiceAttemptId: practiceStart.id, partPlayback, allPartNavigation });
     if (!listeningRuntimePass || !practiceNavigationPass) throw new Error('PRACTICE_MEDIA_OR_NAVIGATION_FAILED');
-  } finally { await browser?.close(); if (userId) await prisma.user.delete({ where: { id: userId } }); await log({ test: 'cleanup', result: 'PASS', userId: userId ?? null }); await prisma.$disconnect(); }
+  } finally { await browser?.close(); if (userId) await deleteQaUsers(prisma, { where: { id: userId } }); await log({ test: 'cleanup', result: 'PASS', userId: userId ?? null }); await prisma.$disconnect(); }
 }
 main().catch(async error => { await log({ test: 'fatal', result: 'FAIL', failure: error instanceof Error ? error.message : String(error) }); console.error(error); process.exitCode = 1; });

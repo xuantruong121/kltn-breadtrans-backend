@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const feBase = process.env.RECOVERY_FE_BASE_URL ?? 'http://localhost:3000';
@@ -65,7 +66,7 @@ async function main() {
     }));
   } finally {
     await browser?.close();
-    if (userId) await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+    if (userId) await deleteQaUsers(prisma, { where: { id: userId } }).catch(() => undefined);
     await prisma.$disconnect();
   }
 }
