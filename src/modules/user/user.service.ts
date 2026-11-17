@@ -439,10 +439,13 @@ export class UserService {
     return this.prisma.profile.upsert({
       where: { userId },
       update: updateData,
+      // The spread goes first: a partial update (only the avatar, owner
+      // 2026-11-17) carries fullName: undefined, which used to overwrite the
+      // fallback and fail the whole upsert with a 500.
       create: {
+        ...updateData,
         userId,
         fullName: updateData.fullName || 'User',
-        ...updateData,
       },
     });
   }
