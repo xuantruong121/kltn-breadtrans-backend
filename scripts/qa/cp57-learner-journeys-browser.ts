@@ -9,7 +9,7 @@ import { check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const one = (sql: string) => harnessQuery(sql)[0]?.[0];
 
 void (async () => {

@@ -3,6 +3,7 @@ import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient, QuizPublicationStatus, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const api = process.env.READING_QA_BACKEND_ORIGIN ?? 'http://127.0.0.1:3018';
 const prefix = 'qa-cms-workflow-reading-final-';
@@ -57,7 +58,7 @@ async function login(email: string) {
 
 async function cleanup() {
   await prisma.quiz.deleteMany({ where: { title: { startsWith: prefix } } });
-  await prisma.user.deleteMany({ where: { email: { startsWith: prefix } } });
+  await deleteQaUsers(prisma, { where: { email: { startsWith: prefix } } });
 }
 
 async function snapshot() {

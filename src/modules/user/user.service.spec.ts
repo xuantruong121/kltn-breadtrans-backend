@@ -52,6 +52,9 @@ const mockPrismaService = {
   diagnosticAttempt: {
     findFirst: jest.fn(),
   },
+  pointHistory: {
+    findMany: jest.fn(),
+  },
 };
 
 const mockEventEmitter = {
@@ -316,6 +319,7 @@ describe('UserService', () => {
         percentage: 60,
         submittedAt: new Date('2026-09-09T00:00:00Z'),
       });
+      mockPrismaService.pointHistory.findMany.mockResolvedValue([]);
 
       await expect(service.getUserStats(7)).resolves.toMatchObject({
         streakCount: 4,
@@ -334,6 +338,42 @@ describe('UserService', () => {
       expect(prisma.toeicAttempt.count).toHaveBeenCalledWith({
         where: { userId: 7, submittedAt: { not: null } },
       });
+    });
+
+    it('lists the weekdays of this Vietnam week with XP, from the history the streak uses', async () => {
+      // Thursday 19/11 12:00 in Vietnam; the week began Monday 16/11 00:00 VN.
+      jest.useFakeTimers({
+        now: new Date('2026-11-19T05:00:00Z'),
+        doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
+      });
+      try {
+        mockPrismaService.userStats.findUnique.mockResolvedValue(null);
+        mockPrismaService.leaderboard.findUnique.mockResolvedValue(null);
+        mockPrismaService.userPet.findUnique.mockResolvedValue(null);
+        mockPrismaService.userVocabWordProgress.count.mockResolvedValue(0);
+        mockPrismaService.submission.count.mockResolvedValue(0);
+        mockPrismaService.toeicAttempt.count.mockResolvedValue(0);
+        mockPrismaService.diagnosticAttempt.findFirst.mockResolvedValue(null);
+        mockPrismaService.pointHistory.findMany.mockResolvedValue([
+          { createdAt: new Date('2026-11-16T01:00:00Z') }, // Mon 08:00 VN
+          { createdAt: new Date('2026-11-16T03:00:00Z') }, // Mon again
+          { createdAt: new Date('2026-11-17T17:30:00Z') }, // Wed 00:30 VN
+        ]);
+
+        const result = await service.getUserStats(7);
+
+        expect(result.studiedDaysThisWeek).toEqual([0, 2]);
+        expect(prisma.pointHistory.findMany).toHaveBeenCalledWith({
+          where: {
+            userId: 7,
+            points: { gt: 0 },
+            createdAt: { gte: new Date('2026-11-15T17:00:00Z') },
+          },
+          select: { createdAt: true },
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

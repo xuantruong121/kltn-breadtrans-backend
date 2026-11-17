@@ -42,6 +42,7 @@ async function main() {
     email,
     password: '123',
     fullName: 'Weak',
+    acceptTerms: true,
   });
   check(
     'a weak password is refused',
@@ -52,12 +53,28 @@ async function main() {
     email: 'not-an-email',
     password,
     fullName: 'X',
+    acceptTerms: true,
   });
   check('an invalid email is refused', badEmail.status === 400);
+  // Consent is a ticked box, never assumed (owner 2026-11-16).
+  for (const acceptTerms of [undefined, false]) {
+    const noConsent = await call('POST', '/auth/register', undefined, {
+      email,
+      password,
+      fullName: 'No Consent',
+      ...(acceptTerms === undefined ? {} : { acceptTerms }),
+    });
+    check(
+      `registration without consent (${String(acceptTerms)}) is refused`,
+      noConsent.status === 400,
+      `(status ${noConsent.status})`,
+    );
+  }
   const reg = await call('POST', '/auth/register', undefined, {
     email,
     password,
     fullName: 'Auth Learner',
+    acceptTerms: true,
     role: 'ADMIN',
   });
   check('registration succeeds', reg.status < 300, `(status ${reg.status})`);
@@ -65,6 +82,7 @@ async function main() {
     email,
     password,
     fullName: 'Again',
+    acceptTerms: true,
   });
   check(
     'a duplicate email is refused (409)',

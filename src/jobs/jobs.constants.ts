@@ -12,6 +12,7 @@ export const JOB_NAMES = {
   R2_AUDIO_CLEANUP: 'r2-audio-cleanup',
   DATABASE_BACKUP_R2_SYNC: 'database-backup-r2-sync',
   EXAM_WRITING_GRADING: 'exam-writing-grading',
+  ACCOUNT_PURGE: 'account-purge',
 } as const;
 
 export type SystemJobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

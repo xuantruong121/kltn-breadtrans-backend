@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const quizId = Number(process.argv[2]);
 const prisma = new PrismaClient();
@@ -69,7 +70,7 @@ async function main() {
     });
     if (reveal.status !== 200 || transcript.status !== 200 || items.length !== timeline.size || transcriptInvalid) throw new Error(`REVEAL_CONTRACT_FAILED reveal=${reveal.status} transcript=${transcript.status} items=${items.length}`);
     console.log(JSON.stringify({ quizId, questionCount: questions.length, artifactVersion: artifact.version, preRevealLeakCount: leaks.length, timingMappings: `${questions.length}/${timeline.size}`, preRevealTranscriptStatus: preTranscript.status, questionAudioCount: audio.length, transcriptCount: items.length, API_RUNTIME_PASS: true }));
-  } finally { if (userId) await prisma.user.delete({ where: { id: userId } }); await prisma.$disconnect(); }
+  } finally { if (userId) await deleteQaUsers(prisma, { where: { id: userId } }); await prisma.$disconnect(); }
 }
 
 void main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

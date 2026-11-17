@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const prisma = new PrismaClient();
 const feBase = process.env.RECOVERY_FE_BASE_URL ?? 'http://localhost:3000';
@@ -150,7 +151,7 @@ async function main() {
     await browser?.close();
     if (userId) {
       await prisma.subscription.deleteMany({ where: { userId } });
-      await prisma.user.delete({ where: { id: userId } });
+      await deleteQaUsers(prisma, { where: { id: userId } });
     }
   }
 }

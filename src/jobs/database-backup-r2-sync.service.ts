@@ -60,6 +60,9 @@ interface BackupCatalog {
   backups: BackupCatalogEntry[];
 }
 
+/** The name backup.sh gives its scheduled dumps; anything else is labelled. */
+const AUTOMATIC_DUMP = /^kltn_db_\d{8}_\d{6}\.dump$/;
+
 @Injectable()
 export class DatabaseBackupR2SyncService {
   private readonly logger = new Logger(DatabaseBackupR2SyncService.name);
@@ -141,6 +144,41 @@ export class DatabaseBackupR2SyncService {
     return join(fallbackDir, 'backup-catalog.json');
   }
 
+  /**
+   * Whether a local dump is not yet recorded as uploaded, by the catalog and
+   * the file sizes alone: no R2 call. The hourly check uses it so a dump made
+   * after a cold start reaches R2 the same day (owner 2026-11-16) without
+   * calling R2 every hour.
+   */
+  hasUnsyncedLocalDumps(): boolean {
+    const catalog = this.readCatalog(this.getCatalogPath());
+    for (const dir of this.getBackupDirs()) {
+      let files: string[] = [];
+      try {
+        files = readdirSync(dir).filter((f) => f.endsWith('.dump'));
+      } catch {
+        continue;
+      }
+      for (const file of files) {
+        let size = 0;
+        try {
+          size = statSync(join(dir, file)).size;
+        } catch {
+          continue;
+        }
+        if (size <= 0) continue;
+        const uploaded = catalog.backups.some(
+          (b) =>
+            b.dumpFile === file &&
+            b.r2UploadVerified === true &&
+            b.bytes === size,
+        );
+        if (!uploaded) return true;
+      }
+    }
+    return false;
+  }
+
   readCatalog(catalogPath: string): BackupCatalog {
     if (existsSync(catalogPath)) {
       try {
@@ -191,6 +229,16 @@ export class DatabaseBackupR2SyncService {
     let backupClass = 'AUTOMATIC';
     let checkpoint = 'scheduled';
 
+    // Only kltn_db_YYYYMMDD_HHMMSS.dump is an automatic dump (backup.sh). A
+    // labelled one (kltn_db_PRE_<what>_<ts>.dump) is a checkpoint taken by hand
+    // before a change: kept, never pruned, like backup.sh keeps it locally.
+    // Until 2026-11-17 these went under automatic/ and were pruned after 14
+    // days, then uploaded again by the next sync.
+    if (!isProtected && !AUTOMATIC_DUMP.test(basename(fileName))) {
+      backupClass = 'MANUAL';
+      checkpoint = 'labelled';
+    }
+
     if (isProtected) {
       if (upper.includes('BASELINE') || upper.includes('CANONICAL')) {
         backupClass = 'PROTECTED_BASELINE';
@@ -221,6 +269,13 @@ export class DatabaseBackupR2SyncService {
       const m = String(fileDate.getUTCMonth() + 1).padStart(2, '0');
       const d = String(fileDate.getUTCDate()).padStart(2, '0');
       return `database-backups/automatic/${y}/${m}/${d}/${basename(fileName)}`;
+    }
+    if (backupClass === 'MANUAL') {
+      const y = fileDate.getUTCFullYear();
+      const m = String(fileDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(fileDate.getUTCDate()).padStart(2, '0');
+      // Outside automatic/, so the retention prune never reaches it.
+      return `database-backups/manual/${y}/${m}/${d}/${basename(fileName)}`;
     }
 
     const subDir =

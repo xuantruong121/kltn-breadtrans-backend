@@ -26,7 +26,12 @@ async function main() {
     const reg = await fetch(`${BE}/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password, fullName: 'Harness Learner' }),
+      body: JSON.stringify({
+        email,
+        password,
+        fullName: 'Harness Learner',
+        acceptTerms: true,
+      }),
     });
     if (!reg.ok) throw new Error(`register ${reg.status}`);
   }

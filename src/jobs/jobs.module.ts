@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccountModule } from '../modules/account/account.module';
 import { GamificationModule } from '../modules/gamification/gamification.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { UploadModule } from '../modules/upload/upload.module';
@@ -9,6 +10,7 @@ import { DatabaseBackupR2SyncService } from './database-backup-r2-sync.service';
 
 @Module({
   imports: [
+    AccountModule,
     GamificationModule,
     NotificationsModule,
     UploadModule,

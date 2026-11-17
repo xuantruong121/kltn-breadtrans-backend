@@ -1,4 +1,5 @@
 import {
+  Equals,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
@@ -32,6 +33,26 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   fullName: string;
+
+  @ApiProperty({
+    example: true,
+    description:
+      'Đồng ý Điều khoản sử dụng và Chính sách bảo mật; ô không được tick sẵn.',
+  })
+  @Equals(true, {
+    message:
+      'Bạn cần đồng ý với Điều khoản sử dụng và Chính sách bảo mật để tạo tài khoản.',
+  })
+  acceptTerms: boolean;
+}
+
+/** Consent given later: an older account, or a new version of the documents. */
+export class AcceptConsentDto {
+  @ApiProperty({ example: true })
+  @Equals(true, {
+    message: 'Hãy tick ô đồng ý để tiếp tục.',
+  })
+  acceptTerms: boolean;
 }
 
 export class LoginDto {
@@ -104,6 +125,14 @@ export class GoogleExchangeDto {
   @IsString()
   @IsNotEmpty()
   code: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Bắt buộc khi Google đăng nhập lần đầu (tạo tài khoản): đồng ý điều khoản.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptTerms?: boolean;
 }
 
 export class GoogleLoginDto {
@@ -118,6 +147,14 @@ export class GoogleLoginDto {
   @IsString()
   @IsOptional()
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Bắt buộc khi Google đăng nhập lần đầu (tạo tài khoản): đồng ý điều khoản.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  acceptTerms?: boolean;
 }
 
 export class LinkGoogleAccountDto {

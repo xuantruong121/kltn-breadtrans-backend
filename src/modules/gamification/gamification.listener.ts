@@ -391,6 +391,10 @@ export class GamificationListener {
           },
         );
       }
+      // Open pages refetch the streak, XP and Bánh Mì now (no reload needed).
+      this.eventEmitter?.emit('learning.effects_applied', {
+        userId: payload.userId,
+      });
     } catch (error) {
       this.logger.error(
         `Failed to handle speaking gamification for user ${payload.userId}`,

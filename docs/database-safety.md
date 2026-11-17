@@ -51,12 +51,15 @@ a `--shadow-database-url` flag at all.
 ## Normal startup
 
 ```bash
-docker compose up -d postgres postgres-shadow postgres-backup redis
+docker compose up -d postgres postgres-shadow postgres-backup postgres-drill redis
 ```
 
-The backup service waits for `postgres` to report healthy, then dumps every
-6 hours (`BACKUP_INTERVAL_SECONDS`) and prunes dumps older than 14 days
-(`BACKUP_RETENTION_DAYS`).
+The backup service waits for `postgres` to report healthy, then dumps once a
+day at 00:00 Vietnam time (`BACKUP_AT`, `BACKUP_UTC_OFFSET_MINUTES`; owner
+2026-11-16, was every 6 hours) and prunes dumps older than 14 days
+(`BACKUP_RETENTION_DAYS`). The backend copies new dumps to the R2 backup
+bucket at 00:02 every day, at backend start, and at minute 20 of any hour in
+which a local dump is not yet uploaded (that check reads only local files).
 
 ### Cadence and its one real limitation
 
@@ -67,11 +70,28 @@ the machine is powered off.
 Scheduling is driven by the newest **verified** automatic dump found in the
 backup directory, not by container uptime, so:
 
-- while the host is up, one verified backup roughly every 6 hours;
-- after host downtime, if the last verified automatic backup is already older
-  than the interval, the next one runs immediately once Postgres is ready;
-- if the container restarts before the next one is due, only the remaining
-  time is waited — a restart no longer resets the cycle.
+- while the host is up, one verified backup a day at 00:00 Vietnam time;
+- after host downtime, if there is no verified automatic backup since the most
+  recent 00:00, one runs immediately once Postgres is ready (a machine switched
+  on at 08:00 gets that day's backup at about 08:00);
+- a container restart on a day that already has its backup adds none; the
+  worker sleeps until the next 00:00.
+
+### Restore drill
+
+A backup counts only if it restores. The backup container also runs
+`docker/postgres-backup/restore-drill.sh --loop`: every Sunday at 04:00
+Vietnam time (or on the next start after a missed Sunday) it restores the
+newest automatic dump into the throwaway `postgres-drill` service (tmpfs, no
+published port), compares tables, the newest migration and the row counts of
+key tables with the live database, writes `restore-drill-<stamp>.json` next to
+the dumps (`OK`, `WARN` or `FAIL`) and drops the restored database. It refuses
+to run if the drill server's `system_identifier` equals the source's.
+
+- Once a month, by hand, drill the off-site copy too:
+  `npm run db:restore:drill:r2` downloads the newest automatic dump from R2,
+  checks its sha256 against the backup catalog and runs the same drill.
+- To drill now: `docker exec kltn-postgres-backup sh /usr/local/bin/restore-drill.sh --now`.
 
 A cycle that fails (Postgres unreachable, `pg_dump` error, archive that
 `pg_restore -l` cannot read) never advances the schedule and never prunes; it

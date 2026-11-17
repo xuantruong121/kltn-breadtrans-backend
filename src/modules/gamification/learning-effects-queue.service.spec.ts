@@ -24,11 +24,13 @@ describe('LearningEffectsQueueService (capacity run 2026-11-09)', () => {
         throw new Error('not in this process');
       }),
     };
+    const events = { emit: jest.fn() };
     const service = new LearningEffectsQueueService(
       listener as never,
       moduleRef as never,
+      events as never,
     );
-    return { service, listener, progress };
+    return { service, listener, progress, events };
   };
   const env = { ...process.env };
   afterEach(() => {
@@ -95,6 +97,31 @@ describe('LearningEffectsQueueService (capacity run 2026-11-09)', () => {
     listener.handleQuizSubmittedEvent.mockRejectedValue(new Error('db'));
     await service.run(payload);
     expect(progress.onQuizSubmitted).toHaveBeenCalled();
+  });
+
+  it('tells the learner when the effects are applied, so open pages refresh (owner 2026-11-17)', async () => {
+    const { service, listener, progress, events } = make();
+    await service.run(payload);
+    expect(events.emit).toHaveBeenCalledWith('learning.effects_applied', {
+      userId: 7,
+    });
+    // after both effects, never before
+    const told = events.emit.mock.invocationCallOrder[0];
+    expect(told).toBeGreaterThan(
+      listener.handleQuizSubmittedEvent.mock.invocationCallOrder[0],
+    );
+    expect(told).toBeGreaterThan(
+      progress.onQuizSubmitted.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('a failed effect still tells the learner, so the page shows what did change', async () => {
+    const { service, listener, events } = make();
+    listener.handleQuizSubmittedEvent.mockRejectedValue(new Error('db'));
+    await service.run(payload);
+    expect(events.emit).toHaveBeenCalledWith('learning.effects_applied', {
+      userId: 7,
+    });
   });
 
   it('a process without skill progress (the speaking worker) starts no queue', () => {

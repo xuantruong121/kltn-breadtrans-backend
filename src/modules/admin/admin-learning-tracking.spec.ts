@@ -16,7 +16,7 @@ const emptyTrackingPrisma = () => ({
 });
 
 const createService = (prisma: any) =>
-  new AdminService(prisma, {} as any, {} as any, undefined);
+  new AdminService(prisma, {} as any, {} as any, {} as any, undefined);
 
 const learner = (overrides: any = {}) => ({
   id: 7,

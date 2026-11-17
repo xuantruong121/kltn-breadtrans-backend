@@ -19,6 +19,7 @@ import {
   failureCount,
   newProStudent,
   newStudent,
+  unlockAllLevels,
 } from './harness-api';
 import { harnessExec, harnessQuery } from './harness-db';
 
@@ -66,6 +67,9 @@ async function main() {
 
   const free = await newStudent('spk-free');
   const pro = await newProStudent('spk-pro');
+  // The premium exercise is above a new learner's level; the level lock is
+  // not what this suite measures, so the PRO learner opens every level.
+  unlockAllLevels(pro.userId);
 
   // Premium media
   const locked = await call(

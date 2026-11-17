@@ -40,6 +40,7 @@ describe('SystemJobsService', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   });
 

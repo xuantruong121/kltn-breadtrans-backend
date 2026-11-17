@@ -5,10 +5,13 @@
 import { chromium } from 'playwright';
 import { requireExplicitOptIn } from './qa-target-guard';
 
-requireExplicitOptIn('QA_OWNER_READONLY', 'cp54-owner-grammar-browser drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions');
+requireExplicitOptIn(
+  'QA_OWNER_READONLY',
+  'cp54-owner-grammar-browser drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions',
+);
 
 const FE = 'http://localhost:3000';
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 
 (async () => {
   let fails = 0;

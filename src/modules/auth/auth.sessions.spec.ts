@@ -133,6 +133,7 @@ describe('refresh tokens, cookies and revocation', () => {
         findUnique: jest.fn(async () => user),
         update: jest.fn(async () => user),
       },
+      userConsent: { findMany: jest.fn(async () => []) },
     };
     service = new AuthService(prisma, jwt, redis as any, {} as any);
     controller = new AuthController(service);

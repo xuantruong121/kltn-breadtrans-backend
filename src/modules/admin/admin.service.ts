@@ -23,6 +23,7 @@ import Redis from 'ioredis';
 import { AuthSessionStore } from '../auth/session-store';
 import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
+import { AccountPurgeService } from '../account/account-purge.service';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
@@ -136,6 +137,7 @@ export class AdminService {
     private prisma: PrismaService,
     private r2Service: R2Service,
     private r2CleanupService: R2CleanupService,
+    private readonly accountPurge: AccountPurgeService,
     @Optional() @InjectRedis() private readonly redis?: Redis,
   ) {}
 
@@ -316,6 +318,9 @@ export class AdminService {
         createdAt: true,
         lastLoginAt: true,
         loginCount: true,
+        // "Chờ xoá ngày …" / "Đã ẩn danh" badges (owner 2026-11-16).
+        deletionScheduledAt: true,
+        anonymizedAt: true,
         profile: { select: { fullName: true, avatar: true, phone: true } },
         stats: {
           select: {
@@ -837,31 +842,14 @@ export class AdminService {
     });
   }
 
+  /**
+   * Admin "Xoá": the same purge as self-service deletion (owner 2026-11-16).
+   * An account without orders or payments is deleted; one with them becomes
+   * an anonymous shell that keeps those records (soft-delete rule).
+   */
   async deleteUser(userId: number) {
-    const deleted = await this.prisma.$transaction(async (tx) => {
-      const lockedUsers = await tx.$queryRaw<Array<{ id: number; role: Role }>>`
-        SELECT id, role
-        FROM "User"
-        WHERE id = ${userId}
-        FOR UPDATE;
-      `;
-
-      if (!lockedUsers || lockedUsers.length === 0) {
-        throw new NotFoundException('Người dùng không tồn tại');
-      }
-
-      const paymentCount = await tx.planPurchase.count({ where: { userId } });
-
-      if (paymentCount > 0) {
-        throw new ConflictException(
-          'Không thể xóa người dùng vì tồn tại lịch sử thanh toán hoặc lịch sử duyệt cần được lưu giữ.',
-        );
-      }
-
-      return tx.user.delete({ where: { id: userId } });
-    });
-    forgetAuthUser(userId);
-    return deleted;
+    const outcome = await this.accountPurge.purgeUser(userId);
+    return { id: userId, outcome };
   }
 
   async getVocabTopics(query: ListQuery = {}) {

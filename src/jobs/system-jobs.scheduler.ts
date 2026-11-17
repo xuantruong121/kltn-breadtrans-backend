@@ -32,6 +32,9 @@ export class SystemJobsScheduler implements OnModuleInit {
         await this.jobs.enqueueWeekly(getBusinessWeekKey(now), true);
       }
       await this.jobs.enqueueDatabaseBackupR2Sync();
+      // Account purge has no fixed minute to wait for: catch the day up. Its
+      // own key, so a start before 02:30 does not swallow the 02:30 run.
+      await this.jobs.enqueueAccountPurge(`start-${dayKey}`);
     } catch (error) {
       this.logger.warn(
         `system_job_startup_recovery_unavailable: ${(error as Error).message}`,
@@ -90,8 +93,28 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());
   }
 
-  @Cron('15 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  // Accounts whose 7-day deletion grace period ended (owner 2026-11-16).
+  @Cron('30 2 * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueueAccountPurge(): Promise<void> {
+    await this.jobs.enqueueAccountPurge(getBusinessDayKey(new Date()));
+  }
+
+  // Daily off-site copy (owner 2026-11-16: daily, not hourly), two minutes
+  // after the 00:00 dump; the dump takes a few seconds.
+  @Cron('2 0 * * *', { timeZone: BUSINESS_TIMEZONE })
   async enqueueDatabaseBackupR2Sync(): Promise<void> {
-    await this.jobs.enqueueDatabaseBackupR2Sync();
+    await this.jobs.enqueueDatabaseBackupR2Sync(
+      `day-${getBusinessDayKey(new Date())}`,
+    );
+  }
+
+  // A dump made after a cold start (machine off at midnight) should not wait
+  // a day for R2. Local check only; R2 is called only when a file is new.
+  @Cron('20 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  async enqueuePendingDatabaseBackupR2Sync(): Promise<void> {
+    const now = new Date();
+    await this.jobs.enqueueDatabaseBackupR2SyncIfPending(
+      `pending-${getBusinessDayKey(now)}-${Math.floor(now.getTime() / 3_600_000)}`,
+    );
   }
 }

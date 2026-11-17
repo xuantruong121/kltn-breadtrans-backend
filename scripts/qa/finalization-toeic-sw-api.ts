@@ -4,7 +4,9 @@
  *
  *   start attempt -> start Speaking -> 11 x (upload intent, PUT, finalize,
  *   poll to COMPLETED) -> complete Speaking -> start Writing -> submit one
- *   task -> completing Writing is refused until all 8 tasks are graded.
+ *   task -> Writing closes with the other 7 unanswered (timed sections,
+ *   2026-11-02) and the attempt completes. A FREE learner cannot start it:
+ *   these exams are a PRO benefit.
  *   With the harness in provider failure mode (cp60-harness-fail.sh) pass
  *   `fail`: the Writing task must be refused honestly, not scored. Without
  *   it the deterministic mock grader scores the task.
@@ -15,7 +17,13 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-import { call, check, failureCount, newStudent } from './harness-api';
+import {
+  call,
+  check,
+  failureCount,
+  newProStudent,
+  newStudent,
+} from './harness-api';
 
 const assessmentId = Number(process.argv[2] ?? 1);
 const wav = readFileSync(process.argv[3]);
@@ -25,17 +33,30 @@ async function main() {
   console.log(
     `\n== TOEIC assessment ${assessmentId} (S&W components) over HTTP`,
   );
-  const s = await newStudent('toeic-sw');
+  const free = await newStudent('toeic-sw-free');
   const detail = await call(
     'GET',
     `/toeic/assessments/${assessmentId}`,
-    s.token,
+    free.token,
   );
   check(
     'assessment detail is served to a FREE learner',
     detail.status === 200,
     `(${detail.status})`,
   );
+  // TOEIC Speaking & Writing and 4 Skills exams are a PRO benefit.
+  const refused = await call(
+    'POST',
+    `/toeic/assessments/${assessmentId}/attempts`,
+    free.token,
+    { idempotencyKey: randomUUID() },
+  );
+  check(
+    'a FREE learner cannot start the exam (PRO benefit)',
+    refused.status === 403,
+    `(${refused.status})`,
+  );
+  const s = await newProStudent('toeic-sw');
   const start = await call(
     'POST',
     `/toeic/assessments/${assessmentId}/attempts`,
@@ -223,9 +244,11 @@ async function main() {
     s.token,
     {},
   );
+  // Since BE 05d00ee (2026-11-02) a timed section closes on submit with tasks
+  // left unanswered; stored answers are graded afterwards by a retry job.
   check(
-    'Writing cannot complete without 8 graded tasks',
-    wdone.status === 400,
+    'Writing closes on submit with 7 of 8 tasks unanswered',
+    wdone.status < 300,
     `(${wdone.status} ${JSON.stringify(wdone.data).slice(0, 160)})`,
   );
   const final = await call(
@@ -234,8 +257,8 @@ async function main() {
     s.token,
   );
   check(
-    'the attempt stays IN_PROGRESS',
-    final.data?.status === 'IN_PROGRESS',
+    'with both sections closed the attempt is COMPLETED',
+    final.data?.status === 'COMPLETED',
     `(${final.data?.status})`,
   );
 

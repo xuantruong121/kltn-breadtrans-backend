@@ -159,14 +159,10 @@ export async function assertBackendUsesTargets(
   });
   try {
     await redis.connect();
-    const [, keys] = await redis.scan(
-      '0',
-      'MATCH',
-      `user:${learner.userId}:device:*`,
-      'COUNT',
-      1000,
-    );
-    if (keys.length === 0)
+    // Since BE 6c4bc48 (2026-11-14) a login adds its device to
+    // auth:sessions:{userId} (src/modules/auth/session-store.ts).
+    const devices = await redis.scard(`auth:sessions:${learner.userId}`);
+    if (devices === 0)
       throw new Error(
         'QA target refused: the backend did not write the login session to the verified Redis',
       );

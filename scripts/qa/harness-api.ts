@@ -52,6 +52,7 @@ export async function newStudent(label = 'api'): Promise<{
     email,
     password,
     fullName: `Harness ${label}`,
+    acceptTerms: true,
   });
   if (reg.status >= 300) throw new Error(`register ${reg.status}`);
   const login = await call('POST', '/auth/login', undefined, {

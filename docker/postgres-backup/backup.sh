@@ -5,14 +5,16 @@
 # versions always match the server. Writes custom-format archives to the
 # host-mounted /backups directory (outside the Postgres data volume).
 #
-# Scheduling is driven by the last VERIFIED automatic backup that exists in the
-# persistent backup directory, not by how long this container has been up. A
-# host reboot therefore no longer restarts the clock: if the newest automatic
-# backup is already older than the interval the next one runs immediately, and
-# if it is newer only the remaining time is waited.
+# Schedule (owner 2026-11-16): one backup a day at BACKUP_AT (default 00:00)
+# in Vietnam time (UTC+7, no DST). Each loop compares the last VERIFIED
+# automatic backup in the persistent backup directory with the most recent
+# daily slot: if the backup is older than that slot it runs now, otherwise the
+# loop sleeps until the next slot. So a machine switched on at 08:00 with no
+# backup since midnight gets one at once, and a container restart never adds
+# an extra one.
 #
 # This worker only runs while Docker/the host runs. It cannot create backups
-# while the machine is powered off; it catches the missed period up on the next
+# while the machine is powered off; it catches the missed day up on the next
 # start instead. See docs/database-safety.md.
 #
 # Safety rules implemented here:
@@ -26,8 +28,10 @@
 #   * a failed cycle never advances the schedule and never prunes.
 set -u
 
-BACKUP_DIR=/backups
-INTERVAL="${BACKUP_INTERVAL_SECONDS:-21600}"
+BACKUP_DIR="${BACKUP_DIR:-/backups}"
+# Daily slot, local wall time HH:MM, and the local offset from UTC in minutes.
+BACKUP_AT="${BACKUP_AT:-00:00}"
+UTC_OFFSET_MINUTES="${BACKUP_UTC_OFFSET_MINUTES:-420}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 DB="${PGDATABASE:-kltn_db}"
 
@@ -52,7 +56,21 @@ log() {
 }
 
 now_epoch() {
-  date -u '+%s'
+  # BACKUP_FAKE_NOW (epoch seconds) is for testing the schedule only.
+  if [ -n "${BACKUP_FAKE_NOW:-}" ]; then echo "$BACKUP_FAKE_NOW"; else date -u '+%s'; fi
+}
+
+# Epoch of the most recent daily slot at or before $1.
+current_slot_epoch() {
+  # Leading zeros stripped: "08" is not octal here.
+  at_h=$(echo "${BACKUP_AT%%:*}" | sed 's/^0*//')
+  at_m=$(echo "${BACKUP_AT##*:}" | sed 's/^0*//')
+  at_seconds=$(( (${at_h:-0} * 60 + ${at_m:-0}) * 60 ))
+  offset=$((UTC_OFFSET_MINUTES * 60))
+  local_day_start=$(( ($1 + offset) / 86400 * 86400 - offset ))
+  slot=$((local_day_start + at_seconds))
+  [ "$slot" -gt "$1" ] && slot=$((slot - 86400))
+  echo "$slot"
 }
 
 # Scheduling math is done in epoch seconds only; the human-readable stamp is
@@ -212,27 +230,29 @@ prune() {
 }
 
 mkdir -p "$BACKUP_DIR"
-log "starting; db=${DB} interval=${INTERVAL}s retention=${RETENTION_DAYS}d readyRetry=${READY_RETRY_SECONDS}s x${READY_MAX_ATTEMPTS} failureRetry=${FAILURE_RETRY_SECONDS}s"
+log "starting; db=${DB} schedule=daily ${BACKUP_AT} (UTC+$((UTC_OFFSET_MINUTES / 60))) retention=${RETENTION_DAYS}d readyRetry=${READY_RETRY_SECONDS}s x${READY_MAX_ATTEMPTS} failureRetry=${FAILURE_RETRY_SECONDS}s"
 
 while true; do
   last_success=$(last_automatic_success_epoch)
   now=$(now_epoch)
+  slot=$(current_slot_epoch "$now")
 
   if [ "$last_success" -eq 0 ]; then
     log "no previous automatic backup found; backing up as soon as postgres is ready"
   elif [ "$last_success" -gt $((now + CLOCK_SKEW_TOLERANCE)) ]; then
     # Never sleep an absurd duration because the clock moved backwards.
     log "WARNING: newest automatic backup is dated $((last_success - now))s in the future (clock moved backwards?); treating backup as due now"
+  elif [ "$last_success" -ge "$slot" ]; then
+    remaining=$((slot + 86400 - now))
+    log "backup for the slot at $(date -u -d "@${slot}" '+%Y-%m-%dT%H:%M:%SZ') already done; next in ${remaining}s"
+    # BACKUP_DECIDE_ONLY prints the decision and exits (schedule tests).
+    [ -n "${BACKUP_DECIDE_ONLY:-}" ] && exit 0
+    sleep "$remaining"
+    continue
   else
-    age=$((now - last_success))
-    if [ "$age" -lt "$INTERVAL" ]; then
-      remaining=$((INTERVAL - age))
-      log "last automatic backup was ${age}s ago; next due in ${remaining}s"
-      sleep "$remaining"
-      continue
-    fi
-    log "last automatic backup was ${age}s ago (interval ${INTERVAL}s); backup is overdue"
+    log "no backup since the slot at $(date -u -d "@${slot}" '+%Y-%m-%dT%H:%M:%SZ'); backup is due"
   fi
+  [ -n "${BACKUP_DECIDE_ONLY:-}" ] && exit 0
 
   if wait_for_postgres && run_backup; then
     prune

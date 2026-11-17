@@ -43,6 +43,7 @@ describe('AuthModule (e2e)', () => {
           email: 'test_e2e@breadtrans.com',
           password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
+          acceptTerms: true,
         })
         .expect(201)
         .expect((res) => {
@@ -59,6 +60,7 @@ describe('AuthModule (e2e)', () => {
           email: 'test_e2e@breadtrans.com', // same email now in DB
           password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
+          acceptTerms: true,
         })
         .expect(409);
     });
@@ -70,6 +72,7 @@ describe('AuthModule (e2e)', () => {
           email: ' Test_E2E@BreadTrans.COM ',
           password: 'mot cum tu e2e test',
           fullName: 'Test E2E User',
+          acceptTerms: true,
         })
         .expect(409);
     });

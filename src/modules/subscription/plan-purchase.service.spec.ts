@@ -937,6 +937,30 @@ describe('PlanPurchaseService', () => {
       });
     });
 
+    it('tells the learner the plan changed once it is confirmed (owner 2026-11-17)', async () => {
+      const tx = lateTx(
+        purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.REVIEW_REQUIRED),
+      );
+      const prisma = makePrisma();
+      prisma.$transaction.mockImplementation(((
+        callback: (value: typeof tx) => unknown,
+      ) => callback(tx)) as never);
+      const events = { emit: jest.fn() };
+      const service = new PlanPurchaseService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+        undefined,
+        undefined,
+        events as never,
+      );
+
+      await service.confirmPurchase(31, 99);
+
+      expect(events.emit).toHaveBeenCalledWith('subscription.changed', {
+        userId: 7,
+      });
+    });
+
     it('is never confirmed automatically on an expired purchase', async () => {
       const tx = lateTx(
         purchase(PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.EXPIRED),

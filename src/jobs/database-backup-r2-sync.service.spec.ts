@@ -13,6 +13,66 @@ describe('DatabaseBackupR2SyncService', () => {
     process.env = originalEnv;
   });
 
+  describe('hasUnsyncedLocalDumps (hourly local-only check)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require('path') as typeof import('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { tmpdir } = require('os') as typeof import('os');
+    let dir: string;
+
+    beforeEach(() => {
+      dir = fs.mkdtempSync(join(tmpdir(), 'r2-pending-'));
+      jest.spyOn(service, 'getBackupDirs').mockReturnValue([dir]);
+      jest
+        .spyOn(service, 'getCatalogPath')
+        .mockReturnValue(join(dir, 'backup-catalog.json'));
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    const catalog = (backups: object[]) =>
+      fs.writeFileSync(
+        join(dir, 'backup-catalog.json'),
+        JSON.stringify({ schemaVersion: 1, updatedAt: '', backups }),
+      );
+
+    it('is false with no dump, or only empty and partial files', () => {
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), '');
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170001.dump.partial'), 'x');
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+    });
+
+    it('is true for a dump the catalog has not seen uploaded at that size', () => {
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), 'abcd');
+      expect(service.hasUnsyncedLocalDumps()).toBe(true);
+      catalog([
+        {
+          dumpFile: 'kltn_db_20261116_170000.dump',
+          r2UploadVerified: true,
+          bytes: 3,
+        },
+      ]);
+      expect(service.hasUnsyncedLocalDumps()).toBe(true);
+    });
+
+    it('is false once every dump is recorded as uploaded', () => {
+      fs.writeFileSync(join(dir, 'kltn_db_20261116_170000.dump'), 'abcd');
+      catalog([
+        {
+          dumpFile: 'kltn_db_20261116_170000.dump',
+          r2UploadVerified: true,
+          bytes: 4,
+        },
+      ]);
+      expect(service.hasUnsyncedLocalDumps()).toBe(false);
+    });
+  });
+
   describe('getClient validation', () => {
     it('returns null if any R2_BACKUP credential is missing', () => {
       delete process.env.R2_BACKUP_BUCKET_NAME;
@@ -64,6 +124,19 @@ describe('DatabaseBackupR2SyncService', () => {
       expect(isProtected).toBe(false);
     });
 
+    it('classifies a labelled checkpoint as MANUAL, not AUTOMATIC (2026-11-17)', () => {
+      for (const name of [
+        'kltn_db_SpeakingExercise_PRE_REFERENCE_AUDIO_20261026_193103.dump',
+        'kltn_db_PRE_WRITING_CONTENT_20261029_141714.dump',
+      ]) {
+        const { backupClass, checkpoint, isProtected } =
+          service.classifyDump(name);
+        expect(backupClass).toBe('MANUAL');
+        expect(checkpoint).toBe('labelled');
+        expect(isProtected).toBe(false);
+      }
+    });
+
     it('classifies CANONICAL_BASELINE_PROTECTED dump as PROTECTED_BASELINE', () => {
       const { backupClass, checkpoint, isProtected } = service.classifyDump(
         'kltn_db_CANONICAL_BASELINE_PROTECTED_20261023_080526.dump',
@@ -104,6 +177,15 @@ describe('DatabaseBackupR2SyncService', () => {
       expect(key).toBe(
         'database-backups/automatic/2026/10/23/kltn_db_20261023_133044.dump',
       );
+    });
+
+    it('puts a labelled checkpoint under manual/, out of reach of the automatic prune', () => {
+      const date = new Date(Date.UTC(2026, 9, 26, 12, 0, 0));
+      const name = 'kltn_db_PRE_WRITING_CONTENT_20261029_141714.dump';
+      const { backupClass, checkpoint } = service.classifyDump(name);
+      const key = service.computeRemoteKey(name, backupClass, checkpoint, date);
+      expect(key).toBe(`database-backups/manual/2026/10/26/${name}`);
+      expect(key.startsWith('database-backups/automatic/')).toBe(false);
     });
 
     it('creates protected baseline path', () => {

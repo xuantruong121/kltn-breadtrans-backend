@@ -35,7 +35,6 @@ FIXTURE=$(mktemp -d)
 sed '/^while true; do$/,$d' "$SRC" >"${FIXTURE}/lib.sh"
 
 export PGDATABASE=kltn_db
-export BACKUP_INTERVAL_SECONDS=21600
 BACKUP_DIR="${FIXTURE}/backups"
 mkdir -p "$BACKUP_DIR"
 # shellcheck disable=SC1090
@@ -104,39 +103,40 @@ is "a zero-byte dump never counts as a success" \
   "$(last_automatic_success_epoch)" "$(stamp_to_epoch 20261025_011937)"
 
 echo
-echo "due / remaining decision (the reboot regression)"
+echo "daily slot (00:00 Vietnam time = 17:00 UTC the day before)"
+e() { stamp_to_epoch "$1"; }
+is "afternoon: the slot is this local day's midnight"   "$(current_slot_epoch "$(e 20261116_100000)")" "$(e 20261115_170000)"
+is "exactly at midnight: the slot is now"   "$(current_slot_epoch "$(e 20261115_170000)")" "$(e 20261115_170000)"
+is "one second before midnight: the slot is the previous midnight"   "$(current_slot_epoch "$(e 20261115_165959)")" "$(e 20261114_170000)"
+BACKUP_AT=08:05
+is "BACKUP_AT=08:05 at 07:00 local: yesterday's 08:05"   "$(current_slot_epoch "$(e 20261116_000000)")" "$(e 20261115_010500)"
+BACKUP_AT=00:00
+
+echo
+echo "due / wait decision (the reboot regression, daily)"
 # Mirrors the main loop's arithmetic exactly.
 decide() {
   last=$1
   now=$2
-  interval=$3
+  slot=$(current_slot_epoch "$now")
   if [ "$last" -eq 0 ]; then
     echo "DUE_NO_HISTORY"
   elif [ "$last" -gt $((now + CLOCK_SKEW_TOLERANCE)) ]; then
     echo "DUE_CLOCK_SKEW"
+  elif [ "$last" -ge "$slot" ]; then
+    echo "WAIT_$((slot + 86400 - now))"
   else
-    age=$((now - last))
-    if [ "$age" -lt "$interval" ]; then
-      echo "WAIT_$((interval - age))"
-    else
-      echo "DUE_OVERDUE"
-    fi
+    echo "DUE_SINCE_SLOT"
   fi
 }
-NOW=1800000000
-is "no history is immediately due" "$(decide 0 "$NOW" 21600)" "DUE_NO_HISTORY"
-is "age 4h with 6h interval waits only the remaining 2h" \
-  "$(decide $((NOW - 14400)) "$NOW" 21600)" "WAIT_7200"
-is "age exactly 6h is due now" \
-  "$(decide $((NOW - 21600)) "$NOW" 21600)" "DUE_OVERDUE"
-is "age 16h15m (the observed host-downtime gap) is due now, not a fresh 6h" \
-  "$(decide $((NOW - 58500)) "$NOW" 21600)" "DUE_OVERDUE"
-is "age 1s waits almost the whole interval" \
-  "$(decide $((NOW - 1)) "$NOW" 21600)" "WAIT_21599"
-is "a backup dated far in the future is due, never an absurd sleep" \
-  "$(decide $((NOW + 86400)) "$NOW" 21600)" "DUE_CLOCK_SKEW"
-is "a backup dated slightly ahead stays within skew tolerance" \
-  "$(decide $((NOW + 60)) "$NOW" 21600)" "WAIT_21660"
+NOW=$(e 20261116_100000) # 17:00 Vietnam time
+is "no history is immediately due" "$(decide 0 "$NOW")" "DUE_NO_HISTORY"
+is "backup made today (11:14 VN) waits for the next midnight"   "$(decide "$(e 20261116_041405)" "$NOW")" "WAIT_25200"
+is "last backup yesterday evening (17:14 VN) is due now"   "$(decide "$(e 20261115_101409)" "$NOW")" "DUE_SINCE_SLOT"
+is "machine switched on at 08:00 VN after a night off is due at once"   "$(decide "$(e 20261115_101409)" "$(e 20261116_010000)")" "DUE_SINCE_SLOT"
+is "a backup made at midnight waits a full day"   "$(decide "$(e 20261115_170000)" "$(e 20261115_170500)")" "WAIT_86100"
+is "a backup dated far in the future is due, never an absurd sleep"   "$(decide $((NOW + 86400)) "$NOW")" "DUE_CLOCK_SKEW"
+is "a backup dated slightly ahead stays within skew tolerance"   "$(decide $((NOW + 60)) "$NOW")" "WAIT_25200"
 
 echo
 echo "prune safety"

@@ -47,6 +47,26 @@ describe('JwtStrategy security checks', () => {
     expect(() => jwt.verify(forged, key)).toThrow();
   });
 
+  it.each([
+    ['waiting for deletion', { deletionRequestedAt: new Date() }],
+    ['an anonymous shell', { anonymizedAt: new Date() }],
+  ])('rejects an account %s (owner 2026-11-16)', async (_label, extra) => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'student@example.com',
+      role: 'STUDENT',
+      mustChangePassword: false,
+      ...extra,
+    });
+
+    await expect(
+      strategy.validate(
+        { headers: { authorization: 'Bearer access-token' } },
+        { sub: 1, type: 'access', deviceId: 'device-1' },
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
   it('rejects refresh tokens on REST guards', async () => {
     await expect(
       strategy.validate(

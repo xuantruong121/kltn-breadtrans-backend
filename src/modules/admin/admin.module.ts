@@ -7,9 +7,10 @@ import { AiReviewCostsService } from './ai-review-costs.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 import { AuthModule } from '../auth/auth.module';
+import { AccountModule } from '../account/account.module';
 
 @Module({
-  imports: [PrismaModule, UploadModule, AuthModule],
+  imports: [PrismaModule, UploadModule, AuthModule, AccountModule],
   controllers: [AdminController],
   providers: [
     AdminService,

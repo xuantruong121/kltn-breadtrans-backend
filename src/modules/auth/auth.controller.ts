@@ -25,6 +25,7 @@ import {
   GoogleExchangeDto,
   GoogleLoginDto,
   LinkGoogleAccountDto,
+  AcceptConsentDto,
 } from './dto/auth.dto';
 
 import {
@@ -75,6 +76,12 @@ const userAgentOf = (req: ExpressRequest) =>
     ? req.headers['user-agent']
     : null;
 
+/** User-Agent and client IP (TRUST_PROXY decides what req.ip is) for consent evidence. */
+const consentMetaOf = (req: ExpressRequest) => ({
+  userAgent: userAgentOf(req),
+  ip: req.ip ?? null,
+});
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -85,8 +92,38 @@ export class AuthController {
   @ApiOperation({ summary: 'Đăng ký tài khoản học viên mới' })
   @ApiResponse({ status: 201, description: 'Đăng ký thành công.' })
   @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  @ApiResponse({
+    status: 400,
+    description: 'Chưa đồng ý Điều khoản sử dụng và Chính sách bảo mật.',
+  })
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Request() req: ExpressRequest,
+  ) {
+    return this.authService.register(registerDto, consentMetaOf(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('consent')
+  @ApiOperation({
+    summary: 'Lịch sử đồng ý điều khoản và chính sách của tài khoản',
+  })
+  listConsents(@Request() req: any) {
+    return this.authService.listConsents(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('consent')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Đồng ý phiên bản hiện hành của Điều khoản sử dụng và Chính sách bảo mật',
+  })
+  @ApiResponse({ status: 200, description: 'Đã ghi nhận đồng ý.' })
+  acceptConsent(@Body() _dto: AcceptConsentDto, @Request() req: any) {
+    return this.authService.acceptConsent(req.user.id, consentMetaOf(req));
   }
 
   @Post('forgot-password')
@@ -114,6 +151,11 @@ export class AuthController {
     description: 'Trả về access token và refresh token.',
   })
   @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'ACCOUNT_PENDING_DELETION: tài khoản đang chờ xoá; kèm scheduledAt và cancelToken.',
+  })
   async login(
     @Body() loginDto: LoginDto,
     @Request() req: ExpressRequest,
@@ -149,9 +191,7 @@ export class AuthController {
   ) {
     return withCookie(
       res,
-      await this.authService.loginWithGoogle(dto, {
-        userAgent: userAgentOf(req),
-      }),
+      await this.authService.loginWithGoogle(dto, consentMetaOf(req)),
     );
   }
 
@@ -210,9 +250,11 @@ export class AuthController {
   ) {
     return withCookie(
       res,
-      await this.authService.exchangeGoogleLoginCode(body.code, {
-        userAgent: userAgentOf(req),
-      }),
+      await this.authService.exchangeGoogleLoginCode(
+        body.code,
+        consentMetaOf(req),
+        body.acceptTerms === true,
+      ),
     );
   }
 

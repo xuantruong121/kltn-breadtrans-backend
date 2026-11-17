@@ -403,6 +403,24 @@ export class SkillCmsController {
     return this.service.setTracks(domain, id, body.tracks, req.user);
   }
 
+  @Delete(':domain/:id')
+  @ApiOperation({
+    summary:
+      'Xoá cả một bộ luyện Nói hoặc bài Nghe/Đọc/Viết (chưa có học viên làm; bài Nghe/Đọc/Viết phải là bản nháp)',
+  })
+  @ApiResponse({ status: 200, description: 'Đã xoá.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Đã có học viên làm bài, thuộc đề thi, hoặc chưa về bản nháp.',
+  })
+  deleteContent(
+    @Param('domain') domain: string,
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    return this.service.deleteContent(domain, id, req.user);
+  }
+
   @Post(':domain/:id/publish') publish(
     @Param('domain') domain: string,
     @Param('id') id: string,

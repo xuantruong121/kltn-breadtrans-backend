@@ -3,7 +3,8 @@
  * Listening free except dictation B1+ (PLUS); Speaking and Writing A1-A2
  * free, B1-B2 PLUS, C1+ PRO; flashcards, vocabulary and grammar free; expired
  * paid plans fall back to FREE. Level locks apply on top of any plan (F7.3)
- * and courses stay hidden (F1). Mock graders only.
+ * and the removed course routes answer 404 (courses gone 2026-11-01). Mock
+ * graders only.
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-entitlements-api.ts <10s.wav>
  */
 import { randomUUID } from 'node:crypto';
@@ -187,7 +188,7 @@ void (async () => {
     (await quizStatus(lowLevel, 2)) === 200,
   );
 
-  console.log('\n== Free modules, hidden courses');
+  console.log('\n== Free modules, removed course routes');
   const topics = (await call('GET', '/vocab/topics', free.token)).data;
   const all = [
     ...(topics?.topics ?? []),
@@ -202,7 +203,7 @@ void (async () => {
     (await call('GET', '/grammar/topics/12', free.token)).status === 200,
   );
   check(
-    'Courses are hidden from every plan (COURSES_ENABLED off)',
+    'removed course route answers 404 for every plan',
     (await call('GET', '/courses/1/learning', pro.token)).status === 404,
   );
 

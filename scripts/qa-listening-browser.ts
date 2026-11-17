@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { chromium } from 'playwright';
 import { PrismaClient, Role, SubscriptionStatus } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const quizId = Number(process.argv[2]);
 const prisma = new PrismaClient();
@@ -128,7 +129,7 @@ async function main() {
     await browser?.close();
     if (userId) {
       await prisma.subscription.deleteMany({ where: { userId } });
-      await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+      await deleteQaUsers(prisma, { where: { id: userId } }).catch(() => undefined);
     }
     // Recover from an interrupted prior browser run without touching product users.
     const staleQaUsers = await prisma.user.findMany({
@@ -137,7 +138,7 @@ async function main() {
     });
     if (staleQaUsers.length) {
       await prisma.subscription.deleteMany({ where: { userId: { in: staleQaUsers.map((user) => user.id) } } });
-      await prisma.user.deleteMany({ where: { id: { in: staleQaUsers.map((user) => user.id) } } });
+      await deleteQaUsers(prisma, { where: { id: { in: staleQaUsers.map((user) => user.id) } } });
     }
     await prisma.$disconnect();
   }

@@ -1,0 +1,234 @@
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
+import { Prisma } from '@prisma/client';
+
+import { PrismaService } from '../../prisma/prisma.service';
+import { R2Service } from '../upload/r2.service';
+import { forgetAuthUser } from '../auth/auth-user-cache';
+import { AuthSessionStore } from '../auth/session-store';
+import {
+  KEPT_TABLES,
+  type KeptTable,
+  R2_RETRY_SET,
+  SCRUBBED_RECIPIENT,
+  hasKeptRecords,
+  shellEmail,
+  storageKeyOf,
+} from './account-deletion.logic';
+
+export type PurgeOutcome = 'DELETED' | 'ANONYMIZED';
+
+/**
+ * Deletes accounts whose grace period has ended (owner 2026-11-16), and the
+ * admin "Xoá" uses the same path. Personal and learning data goes for real;
+ * orders, payments and the ledger move to an anonymous shell first (soft-delete
+ * rule). Files in R2 are deleted after the database commit; a failed file is
+ * retried by the next run.
+ */
+@Injectable()
+export class AccountPurgeService {
+  private readonly logger = new Logger(AccountPurgeService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly r2: R2Service,
+    @InjectRedis() private readonly redis: Redis,
+  ) {}
+
+  /** Every account due at `now`, at most `limit` per run. */
+  async runDue(now = new Date(), limit = 50) {
+    const retried = await this.retryFiles();
+    const due = await this.prisma.user.findMany({
+      where: { deletionScheduledAt: { lte: now }, anonymizedAt: null },
+      select: { id: true },
+      orderBy: { deletionScheduledAt: 'asc' },
+      take: limit,
+    });
+    const result = {
+      deleted: 0,
+      anonymized: 0,
+      failed: 0,
+      filesRetried: retried,
+    };
+    for (const { id } of due) {
+      try {
+        const outcome = await this.purgeUser(id, now);
+        if (outcome === 'DELETED') result.deleted += 1;
+        else result.anonymized += 1;
+      } catch (error) {
+        result.failed += 1;
+        this.logger.error(`account_purge_failed user=${id}: ${String(error)}`);
+      }
+    }
+    if (due.length) this.logger.log(`account_purge ${JSON.stringify(result)}`);
+    return result;
+  }
+
+  /** Deletes one account now: hard delete, or anonymous shell when records must stay. */
+  async purgeUser(userId: number, now = new Date()): Promise<PurgeOutcome> {
+    const files = await this.filesOf(userId);
+
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<
+        Array<{ id: number; anonymizedAt: Date | null }>
+      >`
+        SELECT id, "anonymizedAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+      if (!locked.length)
+        throw new NotFoundException('Người dùng không tồn tại');
+      // A shell already holds only kept records: nothing personal left.
+      if (locked[0].anonymizedAt)
+        throw new BadRequestException('Tài khoản này đã được ẩn danh.');
+
+      // Exam links to the learner's submissions have a Restrict key: first.
+      await tx.toeicAssessmentSpeakingSubmission.deleteMany({
+        where: { speakingSubmission: { userId } },
+      });
+      await tx.toeicAssessmentWritingSubmission.deleteMany({
+        where: { submission: { userId } },
+      });
+      await tx.gameBattle.updateMany({
+        where: { winnerUserId: userId },
+        data: { winnerUserId: null },
+      });
+
+      const counts = await this.keptCounts(tx, userId);
+      let result: PurgeOutcome = 'DELETED';
+      if (hasKeptRecords(counts)) {
+        const shell = await tx.user.create({
+          data: {
+            email: shellEmail(userId, now),
+            password: null,
+            anonymizedAt: now,
+          },
+          select: { id: true },
+        });
+        const to = { userId: shell.id };
+        const where = { userId };
+        await tx.subscription.updateMany({ where, data: to });
+        await tx.planPurchase.updateMany({ where, data: to });
+        await tx.payOSPaymentIntent.updateMany({ where, data: to });
+        await tx.marketOrder.updateMany({ where, data: to });
+        await tx.marketPhysicalRedemption.updateMany({
+          where,
+          data: { ...to, ...SCRUBBED_RECIPIENT },
+        });
+        await tx.banhTransaction.updateMany({ where, data: to });
+        await tx.promoRedemption.updateMany({ where, data: to });
+        await tx.currencyTransaction.updateMany({ where, data: to });
+        result = 'ANONYMIZED';
+      }
+      // Everything else of the learner cascades with the account.
+      await tx.user.delete({ where: { id: userId } });
+      return result;
+    });
+
+    forgetAuthUser(userId);
+    await new AuthSessionStore(this.redis).revokeAll(userId).catch(() => 0);
+    await this.deleteFiles(files);
+    this.logger.log(
+      `account_purged user=${userId} outcome=${outcome} files=${files.length}`,
+    );
+    return outcome;
+  }
+
+  private async keptCounts(
+    tx: Prisma.TransactionClient,
+    userId: number,
+  ): Promise<Record<KeptTable, number>> {
+    const where = { userId };
+    const [a, b, c, d, e, f, g, h] = await Promise.all([
+      tx.subscription.count({ where }),
+      tx.planPurchase.count({ where }),
+      tx.payOSPaymentIntent.count({ where }),
+      tx.marketOrder.count({ where }),
+      tx.marketPhysicalRedemption.count({ where }),
+      tx.banhTransaction.count({ where }),
+      tx.promoRedemption.count({ where }),
+      tx.currencyTransaction.count({ where }),
+    ]);
+    const values = [a, b, c, d, e, f, g, h];
+    return Object.fromEntries(
+      KEPT_TABLES.map((t, i) => [t, values[i]]),
+    ) as Record<KeptTable, number>;
+  }
+
+  /** R2 keys of the learner's own files: recordings, uploads, avatar, attachments. */
+  async filesOf(userId: number): Promise<string[]> {
+    const base = this.r2.getPublicUrl();
+    const [speaking, intents, diagnostic, toeicSw, profile, attachments] =
+      await Promise.all([
+        this.prisma.speakingSubmission.findMany({
+          where: { userId },
+          select: { audioKey: true },
+        }),
+        this.prisma.speakingUploadIntent.findMany({
+          where: { userId },
+          select: { objectKey: true },
+        }),
+        this.prisma.diagnosticSpeakingResponse.findMany({
+          where: { userId },
+          select: { audioKey: true },
+        }),
+        this.prisma.toeicSpeakingWritingSubmission.findMany({
+          where: { userId },
+          select: { audioUrl: true },
+        }),
+        this.prisma.profile.findUnique({
+          where: { userId },
+          select: { avatar: true },
+        }),
+        this.prisma.suggestionAttachment.findMany({
+          where: { suggestion: { userId } },
+          select: { url: true },
+        }),
+      ]);
+    const refs = [
+      ...speaking.map((r) => r.audioKey),
+      ...intents.map((r) => r.objectKey),
+      ...diagnostic.map((r) => r.audioKey),
+      ...toeicSw.map((r) => r.audioUrl),
+      profile?.avatar,
+      ...attachments.map((r) => r.url),
+    ];
+    return [
+      ...new Set(
+        refs
+          .map((ref) => storageKeyOf(ref, base))
+          .filter((k): k is string => !!k),
+      ),
+    ];
+  }
+
+  private async deleteFiles(keys: string[]) {
+    for (const key of keys) {
+      try {
+        await this.r2.deleteFile(key);
+      } catch {
+        await this.redis.sadd(R2_RETRY_SET, key).catch(() => 0);
+      }
+    }
+  }
+
+  private async retryFiles(): Promise<number> {
+    const keys = await this.redis
+      .smembers(R2_RETRY_SET)
+      .catch(() => [] as string[]);
+    let done = 0;
+    for (const key of keys) {
+      try {
+        await this.r2.deleteFile(key);
+        await this.redis.srem(R2_RETRY_SET, key);
+        done += 1;
+      } catch {
+        // Still failing: kept for the next run.
+      }
+    }
+    return done;
+  }
+}

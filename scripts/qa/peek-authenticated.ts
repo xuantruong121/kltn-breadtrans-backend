@@ -2,7 +2,7 @@
  * Authenticated peek at a handful of routes, to tell a redirect apart from a
  * broken render. Read-only; creates and deletes its own QA learner.
  *
- * Usage: npx ts-node scripts/qa/peek-authenticated.ts /classes /my-courses
+ * Usage: npx ts-node scripts/qa/peek-authenticated.ts /hub /vocabulary/saved
  */
 import {
   FE,

@@ -10,7 +10,7 @@ import { BE, call, check, failureCount } from './harness-api';
 import { FE, hidePet, studentPage } from './harness-browser';
 import { harnessQuery } from './harness-db';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 const sign = (data: Record<string, unknown>) =>
   createHmac('sha256', 'mock-checksum-key')
     .update(
@@ -114,19 +114,6 @@ async function main() {
     path: `${SHOTS}/plans-pro-active-1366.png`,
     fullPage: true,
   });
-  const course = Number(
-    harnessQuery(
-      `select id from "Course" where status = 'PUBLISHED' order by id limit 1`,
-    )[0][0],
-  );
-  await page.goto(`${FE}/courses/${course}`, {
-    waitUntil: 'networkidle',
-    timeout: 120_000,
-  });
-  check(
-    'PRO course detail opens in the browser',
-    !(await page.locator('body').innerText()).includes('Nâng cấp lên PRO'),
-  );
   check(
     'no server or page error',
     !issues.some((x) => x.startsWith('api 5') || x.startsWith('pageerror')),

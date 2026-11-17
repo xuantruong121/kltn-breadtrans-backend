@@ -2,6 +2,7 @@ import './qa/qa-legacy-guard';
 import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, QuizPublicationStatus, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const api = process.env.LISTENING_QA_BACKEND_ORIGIN ?? 'http://127.0.0.1:3001';
 const prefix = 'qa-cms-workflow-listening-final-';
@@ -60,7 +61,7 @@ async function login(email: string) {
 
 async function cleanup() {
   await prisma.quiz.deleteMany({ where: { title: { startsWith: prefix } } });
-  await prisma.user.deleteMany({ where: { email: { startsWith: prefix } } });
+  await deleteQaUsers(prisma, { where: { email: { startsWith: prefix } } });
 }
 
 async function activeListeningSnapshot() {

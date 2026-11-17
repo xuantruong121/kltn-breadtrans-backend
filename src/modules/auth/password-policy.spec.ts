@@ -20,7 +20,11 @@ describe('new password policy (NIST: at least 15 characters)', () => {
 
   it('applies to register, reset, change and admin-set passwords', async () => {
     const cases: Array<[any, Record<string, unknown>, string]> = [
-      [RegisterDto, { email: 'a@b.vn', fullName: 'A' }, 'password'],
+      [
+        RegisterDto,
+        { email: 'a@b.vn', fullName: 'A', acceptTerms: true },
+        'password',
+      ],
       [ResetPasswordDto, { token: 't' }, 'newPassword'],
       [ChangePasswordDto, { currentPassword: 'x' }, 'newPassword'],
       [

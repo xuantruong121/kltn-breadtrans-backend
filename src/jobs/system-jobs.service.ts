@@ -10,6 +10,7 @@ import { GamificationService } from '../modules/gamification/gamification.servic
 import { NotificationsCronService } from '../modules/notifications/notifications.cron';
 import { R2CleanupService } from '../modules/upload/r2-cleanup.service';
 import { WritingService } from '../modules/writing/writing.service';
+import { AccountPurgeService } from '../modules/account/account-purge.service';
 import { DatabaseBackupR2SyncService } from './database-backup-r2-sync.service';
 import {
   JOB_NAMES,
@@ -31,6 +32,7 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     private readonly r2Cleanup: R2CleanupService,
     private readonly dbBackupSync: DatabaseBackupR2SyncService,
     private readonly writing: WritingService,
+    private readonly accountPurge: AccountPurgeService,
   ) {
     this.connection = new IORedis(
       process.env.REDIS_URL || 'redis://localhost:6379',
@@ -153,6 +155,24 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /** Enqueues an R2 sync only when a local dump is not uploaded yet. */
+  async enqueueDatabaseBackupR2SyncIfPending(
+    syncKey: string,
+  ): Promise<boolean> {
+    if (!this.dbBackupSync.hasUnsyncedLocalDumps()) return false;
+    await this.enqueueDatabaseBackupR2Sync(syncKey);
+    return true;
+  }
+
+  /** Accounts whose deletion grace period ended (owner 2026-11-16). */
+  async enqueueAccountPurge(runKey: string): Promise<void> {
+    await this.enqueue(
+      JOB_NAMES.ACCOUNT_PURGE,
+      { version: 1 },
+      { jobId: `account-purge-${runKey}` },
+    );
+  }
+
   async enqueueDatabaseBackupR2Sync(syncKey?: string): Promise<void> {
     const key = syncKey ?? new Date().toISOString().slice(0, 13);
     await this.enqueue(
@@ -223,6 +243,8 @@ export class SystemJobsService implements OnModuleInit, OnModuleDestroy {
         return this.dbBackupSync.syncPendingBackups();
       case JOB_NAMES.EXAM_WRITING_GRADING:
         return this.writing.retryUngradedExamWriting();
+      case JOB_NAMES.ACCOUNT_PURGE:
+        return this.accountPurge.runDue();
       default:
         throw new Error('Unknown system job');
     }

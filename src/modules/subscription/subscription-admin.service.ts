@@ -4,7 +4,9 @@ import {
   Logger,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   Prisma,
   Role,
@@ -53,7 +55,14 @@ export class SubscriptionAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
+
+  // The learner's open pages refetch the plan, shields and gated content (owner 2026-11-17).
+  private announce(item: AdminSubscriptionItemDto): AdminSubscriptionItemDto {
+    this.events?.emit('subscription.changed', { userId: item.userId });
+    return item;
+  }
 
   private readonly subscriptionInclude = {
     user: {
@@ -283,7 +292,7 @@ export class SubscriptionAdminService {
         grantedNotice(this.planName(created), created.endsAt),
       );
     }
-    return this.toItemDto(created);
+    return this.announce(this.toItemDto(created));
   }
 
   async extendSubscription(
@@ -396,7 +405,7 @@ export class SubscriptionAdminService {
         extendedNotice(this.planName(updated), updated.endsAt),
       );
     }
-    return this.toItemDto(updated);
+    return this.announce(this.toItemDto(updated));
   }
 
   async revokeSubscription(
@@ -500,7 +509,7 @@ export class SubscriptionAdminService {
         revokedNotice(this.planName(updated)),
       );
     }
-    return this.toItemDto(updated);
+    return this.announce(this.toItemDto(updated));
   }
 
   private planName(sub: {

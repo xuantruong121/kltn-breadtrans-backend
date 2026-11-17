@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { EmailService } from '../../common/email/email.service';
+import { AccountPurgeService } from '../account/account-purge.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
@@ -43,6 +44,7 @@ describe('AdminService user deletion guards', () => {
   const mockR2Service = {};
   const mockR2CleanupService = {};
   const mockEmailService = {};
+  const mockAccountPurge = { purgeUser: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -54,6 +56,7 @@ describe('AdminService user deletion guards', () => {
         { provide: R2Service, useValue: mockR2Service },
         { provide: R2CleanupService, useValue: mockR2CleanupService },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: AccountPurgeService, useValue: mockAccountPurge },
       ],
     }).compile();
 
@@ -84,54 +87,33 @@ describe('AdminService user deletion guards', () => {
     });
   });
 
-  describe('Phase 3C-1 financial-history delete guards', () => {
-    it('DEL-PAY-03: deletes a User without a plan purchase', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 7, role: 'STUDENT' }]);
-      mockPrisma.planPurchase.count.mockResolvedValue(0);
-      mockPrisma.user.delete.mockResolvedValue({ id: 7 });
+  describe('admin "Xoá" uses the account purge (owner 2026-11-16)', () => {
+    it('deletes through AccountPurgeService and reports the outcome', async () => {
+      mockAccountPurge.purgeUser.mockResolvedValue('DELETED');
 
-      await expect(service.deleteUser(7)).resolves.toEqual({ id: 7 });
-      expect(mockPrisma.planPurchase.count).toHaveBeenCalledWith({
-        where: { userId: 7 },
+      await expect(service.deleteUser(7)).resolves.toEqual({
+        id: 7,
+        outcome: 'DELETED',
       });
-    });
-
-    it('DEL-PAY-04: rejects User deletion when a plan purchase exists', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 7, role: 'STUDENT' }]);
-      mockPrisma.planPurchase.count.mockResolvedValue(1);
-
-      await expect(service.deleteUser(7)).rejects.toThrow(ConflictException);
+      expect(mockAccountPurge.purgeUser).toHaveBeenCalledWith(7);
       expect(mockPrisma.user.delete).not.toHaveBeenCalled();
     });
 
-    it('DEL-PAY-05: rejects User deletion when retained reviewed Payment exists for admin reviewer', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 99, role: 'ADMIN' }]);
-      mockPrisma.planPurchase.count.mockResolvedValue(1);
+    it('a user with payments becomes an anonymous shell, not a refusal', async () => {
+      mockAccountPurge.purgeUser.mockResolvedValue('ANONYMIZED');
 
-      await expect(service.deleteUser(99)).rejects.toThrow(ConflictException);
-      expect(mockPrisma.planPurchase.count).toHaveBeenCalledWith({
-        where: { userId: 99 },
+      await expect(service.deleteUser(99)).resolves.toEqual({
+        id: 99,
+        outcome: 'ANONYMIZED',
       });
-      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
     });
 
-    it('DEL-PAY-06: throws NotFoundException when user does not exist', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([]);
+    it('passes NotFound through for a missing user', async () => {
+      mockAccountPurge.purgeUser.mockRejectedValue(
+        new NotFoundException('Người dùng không tồn tại'),
+      );
 
       await expect(service.deleteUser(999)).rejects.toThrow(NotFoundException);
-      expect(mockPrisma.planPurchase.count).not.toHaveBeenCalled();
-      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
-    });
-
-    it('DEL-PAY-08: an unrelated Payment does not block scoped deletion', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 8, role: 'STUDENT' }]);
-      mockPrisma.planPurchase.count.mockResolvedValue(0);
-      mockPrisma.user.delete.mockResolvedValue({ id: 8 });
-
-      await service.deleteUser(8);
-      expect(mockPrisma.planPurchase.count).toHaveBeenCalledWith({
-        where: { userId: 8 },
-      });
     });
   });
 });

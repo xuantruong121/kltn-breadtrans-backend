@@ -8,18 +8,9 @@ import { chromium, type Page } from 'playwright';
 import { newAdmin, newProStudent } from './harness-api';
 import { FE } from './harness-browser';
 
-const SHOTS = 'artifacts/finalization/evidence';
-const LEARNER = [
-  '/dashboard',
-  '/grammar',
-  '/plans',
-  '/courses/1',
-  '/exams',
-  '/speaking',
-];
-const ADMIN = [
-  '/admin/grammar',
-];
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
+const LEARNER = ['/dashboard', '/grammar', '/plans', '/exams', '/speaking'];
+const ADMIN = ['/admin/grammar'];
 
 async function login(page: Page, email: string, password: string) {
   await page.goto(`${FE}/login`, {

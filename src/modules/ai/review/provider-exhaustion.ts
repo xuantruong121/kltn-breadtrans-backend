@@ -41,6 +41,27 @@ export function exhaustionUntil(
   return null;
 }
 
+/**
+ * A 429 asking to wait at most LONG_WAIT_SECONDS is a burst limit (Groq's
+ * per-minute tokens on the free plan), not a spent quota: one retry after the
+ * wait usually passes, where moving on could leave only a reviewer of the
+ * generator's own vendor (a degraded review). Null for anything else.
+ */
+export function shortRetryDelayMs(error: unknown): number | null {
+  const status = Number(
+    (error as any)?.status ?? (error as any)?.statusCode ?? NaN,
+  );
+  const retryAfter = Number((error as any)?.retryAfterSeconds);
+  if (
+    status !== 429 ||
+    !Number.isFinite(retryAfter) ||
+    retryAfter < 0 ||
+    retryAfter > LONG_WAIT_SECONDS
+  )
+    return null;
+  return Math.max(1, Math.ceil(retryAfter)) * 1000;
+}
+
 export const exhaustionKey = (provider: QuotaProvider) =>
   `ai:provider-exhausted:${provider}`;
 

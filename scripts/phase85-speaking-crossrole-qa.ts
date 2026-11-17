@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, Role } from '@prisma/client';
+import { deleteQaUsers } from './qa/delete-qa-users';
 
 const api = 'http://127.0.0.1:3001';
 const prefix = `qa-crossrole-speaking-${Date.now()}`;
@@ -48,7 +49,7 @@ async function cleanup() {
   await prisma.speakingPracticeSet.deleteMany({
     where: { title: { startsWith: prefix } },
   });
-  await prisma.user.deleteMany({ where: { email: { startsWith: prefix } } });
+  await deleteQaUsers(prisma, { where: { email: { startsWith: prefix } } });
 }
 
 async function main() {

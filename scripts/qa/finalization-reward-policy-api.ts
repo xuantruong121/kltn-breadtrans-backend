@@ -28,7 +28,7 @@ import {
   newStudent,
   unlockAllLevels,
 } from './harness-api';
-import { harnessExec, harnessQuery } from './harness-db';
+import { harnessQuery } from './harness-db';
 
 const wavPath = process.argv[2];
 const longWavPath = process.argv[3] ?? wavPath;
@@ -233,7 +233,7 @@ async function main() {
     await expectDelta(
       `TOEIC assessment ${assessment} (${assessment === 1 ? 'S&W' : '4 Skills'}) full lifecycle`,
       false,
-      async (l) => {
+      (l) => {
         const out = execFileSync(
           'npx',
           [
@@ -263,7 +263,11 @@ async function main() {
             .filter((x) => x.startsWith('FAIL'))
             .join(' | '),
         );
+        // The run above is synchronous; expectDelta still awaits a promise.
+        return Promise.resolve();
       },
+      // TOEIC Speaking & Writing and 4 Skills exams are a PRO benefit.
+      true,
     );
   await expectDelta('grammar topic', false, async (l) => {
     const topic = harnessQuery(

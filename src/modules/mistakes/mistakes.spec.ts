@@ -12,7 +12,7 @@ import {
   type MistakeDetail,
   type MistakeObservation,
 } from './mistake-extract.logic';
-import { MistakesService } from './mistakes.service';
+import { MistakesService, SPEAKING_SENTENCE_FROM } from './mistakes.service';
 
 const at = new Date('2026-11-11T02:00:00Z');
 
@@ -195,39 +195,110 @@ describe('mistake-extract.logic', () => {
     ).toEqual([]);
   });
 
-  it('reads weak and well-said words of a recording', () => {
-    const obs = speakingObservations({
-      id: 5,
-      exerciseId: 8,
-      exerciseTitle: 'Giờ mở cửa',
-      submittedAt: at,
-      aiFeedback: {
-        words: [
-          { word: 'The', accuracyScore: 85 },
-          { word: 'library', accuracyScore: 53 },
-          { word: 'Library,', accuracyScore: 40 },
-          { word: 'opens', accuracyScore: 70 },
-          { word: 'a', accuracyScore: 10 },
-        ],
-      },
-    });
-    expect(obs).toHaveLength(2);
-    expect(obs[0]).toMatchObject({
-      sourceType: 'SPEAKING_WORD',
-      itemKey: 'library',
-      outcome: 'WRONG',
-      detail: { kind: 'WORD', score: 40, ref: { exerciseId: 8 } },
-    });
-    expect(obs[1]).toMatchObject({ itemKey: 'the', outcome: 'CORRECT' });
-    expect(
+  describe('speaking: one row per sentence (owner 2026-11-16)', () => {
+    const recording = (
+      words: Array<Record<string, unknown>>,
+      extra: Record<string, unknown> = {},
+    ) =>
       speakingObservations({
         id: 5,
-        exerciseId: 8,
-        exerciseTitle: 'x',
+        exerciseId: 138,
+        exerciseTitle: 'Exercise 2: Student ID',
+        targetText: 'You must show your ID card at the front desk.',
+        setKey: 'speaking-d611',
+        setTitle: 'Borrowing Books from the University Library',
+        overallScore: 6.8,
         submittedAt: at,
-        aiFeedback: null,
-      }),
-    ).toEqual([]);
+        aiFeedback: { words },
+        ...extra,
+      });
+
+    it('a sentence with words read wrong and omitted is one WRONG row', () => {
+      const obs = recording([
+        { word: 'You', accuracyScore: 95, errorType: 'None' },
+        { word: 'show', accuracyScore: 51, errorType: 'Mispronunciation' },
+        { word: 'card', accuracyScore: 70, errorType: 'None' },
+        { word: 'front', accuracyScore: 0, errorType: 'Omission' },
+        { word: 'desk.', accuracyScore: 0, errorType: 'Omission' },
+      ]);
+      expect(obs).toHaveLength(1);
+      expect(obs[0]).toMatchObject({
+        sourceType: 'SPEAKING_SENTENCE',
+        itemKey: 'ex:138',
+        skill: 'SPEAKING',
+        outcome: 'WRONG',
+        detail: {
+          kind: 'SENTENCE',
+          title: 'Borrowing Books from the University Library',
+          question: 'You must show your ID card at the front desk.',
+          score: 6.8,
+          answerable: false,
+          ref: { exerciseId: 138, submissionId: 5, setKey: 'speaking-d611' },
+        },
+      });
+      expect(obs[0].detail?.words).toEqual([
+        { word: 'You', score: 95, status: 'OK' },
+        { word: 'show', score: 51, status: 'WEAK' },
+        { word: 'card', score: 70, status: 'OK' },
+        { word: 'front', score: 0, status: 'OMITTED' },
+        { word: 'desk.', score: 0, status: 'OMITTED' },
+      ]);
+    });
+
+    it('a clean recording is a right answer for the sentence', () => {
+      expect(
+        recording([
+          { word: 'You', accuracyScore: 95 },
+          { word: 'must', accuracyScore: 60 },
+        ]),
+      ).toEqual([
+        {
+          sourceType: 'SPEAKING_SENTENCE',
+          itemKey: 'ex:138',
+          skill: 'SPEAKING',
+          tag: null,
+          at,
+          outcome: 'CORRECT',
+        },
+      ]);
+    });
+
+    it('a one-letter word never makes the sentence wrong', () => {
+      const obs = recording([
+        { word: 'a', accuracyScore: 10, errorType: 'Mispronunciation' },
+        { word: 'I', accuracyScore: 0, errorType: 'Omission' },
+        { word: 'book', accuracyScore: 90 },
+      ]);
+      expect(obs[0].outcome).toBe('CORRECT');
+    });
+
+    it('a free answer (no word list) gives nothing', () => {
+      expect(recording([], {})).toEqual([]);
+      expect(recording([], { aiFeedback: null })).toEqual([]);
+      expect(recording([], { aiFeedback: { words: undefined } })).toEqual([]);
+    });
+
+    it('without a set, the exercise title names the row', () => {
+      const obs = recording([{ word: 'show', accuracyScore: 20 }], {
+        setKey: null,
+        setTitle: null,
+      });
+      expect(obs[0].detail).toMatchObject({
+        title: 'Exercise 2: Student ID',
+        ref: { exerciseId: 138, submissionId: 5 },
+      });
+      expect(obs[0].detail?.ref).not.toHaveProperty('setKey');
+    });
+
+    it('two clean recordings in a row close the sentence', () => {
+      const [wrong] = recording([{ word: 'show', accuracyScore: 20 }]);
+      const [clean] = recording([{ word: 'show', accuracyScore: 90 }]);
+      let state = applyObservation(null, wrong);
+      state = applyObservation(state, clean);
+      expect(state?.resolvedAt).toBeNull();
+      state = applyObservation(state, clean);
+      expect(state?.resolvedAt).toEqual(at);
+    });
   });
 
   const detail: MistakeDetail = {
@@ -357,8 +428,111 @@ describe('MistakesService', () => {
         skill: {
           in: ['LISTENING', 'SPEAKING', 'READING', 'WRITING', 'GRAMMAR'],
         },
+        // Nor is an old per-word Speaking row.
+        sourceType: { not: 'SPEAKING_WORD' },
       },
     });
+  });
+
+  it('hides the old per-word Speaking rows, also when the list is filtered to Speaking', async () => {
+    const none = { findMany: jest.fn().mockResolvedValue([]) };
+    const prisma = {
+      submission: none,
+      grammarAttempt: none,
+      speakingSubmission: none,
+      learnerMistakeIngest: none,
+      learnerMistake: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = new MistakesService(prisma as any);
+    await service.list(10, { skill: 'speaking' });
+    await service.review(10, 'speaking');
+    for (const call of [
+      prisma.learnerMistake.count.mock.calls[0][0],
+      prisma.learnerMistake.findMany.mock.calls[0][0],
+      prisma.learnerMistake.findMany.mock.calls[1][0],
+    ])
+      expect(call.where).toMatchObject({
+        userId: 10,
+        skill: 'SPEAKING',
+        sourceType: { not: 'SPEAKING_WORD' },
+      });
+  });
+
+  it('reads recordings from the microphone fix on, once each, as one row per sentence', async () => {
+    const tx = {
+      learnerMistakeIngest: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      learnerMistake: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn(),
+      },
+    };
+    const none = { findMany: jest.fn().mockResolvedValue([]) };
+    const speakingSubmission = {
+      findMany: jest.fn().mockResolvedValue([{ id: 308 }]),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 308,
+        exerciseId: 138,
+        submittedAt: new Date('2026-11-16T08:30:00Z'),
+        overallScore: 6.8,
+        aiFeedback: {
+          words: [
+            { word: 'You', accuracyScore: 90, errorType: 'None' },
+            { word: 'desk.', accuracyScore: 0, errorType: 'Omission' },
+          ],
+        },
+        exercise: {
+          title: 'Exercise 2: Student ID',
+          targetText: 'You desk.',
+          practiceSet: { id: 'speaking-d611', title: 'Borrowing Books' },
+        },
+      }),
+    };
+    const prisma = {
+      submission: none,
+      grammarAttempt: none,
+      speakingSubmission,
+      learnerMistakeIngest: none,
+      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    };
+    await new MistakesService(prisma as any).sync(10);
+    expect(speakingSubmission.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 10,
+        status: 'COMPLETED',
+        submittedAt: { gte: SPEAKING_SENTENCE_FROM },
+      },
+      select: { id: true },
+    });
+    expect(SPEAKING_SENTENCE_FROM.toISOString()).toBe(
+      '2026-11-16T08:15:53.000Z',
+    );
+    expect(tx.learnerMistakeIngest.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 10, kind: 'SPEAKING_SENTENCE', sourceId: 308 }],
+      skipDuplicates: true,
+    });
+    expect(tx.learnerMistake.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          sourceType: 'SPEAKING_SENTENCE',
+          itemKey: 'ex:138',
+          skill: 'SPEAKING',
+          detail: expect.objectContaining({
+            kind: 'SENTENCE',
+            title: 'Borrowing Books',
+            ref: {
+              exerciseId: 138,
+              submissionId: 308,
+              setKey: 'speaking-d611',
+            },
+          }),
+        }),
+      }),
+    );
   });
 
   it('a right answer counts toward closing, and the second one closes', async () => {

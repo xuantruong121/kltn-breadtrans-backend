@@ -13,7 +13,14 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-import { BE, call, check, failureCount, newStudent } from './harness-api';
+import {
+  BE,
+  call,
+  check,
+  failureCount,
+  newProStudent,
+  newStudent,
+} from './harness-api';
 import { harnessQuery } from './harness-db';
 
 const assessmentId = Number(process.argv[2] ?? 1);
@@ -77,7 +84,8 @@ async function main() {
         process.env.TOEIC_FULL_EMAIL,
         process.env.TOEIC_FULL_PASSWORD!,
       )
-    : await newStudent(`toeic-full-${assessmentId}`);
+    : // TOEIC Speaking & Writing and 4 Skills exams are a PRO benefit.
+      await newProStudent(`toeic-full-${assessmentId}`);
   const start = await call(
     'POST',
     `/toeic/assessments/${assessmentId}/attempts`,

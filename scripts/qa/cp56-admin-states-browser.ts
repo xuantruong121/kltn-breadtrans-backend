@@ -12,7 +12,7 @@ import { chromium, type Page } from 'playwright';
 import { call, check, failureCount, newAdmin } from './harness-api';
 import { attachUiTextSampler, FE } from './harness-browser';
 
-const SHOTS = 'artifacts/finalization/evidence';
+const SHOTS = process.env.SHOTS ?? 'artifacts/finalization/evidence';
 
 /** Waits for a toast matching the pattern; returns its text, or every visible toast. */
 async function toastText(page: Page, re: RegExp) {
@@ -143,9 +143,7 @@ void (async () => {
     );
   }
 
-  for (const route of [
-    '/admin/exams',
-  ]) {
+  for (const route of ['/admin/exams']) {
     await page.goto(FE + route, { waitUntil: 'networkidle', timeout: 120_000 });
     await page.waitForTimeout(2000);
     await page.screenshot({

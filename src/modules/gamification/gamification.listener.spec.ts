@@ -363,6 +363,27 @@ describe('GamificationListener', () => {
   });
 
   describe('handleSpeakingSubmittedEvent', () => {
+    it('tells the learner once the speaking rewards are applied (owner 2026-11-17)', async () => {
+      const events = { emit: jest.fn() };
+      const told = new GamificationListener(
+        prismaMock as unknown as PrismaService,
+        gamificationServiceMock as unknown as GamificationService,
+        events as never,
+        eligibilityMock as unknown as RewardEligibilityService,
+      );
+      gamificationServiceMock.assignedQuests.mockResolvedValueOnce([]);
+      await told.handleSpeakingSubmittedEvent({
+        userId: 15,
+        submissionId: 99,
+        exerciseId: 1,
+        overallScore: 85,
+        isSilentOrNoSpeech: false,
+      });
+      expect(events.emit).toHaveBeenCalledWith('learning.effects_applied', {
+        userId: 15,
+      });
+    });
+
     it('awards speaking Bánh Mì with submissionId and advances quest', async () => {
       gamificationServiceMock.assignedQuests.mockResolvedValueOnce([
         {

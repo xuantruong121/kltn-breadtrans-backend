@@ -23,6 +23,7 @@ import {
   readIsolatedTargets,
   type IsolatedTargets,
 } from './qa-target-guard';
+import { deleteQaUsers } from './delete-qa-users';
 
 /**
  * Targets are explicit and verified (scripts/qa/qa-target-guard.ts). This
@@ -110,7 +111,8 @@ export async function createQaLearner(
   if (tier !== 'FREE') {
     const planVersion = await prisma.planVersion.findFirstOrThrow({
       where: {
-        isCurrent: true, durationDays: 30,
+        isCurrent: true,
+        durationDays: 30,
         status: 'PUBLISHED',
         plan: { code: tier, status: 'ACTIVE' },
       },
@@ -149,8 +151,8 @@ export async function destroyQaLearner(userId: number) {
     .deleteMany({ where: { userId } })
     .catch(ignore);
   await prisma.toeicAttempt.deleteMany({ where: { userId } }).catch(ignore);
-  await prisma.subscription.deleteMany({ where: { userId } }).catch(ignore);
-  await prisma.user.delete({ where: { id: userId } }).catch(ignore);
+  // QA junk: payments, orders and the ledger go first (soft-delete rule).
+  await deleteQaUsers(prisma, { where: { id: userId } }).catch(ignore);
 }
 
 /** Orphan count for this phase's marker prefix; must be 0 after cleanup. */

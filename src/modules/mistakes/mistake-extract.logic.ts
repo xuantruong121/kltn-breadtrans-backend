@@ -26,22 +26,33 @@ export const MISTAKE_SOURCES = [
   'QUIZ_QUESTION',
   'GRAMMAR_QUESTION',
   'WRITING_CORRECTION',
+  /** Per-word rows written before 2026-11-16; kept in the table, never shown. */
   'SPEAKING_WORD',
+  'SPEAKING_SENTENCE',
   'TRANSLATION_SENTENCE',
 ] as const;
 export type MistakeSource = (typeof MISTAKE_SOURCES)[number];
 
 /** Right answers in a row that close a mistake. */
 export const RESOLVE_AFTER_CORRECT = 2;
-/** A word scored below this is weak; from SPEAKING_GOOD_FROM it counts as right. */
+/** A read-aloud word scored below this is read wrong. */
 export const SPEAKING_WEAK_BELOW = 60;
-export const SPEAKING_GOOD_FROM = 80;
+/** Longest sentence kept word by word in a notebook row. */
+const SENTENCE_MAX_WORDS = 60;
 const MAX_ITEMS_PER_ATTEMPT = 40;
 const PASSAGE_MAX = 1500;
 const TEXT_MAX = 600;
 
+/** One word of a read-aloud sentence as the recording scored it. */
+export type SentenceWord = {
+  word: string;
+  score: number;
+  status: 'OK' | 'WEAK' | 'OMITTED';
+};
+
 export type MistakeDetail = {
-  kind: 'CHOICE' | 'DICTATION' | 'CORRECTION' | 'WORD' | 'TRANSLATION';
+  kind:
+    'CHOICE' | 'DICTATION' | 'CORRECTION' | 'WORD' | 'SENTENCE' | 'TRANSLATION';
   /** Where it came from, in the learner's words: quiz title, exam, topic. */
   title: string;
   question?: string;
@@ -54,8 +65,10 @@ export type MistakeDetail = {
   explanation?: string;
   yourAnswer?: string;
   correctAnswer?: string;
-  /** Word accuracy, 0-100. */
+  /** Word accuracy, 0-100; for a SENTENCE, the recording's overall score (0-10). */
   score?: number;
+  /** SENTENCE: every word of the sentence, in reading order. */
+  words?: SentenceWord[];
   /** The item can be answered again inside the notebook (choice or typed translation). */
   answerable: boolean;
   /** Ids for links and for the tutor; the frontend builds the addresses. */
@@ -66,6 +79,8 @@ export type MistakeDetail = {
     attemptId?: number;
     topicId?: number;
     exerciseId?: number;
+    /** Speaking practice set, for grouping and the redo link. */
+    setKey?: string;
   };
 };
 
@@ -411,62 +426,82 @@ export function writingObservations(submission: {
 }
 
 /**
- * Words of a graded recording. Below SPEAKING_WEAK_BELOW the word is a
- * mistake; from SPEAKING_GOOD_FROM it counts as said well; in between it says
- * nothing. A word said several times counts once, with its lowest score.
+ * A graded read-aloud recording as one notebook row per sentence (owner
+ * 2026-11-16: a row per word made the list long and hid which sentence the
+ * words came from). The row keeps every word of the sentence with its state:
+ * read wrong (below SPEAKING_WEAK_BELOW) or omitted (Azure heard nothing).
+ * A recording with neither counts as a right answer, so two clean recordings
+ * in a row close the row. One-letter words ("a", "I") never count as wrong.
+ * A free answer has no word list and gives nothing.
  */
 export function speakingObservations(submission: {
   id: number;
   exerciseId: number;
   exerciseTitle: string;
+  targetText: string;
+  setKey?: string | null;
+  setTitle?: string | null;
+  overallScore?: number | null;
   submittedAt: Date;
   aiFeedback: unknown;
 }): MistakeObservation[] {
-  const words = (submission.aiFeedback as { words?: unknown } | null)?.words;
-  if (!Array.isArray(words)) return [];
-  const lowest = new Map<string, { word: string; score: number }>();
-  for (const item of words as Array<Record<string, unknown>>) {
-    const word = clean(item?.word, 60).replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+  const raw = (submission.aiFeedback as { words?: unknown } | null)?.words;
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const words: SentenceWord[] = [];
+  for (const item of (raw as Array<Record<string, unknown>>).slice(
+    0,
+    SENTENCE_MAX_WORDS,
+  )) {
+    const word = clean(item?.word, 60);
+    if (!word) continue;
     const score = Number(item?.accuracyScore);
-    // One-letter words ("a", "I") are too short to practise on their own.
-    if (word.length < 2 || !Number.isFinite(score)) continue;
-    const key = textKey(word);
-    const known = lowest.get(key);
-    if (!known || score < known.score) lowest.set(key, { word, score });
+    const letters = word.replace(/[^\p{L}]/gu, '');
+    const omitted = String(item?.errorType ?? '').toLowerCase() === 'omission';
+    const status: SentenceWord['status'] =
+      letters.length < 2
+        ? 'OK'
+        : omitted
+          ? 'OMITTED'
+          : Number.isFinite(score) && score < SPEAKING_WEAK_BELOW
+            ? 'WEAK'
+            : 'OK';
+    words.push({
+      word,
+      score: Number.isFinite(score) ? Math.round(score) : 0,
+      status,
+    });
   }
-  const out: MistakeObservation[] = [];
-  for (const [itemKey, { word, score }] of lowest) {
-    const base = {
-      sourceType: 'SPEAKING_WORD' as const,
-      itemKey,
-      skill: 'SPEAKING' as const,
-      tag: null,
-      at: submission.submittedAt,
-    };
-    if (score >= SPEAKING_GOOD_FROM) out.push({ ...base, outcome: 'CORRECT' });
-    else if (score < SPEAKING_WEAK_BELOW)
-      out.push({
-        ...base,
-        outcome: 'WRONG',
-        detail: {
-          kind: 'WORD',
-          title: submission.exerciseTitle,
-          correctAnswer: word,
-          score: Math.round(score),
-          answerable: false,
-          ref: {
-            exerciseId: submission.exerciseId,
-            submissionId: submission.id,
-          },
+  if (words.length === 0) return [];
+  const base = {
+    sourceType: 'SPEAKING_SENTENCE' as const,
+    itemKey: `ex:${submission.exerciseId}`,
+    skill: 'SPEAKING' as const,
+    tag: null,
+    at: submission.submittedAt,
+  };
+  if (words.every((w) => w.status === 'OK'))
+    return [{ ...base, outcome: 'CORRECT' }];
+  const overall = Number(submission.overallScore);
+  return [
+    {
+      ...base,
+      outcome: 'WRONG',
+      detail: {
+        kind: 'SENTENCE',
+        title: clean(submission.setTitle) || submission.exerciseTitle,
+        question:
+          clean(submission.targetText) || words.map((w) => w.word).join(' '),
+        words,
+        ...(Number.isFinite(overall) ? { score: overall } : {}),
+        answerable: false,
+        ref: {
+          exerciseId: submission.exerciseId,
+          submissionId: submission.id,
+          ...(submission.setKey ? { setKey: submission.setKey } : {}),
         },
-      });
-  }
-  // The weakest words first, and not a whole paragraph of them.
-  const wrong = out
-    .filter((o) => o.outcome === 'WRONG')
-    .sort((a, b) => (a.detail?.score ?? 0) - (b.detail?.score ?? 0))
-    .slice(0, 8);
-  return [...wrong, ...out.filter((o) => o.outcome === 'CORRECT')];
+      },
+    },
+  ];
 }
 
 export type MistakeState = {

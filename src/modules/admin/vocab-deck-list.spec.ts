@@ -51,6 +51,7 @@ describe('vocab deck list rules', () => {
       prisma as any,
       {} as any,
       {} as any,
+      {} as any,
       undefined,
     );
     expect(await service.getVocabTopics()).toBe(decks);
