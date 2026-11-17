@@ -266,3 +266,20 @@ describe('EventsGateway Socket.IO Room Authentication & Isolation', () => {
     client.disconnect();
   });
 });
+
+describe('EventsGateway learning effects relay', () => {
+  it('tells the room of that learner once rewards are applied', () => {
+    const emit = jest.fn();
+    const to = jest.fn(() => ({ emit }));
+    const gateway = new EventsGateway(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    (gateway as unknown as { server: unknown }).server = { to };
+    gateway.handleLearningEffectsApplied({ userId: 7 });
+    expect(to).toHaveBeenCalledWith('user_7');
+    expect(emit).toHaveBeenCalledWith('user:progress_updated', { userId: 7 });
+  });
+});

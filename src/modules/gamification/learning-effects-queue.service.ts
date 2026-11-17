@@ -3,9 +3,10 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { LearnerProgressService } from '../learning-path/learner-progress.service';
@@ -13,6 +14,8 @@ import { GamificationListener } from './gamification.listener';
 import { getTodayDateKey } from './gamification.service';
 
 export const LEARNING_EFFECTS_QUEUE = 'breadtrans-learning-effects';
+/** Raised when a submission's effects are applied; EventsGateway tells the learner. */
+export const LEARNING_EFFECTS_APPLIED = 'learning.effects_applied';
 /** Submissions whose rewards are worked on at once; the rest wait their turn. */
 export const LEARNING_EFFECTS_CONCURRENCY = 2;
 const ENQUEUE_TIMEOUT_MS = 2_000;
@@ -49,6 +52,7 @@ export class LearningEffectsQueueService
   constructor(
     private readonly listener: GamificationListener,
     private readonly moduleRef: ModuleRef,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   static mode(): 'queue' | 'inline' {
@@ -155,5 +159,7 @@ export class LearningEffectsQueueService
         `Skill progress failed for user ${payload.userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    // Open pages refetch the streak, XP and Bánh Mì now (no reload needed).
+    this.events?.emit(LEARNING_EFFECTS_APPLIED, { userId: payload.userId });
   }
 }

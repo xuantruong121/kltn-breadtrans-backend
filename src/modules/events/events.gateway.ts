@@ -207,6 +207,18 @@ export class EventsGateway
       .emit('chat:new_message', socketPayload);
   }
 
+  /**
+   * A submission's rewards (XP, streak, Bánh Mì, quests) are applied after the
+   * request, from a queue; the learner's open pages refetch their numbers on
+   * this, instead of waiting for a reload (owner 2026-11-17).
+   */
+  @OnEvent('learning.effects_applied')
+  handleLearningEffectsApplied(payload: { userId: number }) {
+    this.server
+      ?.to(`user_${payload.userId}`)
+      .emit('user:progress_updated', { userId: payload.userId });
+  }
+
   @OnEvent('support.mode_updated')
   handleSupportModeUpdated(payload: {
     conversationId: number;
