@@ -23,7 +23,12 @@ async function main() {
   if (!client || !bucket)
     throw new Error('R2 backup credentials are not configured in .env');
 
-  // Newest automatic dump: keys end in <db>_YYYYMMDD_HHMMSS.dump, so the name sorts by time.
+  // Newest automatic dump. An automatic dump is exactly <db>_YYYYMMDD_HHMMSS.dump
+  // (backup.sh); labelled dumps such as kltn_db_SpeakingExercise_PRE_..._<ts>.dump
+  // also sit under this prefix and, sorted by name, came last (letters sort after
+  // digits): the 2026-11-17 drill restored a one-table dump and failed.
+  // kltn_db is PGDATABASE of the backup container (docker-compose.yml).
+  const AUTOMATIC = /^kltn_db_\d{8}_\d{6}\.dump$/;
   const keys: string[] = [];
   let token: string | undefined;
   do {
@@ -35,7 +40,7 @@ async function main() {
       }),
     );
     for (const o of page.Contents ?? [])
-      if (o.Key?.endsWith('.dump')) keys.push(o.Key);
+      if (o.Key && AUTOMATIC.test(o.Key.split('/').pop()!)) keys.push(o.Key);
     token = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (token);
   if (keys.length === 0) throw new Error(`no automatic dump under ${PREFIX}`);
