@@ -124,6 +124,19 @@ describe('DatabaseBackupR2SyncService', () => {
       expect(isProtected).toBe(false);
     });
 
+    it('classifies a labelled checkpoint as MANUAL, not AUTOMATIC (2026-11-17)', () => {
+      for (const name of [
+        'kltn_db_SpeakingExercise_PRE_REFERENCE_AUDIO_20261026_193103.dump',
+        'kltn_db_PRE_WRITING_CONTENT_20261029_141714.dump',
+      ]) {
+        const { backupClass, checkpoint, isProtected } =
+          service.classifyDump(name);
+        expect(backupClass).toBe('MANUAL');
+        expect(checkpoint).toBe('labelled');
+        expect(isProtected).toBe(false);
+      }
+    });
+
     it('classifies CANONICAL_BASELINE_PROTECTED dump as PROTECTED_BASELINE', () => {
       const { backupClass, checkpoint, isProtected } = service.classifyDump(
         'kltn_db_CANONICAL_BASELINE_PROTECTED_20261023_080526.dump',
@@ -164,6 +177,15 @@ describe('DatabaseBackupR2SyncService', () => {
       expect(key).toBe(
         'database-backups/automatic/2026/10/23/kltn_db_20261023_133044.dump',
       );
+    });
+
+    it('puts a labelled checkpoint under manual/, out of reach of the automatic prune', () => {
+      const date = new Date(Date.UTC(2026, 9, 26, 12, 0, 0));
+      const name = 'kltn_db_PRE_WRITING_CONTENT_20261029_141714.dump';
+      const { backupClass, checkpoint } = service.classifyDump(name);
+      const key = service.computeRemoteKey(name, backupClass, checkpoint, date);
+      expect(key).toBe(`database-backups/manual/2026/10/26/${name}`);
+      expect(key.startsWith('database-backups/automatic/')).toBe(false);
     });
 
     it('creates protected baseline path', () => {
