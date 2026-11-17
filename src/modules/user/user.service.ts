@@ -28,6 +28,7 @@ import {
   UserSkillsSummaryResponse,
 } from './dto/user-skills-summary.dto';
 import { resolveSpeakingPracticeSet } from '../speaking/speaking-practice-set';
+import { studiedWeekdays, vietnamWeekStart } from './study-week.logic';
 
 const CROSS_SKILL_SAMPLE_SIZE = 3;
 
@@ -451,6 +452,7 @@ export class UserService {
   }
 
   async getUserStats(userId: number) {
+    const now = new Date();
     const [
       stats,
       leaderboard,
@@ -459,6 +461,7 @@ export class UserService {
       submissionsCount,
       toeicCount,
       diagnosticAttempt,
+      weekPoints,
     ] = await Promise.all([
       this.prisma.userStats.findUnique({ where: { userId } }),
       this.prisma.leaderboard.findUnique({ where: { userId } }),
@@ -474,11 +477,24 @@ export class UserService {
         where: { userId, status: { not: 'ABANDONED' } },
         orderBy: { submittedAt: 'desc' },
       }),
+      // XP this week: the same events that keep the streak (addPoints).
+      this.prisma.pointHistory.findMany({
+        where: {
+          userId,
+          points: { gt: 0 },
+          createdAt: { gte: vietnamWeekStart(now) },
+        },
+        select: { createdAt: true },
+      }),
     ]);
 
     return {
       streakCount: stats?.streakCount || 0,
       streakFreezes: stats?.streakFreezes || 0,
+      studiedDaysThisWeek: studiedWeekdays(
+        weekPoints.map((row) => row.createdAt),
+        now,
+      ),
       totalBanhRan: stats?.totalBanhRan || 0,
       quizAccuracy: stats?.quizAccuracy || 0,
       speakingAccuracy: stats?.speakingAccuracy || 0,
