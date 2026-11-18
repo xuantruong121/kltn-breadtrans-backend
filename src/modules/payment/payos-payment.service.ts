@@ -164,20 +164,45 @@ export class PayosPaymentService {
         paidAt: intent.paidAt ?? new Date(),
       });
     }
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        status,
-        providerStatus,
-        lastSyncedAt: new Date(),
-        paidAt:
-          status === PayOSPaymentIntentStatus.PAID
-            ? (intent.paidAt ?? new Date())
-            : intent.paidAt,
-      },
+    // A webhook may have written PAID since the read above (the provider
+    // call takes a while): a status other than PAID is written only while
+    // the intent is still not PAID (audit R14, 2026-11-18).
+    const updated =
+      status === PayOSPaymentIntentStatus.PAID
+        ? await this.prisma.payOSPaymentIntent.update({
+            where: { id: intent.id },
+            data: {
+              status,
+              providerStatus,
+              lastSyncedAt: new Date(),
+              paidAt: intent.paidAt ?? new Date(),
+            },
+            include: { planPayment: true },
+          })
+        : await this.writeUnlessPaid(intent.id, {
+            status,
+            providerStatus,
+            lastSyncedAt: new Date(),
+          });
+    return this.toDto(updated);
+  }
+
+  /**
+   * A status write that never overwrites PAID (audit R14): returns the row as
+   * it is stored afterwards, with whichever status won.
+   */
+  private async writeUnlessPaid(
+    id: number,
+    data: Prisma.PayOSPaymentIntentUpdateManyMutationInput,
+  ) {
+    await this.prisma.payOSPaymentIntent.updateMany({
+      where: { id, status: { not: PayOSPaymentIntentStatus.PAID } },
+      data,
+    });
+    return this.prisma.payOSPaymentIntent.findUniqueOrThrow({
+      where: { id },
       include: { planPayment: true },
     });
-    return this.toDto(updated);
   }
 
   /**
@@ -212,14 +237,15 @@ export class PayosPaymentService {
           );
           return 'OPEN';
         }
-        await this.prisma.payOSPaymentIntent.update({
-          where: { id: synced.intentId },
-          data: {
+        {
+          const after = await this.writeUnlessPaid(synced.intentId, {
             status: PayOSPaymentIntentStatus.CANCELLED,
             providerStatus: 'CANCELLED',
             lastSyncedAt: new Date(),
-          },
-        });
+          });
+          // Paid while it was being cancelled: the money wins.
+          if (after.status === PayOSPaymentIntentStatus.PAID) return 'PAID';
+        }
         return 'CLOSED';
       default:
         return 'CLOSED';
@@ -241,14 +267,12 @@ export class PayosPaymentService {
       throw new ConflictException('Không thể hủy khoản đã thanh toán.');
     }
     await this.provider.cancelPayment(Number(intent.orderCode), reason);
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        status: PayOSPaymentIntentStatus.CANCELLED,
-        providerStatus: 'CANCELLED',
-      },
-      include: { planPayment: true },
+    const updated = await this.writeUnlessPaid(intent.id, {
+      status: PayOSPaymentIntentStatus.CANCELLED,
+      providerStatus: 'CANCELLED',
     });
+    if (updated.status === PayOSPaymentIntentStatus.PAID)
+      throw new ConflictException('Không thể hủy khoản đã thanh toán.');
     return this.toDto(updated);
   }
 
@@ -372,20 +396,16 @@ export class PayosPaymentService {
           ? Math.floor(intent.expiresAt.getTime() / 1000)
           : undefined,
     });
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        paymentLinkId: result.paymentLinkId,
-        checkoutUrl: result.checkoutUrl,
-        qrCode: result.qrCode,
-        bankBin: result.bankBin,
-        bankAccountNumber: result.bankAccountNumber,
-        bankAccountName: result.bankAccountName,
-        providerStatus: result.status,
-        status: this.mapStatus(result.status),
-        expiresAt: result.expiresAt,
-      },
-      include: { planPayment: true },
+    const updated = await this.writeUnlessPaid(intent.id, {
+      paymentLinkId: result.paymentLinkId,
+      checkoutUrl: result.checkoutUrl,
+      qrCode: result.qrCode,
+      bankBin: result.bankBin,
+      bankAccountNumber: result.bankAccountNumber,
+      bankAccountName: result.bankAccountName,
+      providerStatus: result.status,
+      status: this.mapStatus(result.status),
+      expiresAt: result.expiresAt,
     });
     return this.toDto(updated);
   }
