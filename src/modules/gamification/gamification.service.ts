@@ -348,14 +348,14 @@ export class GamificationService {
   ) {
     if (points <= 0) return null;
     const client = options?.tx ?? this.prisma;
-    let myLeaderboard = await client.leaderboard.findUnique({
+    // One statement: two first awards at once both find the row instead of the
+    // second failing on the unique userId (audit C4, 2026-11-18). The value is
+    // the row before this award's increment, as the level-up check expects.
+    const myLeaderboard = await client.leaderboard.upsert({
       where: { userId },
+      update: {},
+      create: { userId, tier: 'Đồng' },
     });
-    if (!myLeaderboard) {
-      myLeaderboard = await client.leaderboard.create({
-        data: { userId, tier: 'Đồng' },
-      });
-    }
 
     // Record EXP history
     await client.pointHistory.create({

@@ -14,10 +14,9 @@ describe('learner events for the ranking feed', () => {
     const tx: any = {
       $executeRaw: jest.fn(),
       leaderboard: {
-        findUnique: jest
+        upsert: jest
           .fn()
           .mockResolvedValue({ userId: 1, totalPoints: totalBefore }),
-        create: jest.fn(),
         update: jest.fn(({ data }: any) =>
           Promise.resolve({
             userId: 1,
