@@ -2699,6 +2699,17 @@ model LearnerProgressEvent {
   @@index([userId, skill, level])
 }
 
+/// One row per quiz or writing submission whose rewards and skill progress
+/// have run (audit C1, 2026-11-18). The queue job and the inline fallback
+/// both claim the submission first, so its effects run once. No foreign key:
+/// submission ids are never reused, so a claim left by a deleted submission
+/// blocks nothing.
+model LearningEffectClaim {
+  submissionId Int      @id
+  userId       Int
+  createdAt    DateTime @default(now())
+}
+
 /// Audit trail: one row per level opened for a skill.
 model LevelUnlock {
   id        Int               @id @default(autoincrement())
