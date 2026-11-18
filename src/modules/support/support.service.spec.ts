@@ -37,10 +37,14 @@ describe('SupportService', () => {
   const mockPrisma = {
     supportConversation: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest
+        .fn()
+        .mockResolvedValue({ id: 100, mode: 'HUMAN' }),
       findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn(),
     },
     supportMessage: {
@@ -301,6 +305,18 @@ describe('SupportService', () => {
   });
 
   describe('createAiMessage', () => {
+    it('saves no tutor reply once an admin took the conversation over (audit A11)', async () => {
+      mockPrisma.supportConversation.findUnique.mockResolvedValue({
+        ...mockConversation,
+        mode: 'HUMAN',
+      });
+
+      await expect(
+        service.createAiMessage(100, 'Trả lời của trợ lý', 'ai-for-9'),
+      ).resolves.toBeNull();
+      expect(mockPrisma.supportMessage.create).not.toHaveBeenCalled();
+    });
+
     it('should persist AI message and emit support.message_created', async () => {
       mockPrisma.supportConversation.findUnique.mockResolvedValue(
         mockConversation,
@@ -407,7 +423,10 @@ describe('SupportService', () => {
       mockPrisma.supportConversation.findUnique.mockResolvedValue(
         mockConversation,
       );
-      mockPrisma.supportConversation.update.mockResolvedValue({
+      mockPrisma.supportConversation.updateMany.mockResolvedValue({
+        count: 1,
+      });
+      mockPrisma.supportConversation.findUniqueOrThrow.mockResolvedValue({
         ...mockConversation,
         mode: 'HUMAN',
       });
@@ -432,6 +451,33 @@ describe('SupportService', () => {
           conversationId: 100,
           mode: 'HUMAN',
         }),
+      );
+    });
+
+    it('a second switch to the same mode at once writes no second system line (audit A11)', async () => {
+      // Both requests read AI; the other one wrote HUMAN first.
+      mockPrisma.supportConversation.findUnique.mockResolvedValue(
+        mockConversation,
+      );
+      mockPrisma.supportConversation.updateMany.mockResolvedValue({
+        count: 0,
+      });
+      mockPrisma.supportConversation.findUniqueOrThrow.mockResolvedValue({
+        ...mockConversation,
+        mode: 'HUMAN',
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(mockAdmin);
+
+      const result = await service.updateConversationMode(100, 'HUMAN', {
+        id: 1,
+        role: 'ADMIN',
+      });
+
+      expect(result.mode).toBe('HUMAN');
+      expect(mockPrisma.supportMessage.create).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith(
+        'support.mode_updated',
+        expect.anything(),
       );
     });
 

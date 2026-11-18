@@ -391,6 +391,9 @@ export class SupportService {
     });
 
     if (!conversation) return null;
+    // An admin took over while the tutor was writing (audit A11,
+    // 2026-11-18): the tutor and the admin both answered.
+    if (conversation.mode !== 'AI') return null;
 
     if (clientMessageId) {
       const existing = await this.db.supportMessage.findFirst({
@@ -871,18 +874,23 @@ export class SupportService {
       );
     }
 
-    const updated = await this.db.supportConversation.update({
-      where: { id: conversationId },
+    // Written only when the mode really changes (audit A11, 2026-11-18): two
+    // switches at once both passed a check made on the read above, and each
+    // wrote a system line, an event and, for HUMAN, admin notices.
+    const { count } = await this.db.supportConversation.updateMany({
+      where: { id: conversationId, mode: { not: mode } },
       data: { mode },
     });
+    const updated = await this.db.supportConversation.findUniqueOrThrow({
+      where: { id: conversationId },
+    });
+    if (count === 0) return updated;
 
     const actor = await this.prisma.user.findUnique({
       where: { id: authUser.id },
       include: { profile: true },
     });
     const actorName = actor?.profile?.fullName || actor?.email || 'Hệ thống';
-
-    if (conversation.mode === mode) return updated;
 
     const byStudent = authUser.role === 'STUDENT';
     const sysContent =
