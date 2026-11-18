@@ -168,8 +168,11 @@ export class PlanCatalogAdminService {
       status: current.status,
       isCurrent: current.isCurrent,
     });
-    const updated = await this.prisma.planVersion.update({
-      where: { id },
+    // Written only while it is still a draft not in use (audit A10,
+    // 2026-11-18): a publish between the check above and this write took a
+    // price it never validated.
+    const { count } = await this.prisma.planVersion.updateMany({
+      where: { id, status: PlanVersionStatus.DRAFT, isCurrent: false },
       data: {
         displayName: dto.displayName,
         description: dto.description,
@@ -177,8 +180,15 @@ export class PlanCatalogAdminService {
         priceVnd: dto.priceVnd,
         currency: dto.currency,
       },
-      include: { plan: true, entitlements: true },
     });
+    if (count === 0)
+      throw new ConflictException(
+        'Phiên bản này vừa được áp dụng hoặc thay đổi. Tải lại trang rồi sửa lại.',
+      );
+    const updated = (await this.prisma.planVersion.findUnique({
+      where: { id },
+      include: { plan: true, entitlements: true },
+    }))!;
     this.audit(adminUserId, 'UPDATE_DRAFT', id, current.plan.code);
     return this.toVersionDto(updated, updated.plan.code);
   }
@@ -290,6 +300,20 @@ export class PlanCatalogAdminService {
 
   async publish(id: number, adminUserId: number): Promise<PlanVersionAdminDto> {
     const published = await this.prisma.$transaction(async (tx) => {
+      // The plan and then the version are locked before the version is read
+      // and validated (audit A10, 2026-11-18): a draft edit can no longer
+      // land between the validation and the switch.
+      const head = await tx.planVersion.findUnique({
+        where: { id },
+        select: { planId: true },
+      });
+      if (!head) {
+        throw new NotFoundException('Không tìm thấy phiên bản gói.');
+      }
+      await this.lockPlan(tx, head.planId);
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "PlanVersion" WHERE "id" = ${id} FOR UPDATE`,
+      );
       const current = await tx.planVersion.findUnique({
         where: { id },
         include: { plan: true, entitlements: true },
@@ -298,7 +322,6 @@ export class PlanCatalogAdminService {
         throw new NotFoundException('Không tìm thấy phiên bản gói.');
       }
       this.validateForPublish(current);
-      await this.lockPlan(tx, current.planId);
       // A plan sells one current version per term (30, 90, 180 days):
       // publishing replaces only the version of the same term.
       await tx.planVersion.updateMany({
