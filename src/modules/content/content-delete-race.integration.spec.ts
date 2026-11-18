@@ -153,7 +153,7 @@ describeWithIsolatedDatabase('content delete races a learner attempt', () => {
       expect(await stillPending(attempt)).toBe(true);
     });
     const locked = new GrammarService(
-      client as never,
+      client,
       { emit: jest.fn() } as never,
       {} as never,
     );
@@ -198,7 +198,7 @@ describeWithIsolatedDatabase('content delete races a learner attempt', () => {
       expect(await stillPending(submission)).toBe(true);
     });
 
-    await new SkillCmsService(client as never).deleteContent(
+    await new SkillCmsService(client).deleteContent(
       'reading',
       String(quizId),
       admin,
