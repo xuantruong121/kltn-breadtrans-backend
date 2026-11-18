@@ -23,6 +23,8 @@ import {
 } from './account-deletion.logic';
 
 export type PurgeOutcome = 'DELETED' | 'ANONYMIZED';
+/** The job found the account no longer due (cancelled meanwhile): kept. */
+export type PurgeResult = PurgeOutcome | 'SKIPPED';
 
 /**
  * Deletes accounts whose grace period has ended (owner 2026-11-16), and the
@@ -53,13 +55,17 @@ export class AccountPurgeService {
     const result = {
       deleted: 0,
       anonymized: 0,
+      skipped: 0,
       failed: 0,
       filesRetried: retried,
     };
     for (const { id } of due) {
       try {
-        const outcome = await this.purgeUser(id, now);
+        // The list may be stale by now: a learner who cancels while earlier
+        // accounts are purged must be kept (audit A1, 2026-11-18).
+        const outcome = await this.purgeUser(id, now, { onlyIfDue: true });
         if (outcome === 'DELETED') result.deleted += 1;
+        else if (outcome === 'SKIPPED') result.skipped += 1;
         else result.anonymized += 1;
       } catch (error) {
         result.failed += 1;
@@ -70,20 +76,49 @@ export class AccountPurgeService {
     return result;
   }
 
-  /** Deletes one account now: hard delete, or anonymous shell when records must stay. */
-  async purgeUser(userId: number, now = new Date()): Promise<PurgeOutcome> {
+  /**
+   * Deletes one account now: hard delete, or anonymous shell when records must
+   * stay. With `onlyIfDue` (the scheduled job) an account whose deletion was
+   * cancelled, or moved later, is left alone: the check runs under the row
+   * lock, so a cancel committed before it always wins.
+   */
+  async purgeUser(
+    userId: number,
+    now?: Date,
+    options?: { onlyIfDue?: false },
+  ): Promise<PurgeOutcome>;
+  async purgeUser(
+    userId: number,
+    now: Date,
+    options: { onlyIfDue: true },
+  ): Promise<PurgeResult>;
+  async purgeUser(
+    userId: number,
+    now = new Date(),
+    options: { onlyIfDue?: boolean } = {},
+  ): Promise<PurgeResult> {
     const files = await this.filesOf(userId);
 
     const outcome = await this.prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<
-        Array<{ id: number; anonymizedAt: Date | null }>
+        Array<{
+          id: number;
+          anonymizedAt: Date | null;
+          deletionScheduledAt: Date | null;
+        }>
       >`
-        SELECT id, "anonymizedAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+        SELECT id, "anonymizedAt", "deletionScheduledAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
       if (!locked.length)
         throw new NotFoundException('Người dùng không tồn tại');
       // A shell already holds only kept records: nothing personal left.
       if (locked[0].anonymizedAt)
         throw new BadRequestException('Tài khoản này đã được ẩn danh.');
+      const scheduled = locked[0].deletionScheduledAt;
+      if (
+        options.onlyIfDue &&
+        (!scheduled || scheduled.getTime() > now.getTime())
+      )
+        return 'SKIPPED' as const;
 
       // Exam links to the learner's submissions have a Restrict key: first.
       await tx.toeicAssessmentSpeakingSubmission.deleteMany({
@@ -127,6 +162,10 @@ export class AccountPurgeService {
       await tx.user.delete({ where: { id: userId } });
       return result;
     });
+    if (outcome === 'SKIPPED') {
+      this.logger.log(`account_purge_skipped user=${userId}: no longer due`);
+      return outcome;
+    }
 
     forgetAuthUser(userId);
     await new AuthSessionStore(this.redis).revokeAll(userId).catch(() => 0);

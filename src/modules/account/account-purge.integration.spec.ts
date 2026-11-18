@@ -142,6 +142,25 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     );
   });
 
+  it('the job keeps an account whose deletion was cancelled after it was listed (audit A1)', async () => {
+    // runDue listed the account, then the learner cancelled: the purge must
+    // see the cancel under the row lock, not trust the list.
+    const cancelled = await makeUser('cancelled', null);
+
+    await expect(
+      service.purgeUser(cancelled.id, new Date(), { onlyIfDue: true }),
+    ).resolves.toBe('SKIPPED');
+    expect(
+      await prisma.user.findUnique({ where: { id: cancelled.id } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.profile.count({ where: { userId: cancelled.id } }),
+    ).toBe(1);
+
+    // An admin's delete still removes the account at once.
+    await expect(service.purgeUser(cancelled.id)).resolves.toBe('DELETED');
+  });
+
   it('runDue purges only accounts past their date', async () => {
     const due = await makeUser('due', new Date(Date.now() - 60_000));
     const later = await makeUser(
