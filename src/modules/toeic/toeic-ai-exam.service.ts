@@ -461,7 +461,24 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * One start per admin at a time (audit A13, 2026-11-18): two requests (a
+   * retry with the same key, two tabs) both made a draft exam; the second
+   * job then failed on the unique key with a 500 and left its draft behind.
+   */
   async start(
+    dto: CreateToeicAiExamDto,
+    adminId: number,
+    idempotencyKey?: string,
+  ) {
+    return this.withRedisLock(
+      `toeic-ai-start:${adminId}`,
+      'Đề AI đang được tạo từ yêu cầu trước. Vui lòng chờ giây lát.',
+      () => this.startOnce(dto, adminId, idempotencyKey),
+    );
+  }
+
+  private async startOnce(
     dto: CreateToeicAiExamDto,
     adminId: number,
     idempotencyKey?: string,
@@ -1225,7 +1242,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * on this run's token. Held: 409. Redis silent for 3 s: 503, nothing run.
    */
   private async withJobLock<T>(jobId: string, work: () => Promise<T>) {
-    const key = `toeic-ai-apply:${jobId}`;
+    return this.withRedisLock(
+      `toeic-ai-apply:${jobId}`,
+      'Đề đang được áp dụng. Vui lòng chờ lần áp dụng trước hoàn tất.',
+      work,
+    );
+  }
+
+  private async withRedisLock<T>(
+    key: string,
+    busyMessage: string,
+    work: () => Promise<T>,
+  ) {
     const owner = randomUUID();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let locked: string | null;
@@ -1246,10 +1274,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     } finally {
       clearTimeout(timer);
     }
-    if (locked !== 'OK')
-      throw new ConflictException(
-        'Đề đang được áp dụng. Vui lòng chờ lần áp dụng trước hoàn tất.',
-      );
+    if (locked !== 'OK') throw new ConflictException(busyMessage);
     try {
       return await work();
     } finally {
@@ -1257,7 +1282,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         .eval(UNLOCK_SCRIPT, 1, key, owner)
         .catch((error: unknown) =>
           this.logger.warn(
-            `toeic_ai_apply_unlock_failed jobId=${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+            `toeic_ai_unlock_failed key=${key}: ${error instanceof Error ? error.message : String(error)}`,
           ),
         );
     }

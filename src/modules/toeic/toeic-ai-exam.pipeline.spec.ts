@@ -530,6 +530,35 @@ describe('ToeicAiExamService controlled template pipeline', () => {
     expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
   });
 
+  it('a second start by the same admin while the first runs gets 409, no second draft (audit A13)', async () => {
+    const harness = fixture(requestFor('TOEIC_LR', { 5: fullPlan[5] }));
+    const held = new Set<string>();
+    harness.service.connection = {
+      set: jest.fn((key: string) => {
+        if (held.has(key)) return Promise.resolve(null);
+        held.add(key);
+        return Promise.resolve('OK');
+      }),
+      eval: jest.fn((_s: string, _n: number, key: string) => {
+        held.delete(key);
+        return Promise.resolve(1);
+      }),
+    };
+    let finish!: () => void;
+    harness.service.startOnce = jest.fn(
+      () => new Promise((resolve) => (finish = () => resolve({ id: 'job' }))),
+    );
+
+    const first = harness.service.start({}, 1, 'key-1');
+    await new Promise((r) => setTimeout(r, 5));
+    await expect(harness.service.start({}, 1, 'key-1')).rejects.toThrow(
+      'đang được tạo',
+    );
+    finish();
+    await expect(first).resolves.toEqual({ id: 'job' });
+    expect(harness.service.startOnce).toHaveBeenCalledTimes(1);
+  });
+
   it('returns the durable existing job for the same generation idempotency key', async () => {
     const existing: any = {
       id: 'same-job',
@@ -548,6 +577,11 @@ describe('ToeicAiExamService controlled template pipeline', () => {
     };
     service.genericExam = { createDraft: jest.fn() };
     service.queue = { add: jest.fn() };
+    // The per-admin start lock (audit A13): free here.
+    service.connection = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
     const result = await service.start(
       { variantCode: 'TOEIC_LR', mode: 'PART', part: 5, difficulty: 'medium' },
       1,
