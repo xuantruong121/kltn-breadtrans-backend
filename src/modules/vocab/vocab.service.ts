@@ -276,7 +276,31 @@ export class VocabService {
     }
   }
 
+  /**
+   * A word's first progress row written twice at once (two tabs, a double
+   * tap): the loser's create hits the unique (user, word) and the request
+   * runs once more, now as an update. A word deleted meanwhile (its foreign
+   * key) is "not found" (audit C9, 2026-11-18).
+   */
+  private async progressWrite<T>(run: () => Promise<T>): Promise<T> {
+    const settle = (error: unknown): never => {
+      if ((error as { code?: string })?.code === 'P2003')
+        throw new NotFoundException('Không tìm thấy từ vựng.');
+      throw error;
+    };
+    try {
+      return await run();
+    } catch (error) {
+      if ((error as { code?: string })?.code !== 'P2002') return settle(error);
+      return run().catch(settle);
+    }
+  }
+
   async toggleStar(userId: number, wordId: number) {
+    return this.progressWrite(() => this.toggleStarOnce(userId, wordId));
+  }
+
+  private async toggleStarOnce(userId: number, wordId: number) {
     await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
@@ -297,6 +321,16 @@ export class VocabService {
   }
 
   async setMastered(userId: number, wordId: number, isMastered: boolean) {
+    return this.progressWrite(() =>
+      this.setMasteredOnce(userId, wordId, isMastered),
+    );
+  }
+
+  private async setMasteredOnce(
+    userId: number,
+    wordId: number,
+    isMastered: boolean,
+  ) {
     await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
@@ -357,6 +391,17 @@ export class VocabService {
    * "Tốt" or "Học lại" and needs two right answers before the word is known.
    */
   async submitReview(
+    userId: number,
+    wordId: number,
+    isCorrect: boolean,
+    grade?: SrsGrade,
+  ) {
+    return this.progressWrite(() =>
+      this.submitReviewOnce(userId, wordId, isCorrect, grade),
+    );
+  }
+
+  private async submitReviewOnce(
     userId: number,
     wordId: number,
     isCorrect: boolean,
