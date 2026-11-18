@@ -48,10 +48,24 @@ export type DeviceMeta = {
   /** Client IP, recorded with a consent. */
   ip?: string | null;
 };
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
 import { EmailService } from '../../common/email/email.service';
+
+/**
+ * Two sign-ups with one e-mail at once (a double submit, two tabs) both pass
+ * the check above; the second create hits the unique e-mail (audit A14,
+ * 2026-11-18): 409, as for an e-mail already taken.
+ */
+function emailTaken(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  )
+    throw new ConflictException('Email này đã được đăng ký.');
+  throw error;
+}
 
 @Injectable()
 export class AuthService {
@@ -82,17 +96,19 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 12);
     // The DTO requires acceptTerms === true; the acceptance is stored with the
     // account, in the same write (owner 2026-11-16).
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: { create: { fullName } },
-        consents: { create: consentRows('EMAIL_SIGNUP', meta) },
-      },
-      include: { profile: true },
-    });
+    const user = await this.prisma.user
+      .create({
+        data: {
+          email,
+          password: hashedPassword,
+          role: Role.STUDENT,
+          emailVerifiedAt: new Date(),
+          profile: { create: { fullName } },
+          consents: { create: consentRows('EMAIL_SIGNUP', meta) },
+        },
+        include: { profile: true },
+      })
+      .catch(emailTaken);
     const { password: createdPassword, ...safeUser } = user;
     void createdPassword;
     return safeUser;
@@ -624,25 +640,27 @@ export class AuthService {
     // No password: the learner never chose one. Password login stays closed
     // (it rejects a null password) until they set one via "Quên mật khẩu",
     // and the account page hides "Đổi mật khẩu" while it is null.
-    return this.prisma.user.create({
-      data: {
-        email: profile.email,
-        password: null,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: {
-          create: { fullName: profile.fullName, avatar: profile.avatar },
-        },
-        authAccounts: {
-          create: {
-            provider: 'GOOGLE',
-            providerAccountId: profile.providerId,
+    return this.prisma.user
+      .create({
+        data: {
+          email: profile.email,
+          password: null,
+          role: Role.STUDENT,
+          emailVerifiedAt: new Date(),
+          profile: {
+            create: { fullName: profile.fullName, avatar: profile.avatar },
           },
+          authAccounts: {
+            create: {
+              provider: 'GOOGLE',
+              providerAccountId: profile.providerId,
+            },
+          },
+          consents: { create: consentRows('GOOGLE_SIGNUP', meta) },
         },
-        consents: { create: consentRows('GOOGLE_SIGNUP', meta) },
-      },
-      include: { profile: true },
-    });
+        include: { profile: true },
+      })
+      .catch(emailTaken);
   }
 
   /**
