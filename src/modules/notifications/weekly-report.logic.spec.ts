@@ -179,7 +179,8 @@ describe('weeklyReportMessage', () => {
     );
     expect(message.body).toContain('Còn 45 ngày tới ngày thi bạn đặt.');
     expect(message.body).toContain(PRACTICE_SCORE_NOTE);
-    expect(message.url).toBe('/dashboard');
+    // Opens the dashboard at the "Tuần này của bạn" card (WeekPlanCard).
+    expect(message.url).toBe('/dashboard#week-plan');
   });
 
   it('nudges a learner who did nothing, without a score note', () => {

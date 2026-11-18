@@ -180,6 +180,7 @@ export function weeklyReportMessage(input: {
         ? 'Tuần mới, bắt đầu lại nhé'
         : `Tuần qua bạn luyện ${total} bài`,
     body: parts.join(' '),
-    url: '/dashboard',
+    // The dashboard "Tuần này của bạn" card (FE WeekPlanCard, id week-plan).
+    url: '/dashboard#week-plan',
   };
 }
