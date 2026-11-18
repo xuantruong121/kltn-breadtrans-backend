@@ -99,6 +99,26 @@ export class PlanPurchaseService {
 
     await this.subscriptionService.assertPurchasablePlanVersion(planVersionId);
 
+    // An open purchase of this plan with another code is about to be
+    // replaced: its live PayOS QR is closed first, as replacePayment does, so
+    // it cannot be paid after it expires here (audit R8, 2026-11-18).
+    if (this.payos?.isEnabled()) {
+      const others = await this.prisma.planPurchase.findMany({
+        where: {
+          userId: studentId,
+          planVersionId,
+          status: PlanPurchaseStatus.PENDING_PAYMENT,
+          payment: { is: { payosIntent: { isNot: null } } },
+        },
+        select: { id: true, promoCode: { select: { code: true } } },
+      });
+      for (const other of others) {
+        if ((other.promoCode?.code ?? null) === wantedCode) continue;
+        const settled = await this.closeOldPayosLink(studentId, other.id);
+        if (settled) return settled;
+      }
+    }
+
     const purchase = await this.prisma.$transaction(async (tx) => {
       await this.lockUser(tx, studentId);
       const existing = await tx.planPurchase.findUnique({
@@ -136,6 +156,20 @@ export class PlanPurchaseService {
       ) {
         return activePurchase;
       }
+      // Two Buy clicks with different keys: the first request's PayOS link is
+      // still being made, so its purchase is not active yet. It is resumed,
+      // not expired under the QR that request is about to return (audit R8).
+      const linkInProgress = this.payos?.isEnabled()
+        ? openPurchases.find(
+            (candidate) =>
+              (candidate.promoCode?.code ?? null) === wantedCode &&
+              candidate.payment?.status === PlanPaymentStatus.PENDING &&
+              !candidate.payment.payosIntent?.checkoutUrl &&
+              (candidate.payment.paymentIntentExpiresAt?.getTime() ?? 0) >
+                Date.now(),
+          )
+        : undefined;
+      if (linkInProgress) return linkInProgress;
       for (const stalePurchase of openPurchases) {
         if (stalePurchase.payment) {
           await this.expirePaymentIntent(

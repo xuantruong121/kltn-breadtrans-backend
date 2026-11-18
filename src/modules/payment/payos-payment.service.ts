@@ -9,6 +9,8 @@ import { ModuleRef } from '@nestjs/core';
 import {
   PayOSPaymentIntentStatus,
   PayOSPaymentIntentType,
+  PlanPaymentStatus,
+  PlanPurchaseStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -58,26 +60,62 @@ export class PayosPaymentService {
     });
     if (!payment)
       throw new NotFoundException('Không tìm thấy khoản thanh toán.');
+    // No QR for a purchase that stopped waiting for payment: paying it would
+    // only end in admin review (audit R8, 2026-11-18).
+    if (
+      payment.planPurchase.status !== PlanPurchaseStatus.PENDING_PAYMENT ||
+      (payment.status !== PlanPaymentStatus.PENDING &&
+        payment.status !== PlanPaymentStatus.REPORTED)
+    )
+      throw new ConflictException(
+        'Giao dịch này không còn chờ thanh toán. Vui lòng tạo giao dịch mới.',
+      );
     const existing = await this.prisma.payOSPaymentIntent.findUnique({
       where: { planPaymentId },
       include: { planPayment: true },
     });
     if (existing?.checkoutUrl && existing.qrCode) return this.toDto(existing);
-    const intent =
-      existing ??
-      (await this.createIntent({
-        userId,
-        type: PayOSPaymentIntentType.PLAN,
-        planPaymentId,
-        amountVnd: payment.amountVnd,
-        // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
-        // used to say Plus for every plan. PayOS caps descriptions at 25.
-        description: itemName.split(' — ')[0].slice(0, 25),
-        // The PayOS link closes with the purchase's payment window. Without
-        // it a saved QR stayed payable long after the app showed it expired.
-        expiresAt: payment.paymentIntentExpiresAt,
-      }));
-    return this.createProviderLink(intent, itemName);
+    const made = existing
+      ? { intent: existing, ready: false }
+      : await this.createIntentOnce(planPaymentId, {
+          userId,
+          type: PayOSPaymentIntentType.PLAN,
+          planPaymentId,
+          amountVnd: payment.amountVnd,
+          // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
+          // used to say Plus for every plan. PayOS caps descriptions at 25.
+          description: itemName.split(' — ')[0].slice(0, 25),
+          // The PayOS link closes with the purchase's payment window. Without
+          // it a saved QR stayed payable long after the app showed it expired.
+          expiresAt: payment.paymentIntentExpiresAt,
+        });
+    if (made.ready) return this.toDto(made.intent);
+    return this.createProviderLink(made.intent, itemName);
+  }
+
+  /**
+   * Two requests can make the link of one payment at once (two Buy clicks).
+   * The second insert hits the unique planPaymentId: it takes the intent the
+   * first made when its link is ready, else asks to try again (audit R8).
+   */
+  private async createIntentOnce(
+    planPaymentId: number,
+    data: Parameters<PayosPaymentService['createIntent']>[0],
+  ): Promise<{ intent: IntentWithTarget; ready: boolean }> {
+    try {
+      return { intent: await this.createIntent(data), ready: false };
+    } catch (error) {
+      if ((error as { code?: string })?.code !== 'P2002') throw error;
+      const made = await this.prisma.payOSPaymentIntent.findUnique({
+        where: { planPaymentId },
+        include: { planPayment: true },
+      });
+      if (made?.checkoutUrl && made.qrCode)
+        return { intent: made, ready: true };
+      throw new ConflictException(
+        'Mã thanh toán đang được tạo. Vui lòng thử lại sau giây lát.',
+      );
+    }
   }
 
   async getOwnedIntent(

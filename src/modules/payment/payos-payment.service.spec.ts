@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import {
   PayOSPaymentIntentStatus,
   PayOSPaymentIntentType,
@@ -117,8 +118,9 @@ describe('PayosPaymentService', () => {
         findFirst: jest.fn().mockResolvedValue({
           id: 21,
           amountVnd: 99000,
+          status: 'PENDING',
           paymentIntentExpiresAt: intent.expiresAt,
-          planPurchase: { userId: 7 },
+          planPurchase: { userId: 7, status: 'PENDING_PAYMENT' },
         }),
       },
       payOSPaymentIntent: {
@@ -175,6 +177,79 @@ describe('PayosPaymentService', () => {
     );
     expect(result.checkoutUrl).toBe('https://payos.test/checkout');
     jest.restoreAllMocks();
+  });
+
+  it('makes no PayOS link for a purchase that is no longer waiting for payment (audit R8)', async () => {
+    const prisma = {
+      planPayment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 21,
+          amountVnd: 99000,
+          status: 'EXPIRED',
+          paymentIntentExpiresAt: new Date(Date.now() + 60_000),
+          planPurchase: { userId: 7, status: 'EXPIRED' },
+        }),
+      },
+      payOSPaymentIntent: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      },
+    };
+    const provider = { isConfigured: () => true, createPayment: jest.fn() };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+
+    await expect(
+      service.createForPlanPayment(7, 21, 'Plus monthly'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.payOSPaymentIntent.create).not.toHaveBeenCalled();
+    expect(provider.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('two link requests for one payment: the second reuses the intent the first made (audit R8)', async () => {
+    const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    const ready = {
+      ...intent,
+      checkoutUrl: 'https://payos.test/checkout',
+      qrCode: 'qr',
+    };
+    const prisma = {
+      planPayment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 21,
+          amountVnd: 99000,
+          status: 'PENDING',
+          paymentIntentExpiresAt: intent.expiresAt,
+          planPurchase: { userId: 7, status: 'PENDING_PAYMENT' },
+        }),
+      },
+      payOSPaymentIntent: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(ready),
+        create: jest.fn().mockRejectedValue(
+          Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+          }),
+        ),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: BigInt(18) }]),
+    };
+    const provider = { isConfigured: () => true, createPayment: jest.fn() };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+
+    const result = await service.createForPlanPayment(7, 21, 'Plus monthly');
+
+    expect(result.checkoutUrl).toBe('https://payos.test/checkout');
+    expect(provider.createPayment).not.toHaveBeenCalled();
   });
 
   it('returns PayOS users to the existing account plan route', () => {
