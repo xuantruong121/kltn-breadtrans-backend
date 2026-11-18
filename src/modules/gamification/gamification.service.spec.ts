@@ -1118,6 +1118,9 @@ describe('GamificationService weekly cron hardening', () => {
             }),
           ),
         },
+        // The switch runs under the feed lock (audit R10).
+        $executeRaw: jest.fn(),
+        $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
       };
       const service = new GamificationService(
         prisma,

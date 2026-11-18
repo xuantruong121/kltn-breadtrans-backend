@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  NotFoundException,
   Optional,
   Logger,
 } from '@nestjs/common';
@@ -1647,46 +1648,67 @@ export class GamificationService {
       return this.withPetFeedStatus(pet, initialRoster.bready);
     }
 
-    const currentSpecies = this.normalizeSpeciesKey(pet.name);
-    const rawRoster = ((pet as any).roster as Record<string, any>) || {};
+    let settled = this.settlePet(pet, now, today);
 
-    // 1. Normalize active pet state from roster or root snapshot
-    const currentEntry =
-      rawRoster[currentSpecies] ||
-      (currentSpecies === 'mimi' ? rawRoster['meo'] : undefined);
-    let activePetData = normalizeSpeciesPetState(currentEntry, pet, now);
-
-    // 2. Normalize daily counters for today
-    const dailyNorm = normalizeDailyCounters(activePetData, today);
-    activePetData = dailyNorm.state;
-
-    // 3. Reconcile decay using stateUpdatedAt
-    const decayResult = reconcilePetDecay(activePetData, now);
-    activePetData = decayResult.state;
-
-    // 4. Persist if state changed or if legacy entry lacked stateUpdatedAt
-    if (
-      decayResult.changed ||
-      dailyNorm.reset ||
-      !rawRoster[currentSpecies]?.stateUpdatedAt
-    ) {
-      rawRoster[currentSpecies] = activePetData;
-      pet = await this.prisma.userPet.update({
-        where: { userId },
-        data: {
-          health: activePetData.health,
-          happiness: activePetData.happiness,
-          level: activePetData.level,
-          exp: activePetData.exp,
-          lastFedAt: activePetData.lastFedAt
-            ? new Date(activePetData.lastFedAt)
-            : null,
-          roster: rawRoster as any,
-        } as any,
+    // Persist if state changed or if legacy entry lacked stateUpdatedAt. The
+    // write takes the feed lock and settles the pet again from a fresh read
+    // (audit R10, 2026-11-18): a feed committed after the read above, Bánh
+    // Mì already spent, was overwritten by this page load before.
+    if (settled.needsWrite) {
+      const stale = pet;
+      pet = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
+        const fresh = await tx.userPet.findUnique({ where: { userId } });
+        if (!fresh) return stale;
+        settled = this.settlePet(fresh, now, today);
+        if (!settled.needsWrite) return fresh;
+        settled.roster[settled.species] = settled.state;
+        return tx.userPet.update({
+          where: { userId },
+          data: {
+            health: settled.state.health,
+            happiness: settled.state.happiness,
+            level: settled.state.level,
+            exp: settled.state.exp,
+            lastFedAt: settled.state.lastFedAt
+              ? new Date(settled.state.lastFedAt)
+              : null,
+            roster: settled.roster as any,
+          } as any,
+        });
       });
     }
 
-    return this.withPetFeedStatus(pet, activePetData);
+    return this.withPetFeedStatus(pet, settled.state);
+  }
+
+  /** The active pet with today's counters and decay applied, not saved. */
+  private settlePet(
+    pet: { name: string; roster?: unknown },
+    now: Date,
+    today: string,
+  ) {
+    const species = this.normalizeSpeciesKey(pet.name);
+    const roster = ((pet as any).roster as Record<string, any>) || {};
+
+    // 1. Normalize active pet state from roster or root snapshot
+    const currentEntry =
+      roster[species] || (species === 'mimi' ? roster['meo'] : undefined);
+    let state = normalizeSpeciesPetState(currentEntry, pet as any, now);
+
+    // 2. Normalize daily counters for today
+    const dailyNorm = normalizeDailyCounters(state, today);
+    state = dailyNorm.state;
+
+    // 3. Reconcile decay using stateUpdatedAt
+    const decayResult = reconcilePetDecay(state, now);
+    state = decayResult.state;
+
+    const needsWrite =
+      decayResult.changed ||
+      dailyNorm.reset ||
+      !roster[species]?.stateUpdatedAt;
+    return { species, roster, state, needsWrite };
   }
 
   /**
@@ -1891,9 +1913,30 @@ export class GamificationService {
   }
 
   async changePetType(userId: number, targetPetName: string) {
+    // Creates the pet on a first visit and saves due decay.
+    await this.getMyPet(userId);
+    // The switch reads and writes under the feed lock (audit R10,
+    // 2026-11-18): it rebuilt the roster from a copy read before a feed and
+    // wrote it back, erasing the feed.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
+      return this.switchPet(tx, userId, targetPetName);
+    });
+  }
+
+  private async switchPet(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    targetPetName: string,
+  ) {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
     const now = new Date();
-    const pet = await this.getMyPet(userId);
+    const row = await tx.userPet.findUnique({ where: { userId } });
+    if (!row) throw new NotFoundException('Không tìm thấy thú ảo.');
+    const pet = this.withPetFeedStatus(
+      row,
+      this.settlePet(row, now, today).state,
+    );
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
     const targetSpecies = this.normalizeSpeciesKey(targetPetName);
 
@@ -1948,7 +1991,7 @@ export class GamificationService {
     roster[targetSpecies] = targetData;
 
     // 3. Switch active pet to target pet stats (without arbitrary +15 happiness bump)
-    const updatedPet = await this.prisma.userPet.update({
+    const updatedPet = await tx.userPet.update({
       where: { userId },
       data: {
         name: targetPetName,
