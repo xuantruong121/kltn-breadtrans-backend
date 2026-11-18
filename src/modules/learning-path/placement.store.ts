@@ -111,10 +111,16 @@ export async function applyDiagnosticPlacement(
           ability: ABILITY_SEED[level],
           source: 'DIAGNOSTIC',
         },
+        // Only raises (owner 2026-11-18): Speaking and Writing are graded
+        // later, minutes or days after the attempt, and a learner who
+        // practised up meanwhile kept the higher level, as with a gate test.
         update: {
-          level,
+          level: maxLevel(existing?.level ?? level, level),
           unlockedLevel: maxLevel(existing?.unlockedLevel ?? level, level),
-          ability: ABILITY_SEED[level],
+          ability: Math.max(
+            existing?.ability ?? ABILITY_SEED[level],
+            ABILITY_SEED[level],
+          ),
           source: 'DIAGNOSTIC',
         },
       });
