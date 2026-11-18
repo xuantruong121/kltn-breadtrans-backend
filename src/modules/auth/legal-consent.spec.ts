@@ -65,6 +65,56 @@ describe('legal consent (owner 2026-11-16)', () => {
     ).toHaveLength(1);
   });
 
+  describe('accepting after sign-up (audit A15)', () => {
+    function setup(seenInsideLock: { document: string; version: string }[]) {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        userConsent: {
+          findMany: jest.fn().mockResolvedValue(seenInsideLock),
+          createMany: jest.fn().mockResolvedValue({ count: 2 }),
+        },
+      };
+      const prisma: any = {
+        userConsent: {
+          findMany: jest.fn().mockResolvedValue([]),
+          createMany: jest.fn().mockResolvedValue({ count: 2 }),
+        },
+        $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+      };
+      const service = new AuthService(prisma, {} as any, {} as any, {} as any);
+      return { service, prisma, tx };
+    }
+
+    it('two accepts at once record the documents once', async () => {
+      // The other request wrote both rows while this one waited on the lock.
+      const { service, prisma, tx } = setup([
+        { document: 'TERMS', version: LEGAL_VERSION },
+        { document: 'PRIVACY', version: LEGAL_VERSION },
+      ]);
+
+      await expect(service.acceptConsent(7)).resolves.toEqual({
+        consentRequired: false,
+        version: LEGAL_VERSION,
+      });
+      expect(tx.$executeRaw).toHaveBeenCalled();
+      expect(prisma.userConsent.createMany).not.toHaveBeenCalled();
+      expect(tx.userConsent.createMany).not.toHaveBeenCalled();
+    });
+
+    it('the first accept records both documents for the user', async () => {
+      const { service, tx } = setup([]);
+
+      await service.acceptConsent(7, { ip: '203.0.113.9' });
+
+      const rows = tx.userConsent.createMany.mock.calls[0][0].data;
+      expect(rows.map((r: { document: string }) => r.document)).toEqual([
+        'TERMS',
+        'PRIVACY',
+      ]);
+      expect(rows[0]).toMatchObject({ userId: 7, method: 'PROMPT' });
+    });
+  });
+
   describe('Google redirect sign-in (code, then exchange)', () => {
     const profile = {
       providerId: 'g-9',

@@ -824,8 +824,19 @@ export class AuthService {
   /** Records consent given after sign-up (older account or new documents). */
   async acceptConsent(userId: number, meta: DeviceMeta = {}) {
     if (await this.consentRequiredFor(userId))
-      await this.prisma.userConsent.createMany({
-        data: consentRows('PROMPT', meta).map((row) => ({ ...row, userId })),
+      // Checked again under a per-user lock (audit A15, 2026-11-18): two
+      // accepts at once (double click, two tabs) both read "required" and
+      // each wrote both documents.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`consent:${userId}`}, 0))`;
+        const consents = await tx.userConsent.findMany({
+          where: { userId, version: LEGAL_VERSION },
+          select: { document: true, version: true },
+        });
+        if (!consentRequired(consents)) return;
+        await tx.userConsent.createMany({
+          data: consentRows('PROMPT', meta).map((row) => ({ ...row, userId })),
+        });
       });
     return { consentRequired: false, version: LEGAL_VERSION };
   }
