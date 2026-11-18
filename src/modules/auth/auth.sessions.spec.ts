@@ -46,6 +46,29 @@ function memoryRedis() {
     expire: jest.fn(async () => 1),
     ttl: jest.fn(async () => -2),
     incr: jest.fn(async () => 1),
+    // The rotation script only (session-store ROTATE_SCRIPT), run in one step.
+    eval: jest.fn(
+      async (
+        _script: string,
+        _n: number,
+        sessionKey: string,
+        deviceSet: string,
+        presentedHash: string,
+        nextJson: string,
+        _ttl: string,
+        deviceId: string,
+      ) => {
+        const cur = store.get(sessionKey);
+        if (!cur) return [0];
+        if ((JSON.parse(cur) as { hash: string }).hash !== presentedHash)
+          return [2, cur];
+        store.set(sessionKey, nextJson);
+        const s = sets.get(deviceSet) ?? new Set<string>();
+        s.add(deviceId);
+        sets.set(deviceSet, s);
+        return [1];
+      },
+    ),
   };
 }
 
@@ -168,6 +191,26 @@ describe('refresh tokens, cookies and revocation', () => {
     expect(short.r.cookie.mock.calls[0][2]).not.toHaveProperty('maxAge');
     // Signed with the refresh secret: the access secret cannot verify it.
     expect(() => jwt.verify(token)).toThrow();
+  });
+
+  it('a password reset landing during a sign-in refuses that sign-in (audit A2)', async () => {
+    const prisma = (service as any).prisma;
+    // The reset saves the new hash after this sign-in read the old one, and
+    // revokes every session before this sign-in has made its own.
+    prisma.user.update.mockImplementationOnce(async () => {
+      await service.sessions.markPasswordChanged(user.id);
+      await service.sessions.revokeAll(user.id);
+      return user;
+    });
+    await expect(login()).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(await service.sessions.list(user.id)).toEqual([]);
+  });
+
+  it('a sign-in that starts after a password change goes through', async () => {
+    await service.sessions.markPasswordChanged(user.id, Date.now() - 1000);
+    const { body } = await login();
+    expect(body).toHaveProperty('access_token');
+    expect(await service.sessions.list(user.id)).toHaveLength(1);
   });
 
   it('refresh needs the CSRF header and an allowed origin', async () => {

@@ -170,6 +170,8 @@ export class AuthService {
     forgetAuthUser(userId);
     await this.redis.del(userTokenKey);
 
+    // After the new hash is saved: a sign-in that read the old one sees it.
+    await this.sessions.markPasswordChanged(userId);
     // Every device, and every access token it still holds.
     await this.sessions.revokeAll(userId);
 
@@ -178,6 +180,7 @@ export class AuthService {
   async login(loginDto: LoginDto, deviceId: string, meta: DeviceMeta = {}) {
     const { email, password } = loginDto;
     await this.loginGuard.assertAllowed(email);
+    const startedAt = Date.now();
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
@@ -200,10 +203,12 @@ export class AuthService {
       },
     });
 
-    return this.issueTokens(user, deviceId, {
-      userAgent: meta.userAgent,
-      remember: loginDto.rememberMe ?? false,
-    });
+    return this.issueTokensUnlessPasswordChanged(
+      user,
+      deviceId,
+      { userAgent: meta.userAgent, remember: loginDto.rememberMe ?? false },
+      startedAt,
+    );
   }
 
   /**
@@ -370,6 +375,7 @@ export class AuthService {
       data: { password, mustChangePassword: false },
     });
     forgetAuthUser(userId);
+    await this.sessions.markPasswordChanged(userId);
     // Someone holding another session must not keep it (owner 2026-11-14).
     const signedOut = await this.sessions.revokeAll(userId, currentDeviceId);
     return { message: 'Đổi mật khẩu thành công.', signedOutDevices: signedOut };
@@ -463,6 +469,7 @@ export class AuthService {
       );
     }
 
+    const startedAt = Date.now();
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
@@ -519,7 +526,12 @@ export class AuthService {
       data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
     });
 
-    return this.issueTokens(user, deviceId, { ...meta, remember: true });
+    return this.issueTokensUnlessPasswordChanged(
+      user,
+      deviceId,
+      { ...meta, remember: true },
+      startedAt,
+    );
   }
 
   /**
@@ -704,6 +716,28 @@ export class AuthService {
   }
 
   /** A new device session: access token, refresh token (for the cookie) and the user. */
+  /**
+   * A sign-in that checked the password it read from `startedAt` on. If the
+   * password changed since, the new session is ended and the sign-in refused
+   * (audit A2, 2026-11-18). The check runs after the session exists: either
+   * it sees the change, or the change's revokeAll sees the session.
+   */
+  private async issueTokensUnlessPasswordChanged(
+    user: { id: number; email: string; role: Role; profile?: unknown },
+    deviceId: string,
+    meta: DeviceMeta,
+    startedAt: number,
+  ) {
+    const issued = await this.issueTokens(user, deviceId, meta);
+    if (await this.sessions.passwordChangedSince(user.id, startedAt)) {
+      await this.sessions.revoke(user.id, deviceId);
+      throw new UnauthorizedException(
+        'Mật khẩu vừa được đổi. Vui lòng đăng nhập lại bằng mật khẩu mới.',
+      );
+    }
+    return issued;
+  }
+
   private async issueTokens(
     user: { id: number; email: string; role: Role; profile?: unknown },
     deviceId: string,

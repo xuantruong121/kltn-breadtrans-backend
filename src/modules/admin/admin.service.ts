@@ -809,7 +809,11 @@ export class AdminService {
       });
       forgetAuthUser(userId);
       // A new password or role ends every session of the account.
-      if (this.redis) await new AuthSessionStore(this.redis).revokeAll(userId);
+      if (this.redis) {
+        const sessions = new AuthSessionStore(this.redis);
+        if (dto.password) await sessions.markPasswordChanged(userId);
+        await sessions.revokeAll(userId);
+      }
     }
 
     if (dto.fullName !== undefined || dto.phone !== undefined) {

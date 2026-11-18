@@ -42,6 +42,29 @@ const setKey = (userId: number) => `auth:sessions:${userId}`;
 /** Read by JwtStrategy and the socket gateways: kept in its old shape. */
 export const loggedOutKey = (userId: number, deviceId: string) =>
   `user:${userId}:device:${deviceId}:logged_out_at`;
+const passwordChangedKey = (userId: number) =>
+  `auth:password-changed-at:${userId}`;
+
+/**
+ * The compare-and-set of a rotation, in one Redis step (audit A2/A4,
+ * 2026-11-18). KEYS: the session, the account's device set. ARGV: the hash
+ * the caller presented, the new session JSON, the TTL in seconds, the device
+ * id. Returns {1} when it rotated, {0} when the session is gone, or
+ * {2, current JSON} when the stored hash is no longer the presented one.
+ */
+const ROTATE_SCRIPT = `
+local cur = redis.call('GET', KEYS[1])
+if not cur then return {0} end
+local ok, s = pcall(cjson.decode, cur)
+if not ok or type(s) ~= 'table' then return {0} end
+if s['hash'] == ARGV[1] then
+  redis.call('SET', KEYS[1], ARGV[2], 'EX', tonumber(ARGV[3]))
+  redis.call('SADD', KEYS[2], ARGV[4])
+  redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+  return {1}
+end
+return {2, cur}
+`;
 
 /**
  * Refresh sessions, one per signed-in device (owner 2026-11-14):
@@ -111,7 +134,7 @@ export class AuthSessionStore {
     next: string,
     now = Date.now(),
   ): Promise<RotationResult> {
-    const session = await this.get(userId, deviceId);
+    let session = await this.get(userId, deviceId);
     if (!session) return { kind: 'MISSING' };
     const presentedHash = hashToken(presented);
     if (sameHash(session.hash, presentedHash)) {
@@ -122,13 +145,50 @@ export class AuthSessionStore {
         hash: hashToken(next),
         lastUsedAt: now,
       };
-      await this.save(userId, rotated);
-      return { kind: 'ROTATED', session: rotated };
+      // The write happens only if the stored hash is still the presented one:
+      // two tabs refreshing at once give one ROTATED and one GRACE, and a
+      // revokeAll that ran meanwhile is not undone.
+      const reply = (await this.redis.eval(
+        ROTATE_SCRIPT,
+        2,
+        sessionKey(userId, deviceId),
+        setKey(userId),
+        presentedHash,
+        JSON.stringify(rotated),
+        String(REFRESH_TOKEN_TTL_SECONDS),
+        deviceId,
+      )) as [number, string?];
+      if (reply[0] === 1) return { kind: 'ROTATED', session: rotated };
+      if (reply[0] === 0 || !reply[1]) return { kind: 'MISSING' };
+      try {
+        session = JSON.parse(reply[1]) as StoredSession;
+      } catch {
+        return { kind: 'MISSING' };
+      }
     }
     if (sameHash(session.prevHash, presentedHash) && now <= session.prevUntil)
       return { kind: 'GRACE', session };
     await this.revoke(userId, deviceId, now);
     return { kind: 'REUSED' };
+  }
+
+  /**
+   * A password change: a sign-in that checked the old password before this
+   * moment cannot finish (audit A2). Kept as long as a logged-out mark.
+   */
+  async markPasswordChanged(userId: number, now = Date.now()) {
+    await this.redis.set(
+      passwordChangedKey(userId),
+      String(now),
+      'EX',
+      LOGGED_OUT_MARK_SECONDS,
+    );
+  }
+
+  /** True when the password changed at or after `since` (ms). */
+  async passwordChangedSince(userId: number, since: number) {
+    const raw = await this.redis.get(passwordChangedKey(userId));
+    return raw !== null && Number(raw) >= since;
   }
 
   async list(userId: number): Promise<StoredSession[]> {
