@@ -26,6 +26,8 @@ describe('PlanPurchaseService.expireStalePurchases', () => {
     current?: ReturnType<typeof stored>;
     payosEnabled?: boolean;
     closeUnpaid?: jest.Mock;
+    /** The payment once PayOS was synchronised (confirmed, or held). */
+    afterSync?: PlanPaymentStatus;
   }) => {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: 1 }]),
@@ -51,6 +53,11 @@ describe('PlanPurchaseService.expireStalePurchases', () => {
             },
           },
         ]),
+        findUnique: jest.fn().mockResolvedValue({
+          payment: {
+            status: options.afterSync ?? PlanPaymentStatus.CONFIRMED,
+          },
+        }),
       },
       $transaction: jest.fn((callback: (value: typeof tx) => unknown) =>
         callback(tx),
@@ -123,6 +130,25 @@ describe('PlanPurchaseService.expireStalePurchases', () => {
     expect(result.paid).toBe(1);
     expect(tx.planPayment.update).not.toHaveBeenCalled();
     expect(tx.planPurchase.update).not.toHaveBeenCalled();
+  });
+
+  it('counts a paid order that synchronize held for an admin as review, not paid (audit R2 note)', async () => {
+    // PayOS reports PAID; confirming it was not possible (the purchase had
+    // been replaced meanwhile), so synchronize held the money for review.
+    const { service } = setup({
+      closeUnpaid: jest.fn().mockResolvedValue('PAID'),
+      afterSync: PlanPaymentStatus.REVIEW_REQUIRED,
+    });
+
+    const result = await service.expireStalePurchases(now);
+
+    expect(result).toEqual({
+      expired: 0,
+      paid: 0,
+      review: 1,
+      open: 0,
+      failed: 0,
+    });
   });
 
   it('does not touch a purchase whose link is still open or being processed', async () => {

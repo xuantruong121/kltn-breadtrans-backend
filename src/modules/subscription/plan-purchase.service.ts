@@ -1060,7 +1060,11 @@ export class PlanPurchaseService {
           }
           const outcome = await this.payos.closeUnpaid(Number(orderCode));
           if (outcome === 'PAID') {
-            result.paid += 1;
+            // synchronize confirms a paid order, or holds the money for an
+            // admin when it cannot be applied (audit R2 note, 2026-11-18):
+            // count what the payment really became.
+            if (await this.heldForReview(purchase.id)) result.review += 1;
+            else result.paid += 1;
             continue;
           }
           if (outcome === 'OPEN') {
@@ -1145,6 +1149,14 @@ export class PlanPurchaseService {
       );
       return true;
     });
+  }
+
+  private async heldForReview(purchaseId: number): Promise<boolean> {
+    const purchase = await this.prisma.planPurchase.findUnique({
+      where: { id: purchaseId },
+      select: { payment: { select: { status: true } } },
+    });
+    return purchase?.payment?.status === PlanPaymentStatus.REVIEW_REQUIRED;
   }
 
   private async expireIfStillPending(purchaseId: number): Promise<boolean> {
