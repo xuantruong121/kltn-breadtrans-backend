@@ -348,13 +348,13 @@ export class GamificationService {
   ) {
     if (points <= 0) return null;
     const client = options?.tx ?? this.prisma;
-    // One statement: two first awards at once both find the row instead of the
-    // second failing on the unique userId (audit C4, 2026-11-18). The value is
-    // the row before this award's increment, as the level-up check expects.
-    const myLeaderboard = await client.leaderboard.upsert({
-      where: { userId },
-      update: {},
-      create: { userId, tier: 'Đồng' },
+    // INSERT ... ON CONFLICT DO NOTHING: of two first awards at once, the
+    // second no longer fails on the unique userId (audit C4, 2026-11-18).
+    // An upsert with nothing to update runs as SELECT then INSERT in Prisma
+    // and failed the same way.
+    await client.leaderboard.createMany({
+      data: [{ userId, tier: 'Đồng' }],
+      skipDuplicates: true,
     });
 
     // Record EXP history
@@ -373,7 +373,9 @@ export class GamificationService {
 
     // A new XP level is a moment for the ranking's activity feed.
     const levelAfter = xpLevel(updatedLeaderboard.totalPoints);
-    if (levelAfter > xpLevel(myLeaderboard.totalPoints)) {
+    // The level before this award, from the same row: exact even when another
+    // award landed at the same moment.
+    if (levelAfter > xpLevel(updatedLeaderboard.totalPoints - points)) {
       await client.learnerEvent.create({
         data: { userId, type: 'LEVEL_UP', value: levelAfter },
       });

@@ -654,7 +654,7 @@ describe('GamificationService weekly cron hardening', () => {
           update: jest.fn().mockResolvedValue({}),
         },
         leaderboard: {
-          upsert: jest.fn().mockResolvedValue({ id: 1, userId: 2 }),
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
           update: jest.fn().mockResolvedValue({}),
         },
         pointHistory: {
