@@ -387,6 +387,28 @@ describe('GenericExamService publish builds the recording', () => {
     expect(tx.exam.update).not.toHaveBeenCalled();
   });
 
+  it('locks the exam row before it reads the content again, so a Speaking or Writing edit is checked too', async () => {
+    const service = build(jest.fn().mockResolvedValue({ examId: 3 }));
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest.fn().mockResolvedValue(draft),
+        update: jest.fn(),
+      },
+      toeicExamSet: { update: jest.fn() },
+    };
+    service.prisma.$transaction = jest.fn((run: any) => run(tx));
+
+    await service.publish(5);
+
+    const locks = tx.$queryRaw.mock.calls.map((call: any) => call[0].join('?'));
+    expect(locks[0]).toContain('FROM "ToeicExamSet"');
+    expect(locks[1]).toContain('FROM "Exam"');
+    expect(tx.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      tx.exam.findUnique.mock.invocationCallOrder[0],
+    );
+  });
+
   it('keeps the exam a draft when the recording cannot be built', async () => {
     const service = build(jest.fn().mockRejectedValue(new Error('Azure down')));
     await expect(service.publish(5)).rejects.toThrow(

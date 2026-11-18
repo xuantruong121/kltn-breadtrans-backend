@@ -1287,6 +1287,10 @@ export class GenericExamService {
       // published unchecked. A new group (its foreign key) waits for this.
       if (exam.toeicExamSet)
         await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      // The exam row too, before the content is read again (2026-11-18): a
+      // Speaking or Writing edit (inDraftExam) holds it, so it is checked
+      // here, or it waits and then sees the exam is no longer a draft.
+      await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${id} FOR UPDATE`;
       const fresh = (await tx.exam.findUnique({
         where: { id },
         include: this.include,
@@ -1455,28 +1459,28 @@ export class GenericExamService {
     exam: ProductRecord,
     publicationStatus: QuizPublicationStatus,
   ) {
-    await this.prisma.$transaction([
-      this.prisma.exam.update({
+    // One lock order for every status change and content edit: the exam
+    // set, then the exam (2026-11-18). This wrote the exam first and could
+    // deadlock with an edit that locks the set first; one side got a 500.
+    await this.prisma.$transaction(async (tx) => {
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${exam.id} FOR UPDATE`;
+      await tx.exam.update({
         where: { id: exam.id },
         data: { publicationStatus },
-      }),
-      ...(exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id
-        ? [
-            this.prisma.toeicExamSet.update({
-              where: { id: exam.toeicExamSet.id },
-              data: { publicationStatus },
-            }),
-          ]
-        : []),
-      ...(exam.toeicAssessment
-        ? [
-            this.prisma.toeicAssessment.update({
-              where: { id: exam.toeicAssessment.id },
-              data: { publicationStatus },
-            }),
-          ]
-        : []),
-    ]);
+      });
+      if (exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id)
+        await tx.toeicExamSet.update({
+          where: { id: exam.toeicExamSet.id },
+          data: { publicationStatus },
+        });
+      if (exam.toeicAssessment)
+        await tx.toeicAssessment.update({
+          where: { id: exam.toeicAssessment.id },
+          data: { publicationStatus },
+        });
+    });
   }
 
   async delete(id: number) {

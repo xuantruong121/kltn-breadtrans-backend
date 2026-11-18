@@ -42,3 +42,30 @@ export async function inDraftSet<T>(
     return work(tx);
   });
 }
+
+/**
+ * The same for the Speaking and Writing sections of an exam, which have no
+ * exam set (2026-11-18): the exam row is locked and must still be a draft.
+ * Publish locks this row before it reads the content again, so it waits for
+ * the write and checks it, or the write waits and gets 409. READ COMMITTED on
+ * purpose: FOR UPDATE then reads the committed row, where SERIALIZABLE would
+ * fail with a serialization error.
+ */
+export async function inDraftExam<T>(
+  prisma: PrismaService,
+  examId: number,
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+  message = EXAM_SET_NOT_DRAFT,
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${examId} FOR UPDATE`;
+    const exam = await tx.exam.findUnique({
+      where: { id: examId },
+      select: { publicationStatus: true },
+    });
+    if (!exam) throw new NotFoundException(`Exam ${examId} không tồn tại`);
+    if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
+      throw new ExamNotDraftException(message);
+    return work(tx);
+  });
+}

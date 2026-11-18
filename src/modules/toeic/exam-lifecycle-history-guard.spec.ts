@@ -79,6 +79,16 @@ describe('GenericExamService — attempt-aware unpublish/delete guard (P1-01)', 
 
     await service.retire(5);
 
+    // The same lock order as publish and the content edits (Set, then Exam):
+    // the Exam written first could deadlock with an edit (2026-11-18).
+    const locks = prisma.$queryRaw.mock.calls.map((call: any) =>
+      call[0].join('?'),
+    );
+    expect(locks[0]).toContain('FROM "ToeicExamSet"');
+    expect(locks[1]).toContain('FROM "Exam"');
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.exam.update.mock.invocationCallOrder[0],
+    );
     const archived = { publicationStatus: QuizPublicationStatus.ARCHIVED };
     expect(prisma.exam.update).toHaveBeenCalledWith({
       where: { id: 5 },
