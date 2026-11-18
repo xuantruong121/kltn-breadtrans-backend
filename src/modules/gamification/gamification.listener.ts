@@ -5,6 +5,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma, QuizType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService, getTodayDateKey } from './gamification.service';
+import { quizBanhReward, rewardPercent } from './quiz-reward.logic';
 
 @Injectable()
 export class GamificationListener {
@@ -66,19 +67,22 @@ export class GamificationListener {
         // The pet grows with study, on the same first completion as the XP.
         await this.gamificationService.awardPetStudyExp(payload.userId);
 
-        // Banh only for first submission (idempotent via quizId)
+        // Banh only for first submission (idempotent via quizId), 10 to 40
+        // by the percent of the answer (quiz-reward.logic.ts, owner
+        // 2026-11-18): Listening and Reading always paid 10 before.
         if (payload.quizId && payload.isFirstSubmission !== false) {
-          const banhReward = Math.min(
-            40,
-            Math.max(10, Math.round(payload.score * 0.4)),
-          );
+          const percent = rewardPercent(payload);
+          const banhReward = quizBanhReward(percent);
           if (banhReward > 0) {
             await this.gamificationService.awardBanh(
               payload.userId,
               banhReward,
               'QUIZ_FIRST_COMPLETION',
               `quiz:${payload.quizId}`,
-              { isCapped: true, metadata: { score: payload.score } },
+              {
+                isCapped: true,
+                metadata: { score: payload.score, scorePercent: percent },
+              },
             );
           }
         }

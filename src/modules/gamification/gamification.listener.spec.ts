@@ -203,6 +203,37 @@ describe('GamificationListener', () => {
       ).toHaveBeenCalledWith(12, expect.any(Array), expect.any(String));
     });
 
+    it.each([
+      ['Listening 5/5', 5, 100, 50, 40],
+      ['Listening 6/20', 6, 30, 60, 12],
+    ])(
+      '%s: XP per right answer, Bánh mì by the percent (owner 2026-11-18)',
+      async (_label, score, scorePercent, xp, banh) => {
+        prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+        await listener.handleQuizSubmittedEvent({
+          userId: 12,
+          quizId: 45,
+          score,
+          scorePercent,
+          isFirstSubmission: true,
+        });
+
+        expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
+          12,
+          xp,
+          'Hoàn thành bài thi (Quiz)',
+        );
+        expect(gamificationServiceMock.awardBanh).toHaveBeenCalledWith(
+          12,
+          banh,
+          'QUIZ_FIRST_COMPLETION',
+          'quiz:45',
+          expect.objectContaining({ isCapped: true }),
+        );
+      },
+    );
+
     it('a Writing exercise passes its XP explicitly; Bánh mì still comes from the score', async () => {
       prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
 
