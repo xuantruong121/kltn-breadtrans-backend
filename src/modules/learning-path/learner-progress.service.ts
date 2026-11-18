@@ -236,6 +236,12 @@ export class LearnerProgressService {
     const row = (await tx.learnerSkillLevel.findUnique({
       where: { userId_skill: { userId, skill } },
     }))!;
+    // One item at a time (audit C7, 2026-11-18): two learners graded on the
+    // same item each read its difficulty and wrote their own result, so one
+    // change was lost, and two first attempts both tried to create it. Taken
+    // after the learner's skill lock, one item per transaction: the order is
+    // always skill, then item.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`content-difficulty:${attempt.contentType}:${attempt.difficultyId}`}, 0))`;
     const item = await tx.contentDifficulty.findUnique({
       where: {
         contentType_contentId: {

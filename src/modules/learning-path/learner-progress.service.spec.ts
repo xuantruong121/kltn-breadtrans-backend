@@ -129,6 +129,15 @@ describe('LearnerProgressService', () => {
     expect(t.difficulty.get('1').difficulty).toBeLessThan(-0.5);
   });
 
+  it('updates an item difficulty under a lock per item, so two learners on it keep both changes (audit C7)', async () => {
+    const t = setup();
+    await t.service.recordQuizAttempt(attempt(1, 100, 100));
+    const keys = (t.tx.$executeRaw as jest.Mock).mock.calls.flatMap(
+      (call: unknown[]) => call.slice(1),
+    );
+    expect(keys).toContain('content-difficulty:QUIZ:1');
+  });
+
   it('counts a replayed submission once', async () => {
     const t = setup();
     await t.service.recordQuizAttempt(attempt(1, 100));
