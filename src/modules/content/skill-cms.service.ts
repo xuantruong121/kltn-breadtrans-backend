@@ -1217,6 +1217,12 @@ export class SkillCmsService {
     await this.assertNoSpeakingHistory(rawSetId);
     return this.prisma.$transaction(
       async (tx) => {
+        // Counted again with the exercise row locked (audit A5 follow-up,
+        // 2026-11-18): a recording saved between the check above and the
+        // delete was removed with the exercise. A recording on it now waits,
+        // then fails on its foreign key.
+        await tx.$queryRaw`SELECT id FROM "SpeakingExercise" WHERE id = ${exerciseId} FOR UPDATE`;
+        await this.assertNoSpeakingHistory(rawSetId, tx);
         const deleted = await tx.speakingExercise.delete({
           where: { id: exerciseId },
         });
@@ -1796,8 +1802,11 @@ export class SkillCmsService {
     };
   }
 
-  private async assertNoSpeakingHistory(setId: string) {
-    const count = await this.prisma.speakingSubmission.count({
+  private async assertNoSpeakingHistory(
+    setId: string,
+    client: Pick<Prisma.TransactionClient, 'speakingSubmission'> = this.prisma,
+  ) {
+    const count = await client.speakingSubmission.count({
       where: { exercise: { practiceSetId: setId } },
     });
     if (count > 0)

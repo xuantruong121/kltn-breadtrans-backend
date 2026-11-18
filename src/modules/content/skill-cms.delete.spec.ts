@@ -149,6 +149,33 @@ describe('SkillCmsService.deleteContent', () => {
     }
   });
 
+  it('a recording saved while one Speaking exercise is deleted keeps the exercise (audit A5)', async () => {
+    const tx: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      // The recording landed after the first count.
+      speakingSubmission: { count: jest.fn().mockResolvedValue(1) },
+      speakingExercise: { delete: jest.fn() },
+    };
+    const prisma: any = {
+      speakingExercise: {
+        findFirst: jest.fn().mockResolvedValue({ id: 31, practiceSetId: 's1' }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+      $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    };
+
+    await expect(
+      new SkillCmsService(prisma).deleteSpeakingExercise(
+        'speaking',
+        's1',
+        '31',
+        admin,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.speakingExercise.delete).not.toHaveBeenCalled();
+  });
+
   it('requires an admin', async () => {
     await expect(
       new SkillCmsService(quizPrisma()).deleteContent('reading', '31', {
