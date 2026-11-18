@@ -54,6 +54,7 @@ import {
 import { SpeakingStimulusDto } from '../content/speaking-stimulus.dto';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import { examListFacets, filterExamList } from './exam-admin-list';
+import { inDraftSet } from './draft-set-lock';
 
 type ProductRecord = any;
 
@@ -1184,28 +1185,51 @@ export class GenericExamService {
             dto.durationSeconds ?? child.durationSeconds,
           )
         : undefined;
-    const updated = await this.prisma.exam.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.description !== undefined && { description: dto.description }),
-      },
-      include: this.include,
-    });
-    if (child) {
-      await this.prisma.toeicExamSet.update({
-        where: { id: child.id },
+    const write = async (tx: Prisma.TransactionClient) => {
+      const row = await tx.exam.update({
+        where: { id },
         data: {
           ...(dto.title !== undefined && { title: dto.title }),
           ...(dto.description !== undefined && {
             description: dto.description,
           }),
-          ...(dto.type !== undefined && { type: dto.type as any }),
-          ...(dto.difficulty !== undefined && { difficulty: dto.difficulty }),
-          ...(durationSeconds !== undefined && { durationSeconds }),
         },
+        include: this.include,
       });
-    }
+      if (child) {
+        await tx.toeicExamSet.update({
+          where: { id: child.id },
+          data: {
+            ...(dto.title !== undefined && { title: dto.title }),
+            ...(dto.description !== undefined && {
+              description: dto.description,
+            }),
+            ...(dto.type !== undefined && { type: dto.type as any }),
+            ...(dto.difficulty !== undefined && {
+              difficulty: dto.difficulty,
+            }),
+            ...(durationSeconds !== undefined && { durationSeconds }),
+          },
+        });
+      }
+      return row;
+    };
+    // Written under the lock a publish takes, in its order (audit A8
+    // follow-up, 2026-11-18): an edit checked as a draft above could land
+    // just after the exam went live. Without an L&R set, the exam row.
+    const updated = child
+      ? await inDraftSet(this.prisma, child.id, write, EXAM_NOT_DRAFT)
+      : await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${id} FOR UPDATE`;
+          const still = await tx.exam.findUnique({
+            where: { id },
+            select: { publicationStatus: true },
+          });
+          if (!still)
+            throw new NotFoundException(`Exam với ID ${id} không tồn tại`);
+          this.assertDraftExam(still);
+          return write(tx);
+        });
     if (dto.title !== undefined) await this.renameSources(exam, dto.title);
     return this.project(updated);
   }

@@ -109,6 +109,7 @@ import type {
   QuestionReview,
   QuestionVerdict,
 } from './toeic-answer-review.types';
+import { ExamNotDraftException, inDraftSet } from './draft-set-lock';
 
 const TOEIC_AI_QUEUE = 'breadtrans-toeic-ai-exam';
 /** Tries per batch: the first draft plus these, each told why it was refused. */
@@ -1502,6 +1503,39 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return { ...(await this.status(jobId)), skipped };
   }
 
+  /**
+   * One content write of an AI path, with the exam set locked and still a
+   * draft (audit A8 follow-up, 2026-11-18). The AI calls before it take
+   * seconds to minutes; a publish meanwhile had its content rewritten.
+   */
+  private draftWrite<T>(
+    setId: number,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return inDraftSet(
+      this.prisma,
+      setId,
+      work,
+      'Đề vừa được xuất bản. Chỉ Draft mới có thể tạo lại nội dung AI.',
+    );
+  }
+
+  /** A refused or failed write leaves no new file, unless the row already showed it. */
+  private async writeOrDropUpload<T>(
+    setId: number,
+    uploadedKey: string,
+    alreadyShown: boolean,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    try {
+      return await this.draftWrite(setId, work);
+    } catch (error) {
+      if (!alreadyShown)
+        await this.r2.deleteFile(uploadedKey).catch(() => undefined);
+      throw error;
+    }
+  }
+
   private async editableDraft(examId: number) {
     const exam = await this.prisma.exam.findUnique({
       where: { id: examId },
@@ -1641,6 +1675,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const missing: string[] = [];
     const attempt = async (slot: string, fill: () => Promise<boolean>) => {
       const done = await fill().catch((error) => {
+        if (error instanceof ExamNotDraftException) throw error;
         this.logger.warn(`Exam image still missing ${slot}: ${String(error)}`);
         return false;
       });
@@ -1689,10 +1724,12 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             brief,
             1,
           );
-          await this.prisma.speakingExercise.update({
-            where: { id: exercise.id },
-            data: { imageUrl: image.url },
-          });
+          await this.writeOrDropUpload(setId, image.key, false, (tx) =>
+            tx.speakingExercise.update({
+              where: { id: exercise.id },
+              data: { imageUrl: image.url },
+            }),
+          );
           return true;
         });
       }
@@ -1715,16 +1752,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             brief,
             1,
           );
-          await this.prisma.question.update({
-            where: { id: question.id },
-            data: {
-              content: {
-                ...content,
-                imageUrl: image.url,
-                aiMedia: image.metadata,
-              } as Prisma.InputJsonValue,
-            },
-          });
+          await this.writeOrDropUpload(setId, image.key, false, (tx) =>
+            tx.question.update({
+              where: { id: question.id },
+              data: {
+                content: {
+                  ...content,
+                  imageUrl: image.url,
+                  aiMedia: image.metadata,
+                } as Prisma.InputJsonValue,
+              },
+            }),
+          );
           return true;
         });
       }
@@ -1771,18 +1810,25 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           image,
           image.url,
         );
-        const updated = await this.prisma.toeicQuestionGroup.update({
-          where: { id: group.id },
-          data: {
-            imageUrl: image.url,
-            mediaMetadata: metadata as Prisma.InputJsonValue,
-          },
-        });
+        const updated = await this.writeOrDropUpload(
+          group.examId,
+          image.key,
+          image.url === group.imageUrl,
+          (tx) =>
+            tx.toeicQuestionGroup.update({
+              where: { id: group.id },
+              data: {
+                imageUrl: image.url,
+                mediaMetadata: metadata as Prisma.InputJsonValue,
+              },
+            }),
+        );
         // Part 1 audio reads the statements, which the photo just replaced.
         return metadata.image.questionStatus === 'READY_FOR_REVIEW'
           ? await this.regenerateMedia(examId, groupId, 'audio')
           : updated;
-      } catch {
+      } catch (error) {
+        if (error instanceof ExamNotDraftException) throw error;
         throw new BadRequestException(mediaRetryMessage('image'));
       }
     }
@@ -1811,14 +1857,21 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         sourceHash,
         scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
       };
-      return this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          audioUrl: uploaded.key,
-          mediaMetadata: metadata as Prisma.InputJsonValue,
-        },
-      });
-    } catch {
+      return await this.writeOrDropUpload(
+        group.examId,
+        uploaded.key,
+        uploaded.key === group.audioUrl,
+        (tx) =>
+          tx.toeicQuestionGroup.update({
+            where: { id: group.id },
+            data: {
+              audioUrl: uploaded.key,
+              mediaMetadata: metadata as Prisma.InputJsonValue,
+            },
+          }),
+      );
+    } catch (error) {
+      if (error instanceof ExamNotDraftException) throw error;
       throw new BadRequestException(mediaRetryMessage('audio'));
     }
   }
@@ -1978,14 +2031,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         questionStatus: 'STALE',
       };
       const mediaMetadata = { ...current, image: imageMetadata };
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          imageUrl: uploaded.url,
-          imageBrief,
-          mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
-        },
-      });
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            imageUrl: uploaded.url,
+            imageBrief,
+            mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
+          },
+        }),
+      );
+      // The group shows the file now: a later failure must not delete it.
+      uploadedKey = undefined;
       let vision: ToeicPart1QuestionCandidate | undefined;
       let visionError: string | undefined;
       try {
@@ -2007,16 +2064,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       if (vision) {
         const question = group.questions[0];
         const data = part1QuestionData(vision);
-        if (question) {
-          await this.prisma.toeicQuestion.update({
-            where: { id: question.id },
-            data,
-          });
-        } else {
-          await this.prisma.toeicQuestion.create({
-            data: { ...data, groupId: group.id, questionNumber: 1 },
-          });
-        }
+        await this.draftWrite(group.examId, async (tx) => {
+          if (question)
+            await tx.toeicQuestion.update({
+              where: { id: question.id },
+              data,
+            });
+          else
+            await tx.toeicQuestion.create({
+              data: { ...data, groupId: group.id, questionNumber: 1 },
+            });
+        });
         imageMetadata.questionStatus = 'READY_FOR_REVIEW';
         imageMetadata.questionImageHash = imageHash;
         imageMetadata.sceneSummary = vision.sceneSummary;
@@ -2040,15 +2098,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           uploaded.url,
         );
       }
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          mediaMetadata: {
-            ...current,
-            image: imageMetadata,
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            mediaMetadata: {
+              ...current,
+              image: imageMetadata,
+            },
           },
-        },
-      });
+        }),
+      );
       this.imageCandidates.delete(candidateId);
       return {
         imageUrl: uploaded.url,
@@ -2057,7 +2117,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         error: visionError,
       };
     } catch (error) {
-      if (uploadedKey)
+      // Kept when the group already showed this file (the same photo again).
+      if (uploadedKey && !group.imageUrl?.endsWith(`/${uploadedKey}`))
         await this.r2.deleteFile(uploadedKey).catch(() => undefined);
       this.imageCandidates.delete(candidateId);
       throw error;
@@ -2099,15 +2160,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const imageHash = sha256(image.buffer);
     const question = group.questions[0];
     const data = part1QuestionData(vision);
-    if (question)
-      await this.prisma.toeicQuestion.update({
-        where: { id: question.id },
-        data,
-      });
-    else
-      await this.prisma.toeicQuestion.create({
-        data: { ...data, groupId: group.id, questionNumber: 1 },
-      });
     const imageMeta: Record<string, any> = {
       ...(current.image ?? {}),
       status: 'READY',
@@ -2125,14 +2177,27 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       image,
       group.imageUrl,
     );
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: {
-          ...current,
-          image: imageMeta,
-        } as Prisma.InputJsonValue,
-      },
+    // The review above reads the question from memory, so the question and
+    // its review are written together here.
+    await this.draftWrite(group.examId, async (tx) => {
+      if (question)
+        await tx.toeicQuestion.update({
+          where: { id: question.id },
+          data,
+        });
+      else
+        await tx.toeicQuestion.create({
+          data: { ...data, groupId: group.id, questionNumber: 1 },
+        });
+      await tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: {
+            ...current,
+            image: imageMeta,
+          } as Prisma.InputJsonValue,
+        },
+      });
     });
     return { question: vision, review: imageMeta.review ?? null };
   }
@@ -3475,12 +3540,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const group = await this.part1DraftGroup(examId, groupId);
     const { metadata, image, stored } = await this.currentPart1Review(group);
     await this.reviewPart1DraftGroup(group, image, stored, group.imageUrl);
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-      },
-    });
+    await this.draftWrite(group.examId, (tx) =>
+      tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+        },
+      }),
+    );
     return { groupId: group.id, image };
   }
 
@@ -3498,12 +3565,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const { metadata, image, review, currentHash, changed } =
       await this.currentPart1Review(group);
     if (changed) {
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-        },
-      });
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+          },
+        }),
+      );
       throw new ConflictException(
         'Nội dung hoặc ảnh đã thay đổi sau lần kiểm định; kết quả cũ đã chuyển vào lịch sử. Hãy chạy lại kiểm tra Vision hoặc xác nhận thủ công.',
       );
@@ -3521,18 +3590,23 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       at: new Date().toISOString(),
       method,
     });
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-      },
-    });
+    await this.draftWrite(group.examId, (tx) =>
+      tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+        },
+      }),
+    );
     return { groupId: group.id, image };
   }
 
   /** A library photo is not the scene the question was written for. */
   private async matchPart1QuestionToImage(
-    group: { questions: Array<{ id: number; options?: unknown }> },
+    group: {
+      examId: number;
+      questions: Array<{ id: number; options?: unknown }>;
+    },
     metadata: { image?: Record<string, unknown> },
     image: { buffer?: Buffer; mimeType?: string; metadata: object },
   ) {
@@ -3549,10 +3623,12 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       this.assertPart1QuestionCandidate(vision);
       if (question) {
         const data = part1QuestionData(vision);
-        await this.prisma.toeicQuestion.update({
-          where: { id: question.id },
-          data,
-        });
+        await this.draftWrite(group.examId, (tx) =>
+          tx.toeicQuestion.update({
+            where: { id: question.id },
+            data,
+          }),
+        );
         // The audio and the answer review read this same object right after.
         Object.assign(question, data);
       }

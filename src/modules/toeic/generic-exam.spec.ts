@@ -190,15 +190,49 @@ describe('GenericExamService internal sources', () => {
 });
 
 describe('GenericExamService.update title', () => {
+  it('an edit that lands after the exam was published is refused (audit A8 follow-up)', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.prisma = {
+      exam: {
+        update: jest.fn(),
+        // Read DRAFT first; PUBLISHED under the lock.
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+        }),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    service.prisma.$transaction = jest.fn((cb: (tx: unknown) => unknown) =>
+      cb(service.prisma),
+    );
+    service.findExam = jest
+      .fn()
+      .mockResolvedValue({ publicationStatus: QuizPublicationStatus.DRAFT });
+
+    await expect(service.update(5, { title: 'Đề 02' })).rejects.toThrow(
+      'bản nháp',
+    );
+    expect(service.prisma.exam.update).not.toHaveBeenCalled();
+  });
+
   it('renames what learners read, not only the exam row', async () => {
     const service: any = Object.create(GenericExamService.prototype);
     const update = () => jest.fn().mockResolvedValue({});
     service.prisma = {
-      exam: { update: update() },
+      exam: {
+        update: update(),
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
       toeicAssessment: { update: update() },
       speakingPracticeSet: { update: update() },
       toeicWritingSet: { update: update() },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
+    service.prisma.$transaction = jest.fn((cb: (tx: unknown) => unknown) =>
+      cb(service.prisma),
+    );
     service.project = jest.fn();
     service.findExam = jest.fn().mockResolvedValue({
       publicationStatus: QuizPublicationStatus.DRAFT,

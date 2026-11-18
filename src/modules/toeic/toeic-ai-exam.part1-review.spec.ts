@@ -75,6 +75,19 @@ function draftGroup(overrides: Record<string, any> = {}) {
   };
 }
 
+/** The exam set lock of inDraftSet, on a hand-made Prisma mock. */
+const withDraftLock = (prisma: any, status = 'DRAFT') =>
+  Object.assign(prisma, {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+    toeicExamSet: {
+      findUnique: jest.fn().mockResolvedValue({
+        publicationStatus: 'DRAFT',
+        genericExam: { publicationStatus: status },
+      }),
+    },
+  });
+
 function build(mode: 'agree' | 'disagree' | 'outage', group = draftGroup()) {
   const { service: answerReview, calls } = vision(mode);
   const updates: any[] = [];
@@ -89,7 +102,7 @@ function build(mode: 'agree' | 'disagree' | 'outage', group = draftGroup()) {
         mimeType,
       }),
     },
-    prisma: {
+    prisma: withDraftLock({
       exam: {
         findUnique: jest.fn(async () => ({
           publicationStatus: 'DRAFT',
@@ -104,7 +117,7 @@ function build(mode: 'agree' | 'disagree' | 'outage', group = draftGroup()) {
           return group;
         }),
       },
-    },
+    }),
   });
   return { service, calls, updates, group };
 }

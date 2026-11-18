@@ -1,5 +1,18 @@
 import { ToeicAiExamService } from './toeic-ai-exam.service';
 
+/** The exam set lock of inDraftSet, on a hand-made Prisma mock. */
+const withDraftLock = (prisma: any, status = 'DRAFT') =>
+  Object.assign(prisma, {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+    toeicExamSet: {
+      findUnique: jest.fn().mockResolvedValue({
+        publicationStatus: 'DRAFT',
+        genericExam: { publicationStatus: status },
+      }),
+    },
+  });
+
 describe('exam images', () => {
   afterEach(() => {
     delete process.env.GEMINI_IMAGE_GENERATION;
@@ -124,7 +137,7 @@ describe('exam images', () => {
   it('rewrites a Part 1 question to match a library photo', async () => {
     const service = build(true);
     const update = jest.fn();
-    service.prisma = { toeicQuestion: { update } };
+    service.prisma = withDraftLock({ toeicQuestion: { update } });
     service.ai.generateToeicPart1FromImage = jest.fn().mockResolvedValue({
       statements: ['A', 'B', 'C', 'D'],
       correctIndex: 1,
@@ -133,7 +146,7 @@ describe('exam images', () => {
     });
     service.assertPart1QuestionCandidate = jest.fn();
     const metadata: { image?: Record<string, unknown> } = { image: {} };
-    const group = { questions: [{ id: 7, options: ['old'] }] };
+    const group = { examId: 3, questions: [{ id: 7, options: ['old'] }] };
 
     await service.matchPart1QuestionToImage(group, metadata, {
       buffer: png,
@@ -155,7 +168,7 @@ describe('exam images', () => {
         .fn()
         .mockResolvedValue({ toeicExamSet: { id: 3 } });
       service.regenerateMedia = jest.fn().mockResolvedValue({});
-      service.prisma = {
+      service.prisma = withDraftLock({
         toeicQuestionGroup: {
           findMany: jest.fn().mockResolvedValue([{ id: 8, groupOrder: 1 }]),
         },
@@ -204,7 +217,7 @@ describe('exam images', () => {
           ]),
         },
         question: { update: jest.fn() },
-      };
+      });
       return service;
     };
 
