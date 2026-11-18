@@ -88,6 +88,9 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
         )
         .map((s) => s.id),
     ];
+    await prisma.aiGenerationJob.deleteMany({
+      where: { createdByAdminId: { in: ids } },
+    });
     await prisma.marketOrder.deleteMany({ where: { userId: { in: ids } } });
     await prisma.banhTransaction.deleteMany({ where: { userId: { in: ids } } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
@@ -175,6 +178,40 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     const kept = await prisma.user.findUnique({ where: { id: later.id } });
     expect(kept?.deletionScheduledAt).not.toBeNull();
     expect(await prisma.profile.count({ where: { userId: later.id } })).toBe(1);
+  });
+
+  it('an admin with AI exam jobs leaves a shell that keeps them; running ones stop (audit A9 follow-up)', async () => {
+    const admin = await makeUser('ai-admin', null);
+    const other = await makeUser('ai-admin-2', null);
+    await prisma.user.updateMany({
+      where: { id: { in: [admin.id, other.id] } },
+      data: { role: 'ADMIN' },
+    });
+    const job = (id: string, status: 'QUEUED' | 'PUBLISHED') => ({
+      id: `purge-${id}-${suffix}`,
+      createdByAdminId: admin.id,
+      generationType: 'TOEIC_QUIZ' as const,
+      status,
+      requestSnapshot: {},
+    });
+    await prisma.aiGenerationJob.createMany({
+      data: [job('queued', 'QUEUED'), job('published', 'PUBLISHED')],
+    });
+
+    await expect(service.purgeUser(admin.id)).resolves.toBe('ANONYMIZED');
+
+    const shell = await prisma.user.findFirstOrThrow({
+      where: { email: { startsWith: `deleted-${admin.id}-` } },
+    });
+    const jobs = await prisma.aiGenerationJob.findMany({
+      where: { id: { startsWith: 'purge-' }, createdByAdminId: shell.id },
+      orderBy: { id: 'asc' },
+      select: { id: true, status: true },
+    });
+    expect(jobs).toEqual([
+      { id: `purge-published-${suffix}`, status: 'PUBLISHED' },
+      { id: `purge-queued-${suffix}`, status: 'CANCELLED' },
+    ]);
   });
 
   it('the database refuses to delete a user who still has an order', async () => {

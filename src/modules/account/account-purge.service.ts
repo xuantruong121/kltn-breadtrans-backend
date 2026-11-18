@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { Prisma, Role } from '@prisma/client';
+import { AiGenerationJobStatus, Prisma, Role } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../upload/r2.service';
@@ -137,8 +137,14 @@ export class AccountPurgeService {
       });
 
       const counts = await this.keptCounts(tx, userId);
+      // An admin's AI exam jobs keep their creator by a Restrict key: the
+      // purge failed on them (audit A9 follow-up, 2026-11-18). They are the exam
+      // history, so they move to the shell like orders.
+      const aiJobs = await tx.aiGenerationJob.count({
+        where: { createdByAdminId: userId },
+      });
       let result: PurgeOutcome = 'DELETED';
-      if (hasKeptRecords(counts)) {
+      if (hasKeptRecords(counts) || aiJobs > 0) {
         const shell = await tx.user.create({
           data: {
             email: shellEmail(userId, now),
@@ -160,6 +166,29 @@ export class AccountPurgeService {
         await tx.banhTransaction.updateMany({ where, data: to });
         await tx.promoRedemption.updateMany({ where, data: to });
         await tx.currencyTransaction.updateMany({ where, data: to });
+        if (aiJobs > 0) {
+          // Nobody is left to review a job still running: it stops at the
+          // worker's next check, as a cancel does.
+          await tx.aiGenerationJob.updateMany({
+            where: {
+              createdByAdminId: userId,
+              status: {
+                in: [
+                  AiGenerationJobStatus.QUEUED,
+                  AiGenerationJobStatus.PROCESSING,
+                ],
+              },
+            },
+            data: {
+              status: AiGenerationJobStatus.CANCELLED,
+              errorSummary: 'Tài khoản người tạo đã bị xoá.',
+            },
+          });
+          await tx.aiGenerationJob.updateMany({
+            where: { createdByAdminId: userId },
+            data: { createdByAdminId: shell.id },
+          });
+        }
         result = 'ANONYMIZED';
       }
       // Everything else of the learner cascades with the account.
