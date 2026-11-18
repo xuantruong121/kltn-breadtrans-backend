@@ -1373,6 +1373,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         toApply.includes(g.candidateKey),
       );
       await this.prisma.$transaction(async (tx) => {
+        // Still a draft where the groups are written, with the exam set
+        // locked (audit A8, 2026-11-18): a publish between the check at the
+        // start of Apply and here had its content rewritten under learners.
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet!.id} FOR UPDATE`;
+        const still = await tx.exam.findUnique({
+          where: { id: exam.id },
+          select: { publicationStatus: true },
+        });
+        if (still?.publicationStatus !== QuizPublicationStatus.DRAFT)
+          throw new ConflictException('Chỉ có thể Apply candidate vào Draft');
         if (!isSelective) {
           // Full apply-all (default, backward-compatible): replace the
           // entire L&R content set in one shot, as before.

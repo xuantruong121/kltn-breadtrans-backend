@@ -122,6 +122,11 @@ function harness(
     approvedSnapshot: null,
   };
   const tx = {
+    // Apply re-checks the Draft under the exam set lock (audit A8).
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    exam: {
+      findUnique: jest.fn().mockResolvedValue({ publicationStatus: 'DRAFT' }),
+    },
     toeicQuestionGroup: { deleteMany: jest.fn(), create: jest.fn() },
   };
   const prisma: any = {

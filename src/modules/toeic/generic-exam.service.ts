@@ -1257,6 +1257,26 @@ export class GenericExamService {
     }
     await this.ensureListeningMaster(exam);
     await this.prisma.$transaction(async (tx) => {
+      // Checked again where the status changes, with the exam set locked
+      // (audit A8, 2026-11-18): the image checks and the master audio above
+      // take seconds to minutes, and content deleted or emptied meanwhile was
+      // published unchecked. A new group (its foreign key) waits for this.
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      const fresh = (await tx.exam.findUnique({
+        where: { id },
+        include: this.include,
+      })) as ProductRecord;
+      if (!fresh)
+        throw new NotFoundException(`Exam với ID ${id} không tồn tại`);
+      const again = this.productReadiness(fresh);
+      if (!again.learnerReady)
+        throw new ConflictException({
+          message:
+            'Nội dung đề vừa thay đổi trong lúc kiểm tra và chưa đủ điều kiện xuất bản. Tải lại trang rồi kiểm tra lại.',
+          issues: again.lrValidation?.issues,
+          readiness: again.readiness,
+        });
       await tx.exam.update({
         where: { id },
         data: { publicationStatus: QuizPublicationStatus.PUBLISHED },

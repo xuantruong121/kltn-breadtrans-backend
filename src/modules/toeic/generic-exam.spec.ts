@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import { GenericExamService, lrSourceIsLive } from './generic-exam.service';
@@ -327,6 +327,30 @@ describe('GenericExamService publish builds the recording', () => {
     expect(ensure.mock.invocationCallOrder[0]).toBeLessThan(
       service.prisma.$transaction.mock.invocationCallOrder[0],
     );
+  });
+
+  it('content emptied while the slow checks ran is refused where the status changes (audit A8)', async () => {
+    const service = build(jest.fn().mockResolvedValue({ examId: 3 }));
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest.fn().mockResolvedValue(draft),
+        update: jest.fn(),
+      },
+      toeicExamSet: { update: jest.fn() },
+    };
+    service.prisma.$transaction = jest.fn((run: any) => run(tx));
+    service.productReadiness = jest
+      .fn()
+      .mockReturnValueOnce({ learnerReady: true })
+      .mockReturnValueOnce({
+        learnerReady: false,
+        lrValidation: { issues: ['Part 5 không còn câu nào'] },
+      });
+
+    await expect(service.publish(5)).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.exam.update).not.toHaveBeenCalled();
   });
 
   it('keeps the exam a draft when the recording cannot be built', async () => {

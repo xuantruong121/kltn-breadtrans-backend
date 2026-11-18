@@ -75,6 +75,11 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
 
   beforeEach(() => {
     tx = {
+      // Apply re-checks the Draft under the exam set lock (audit A8).
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest.fn().mockResolvedValue({ publicationStatus: 'DRAFT' }),
+      },
       toeicQuestionGroup: {
         deleteMany: jest.fn(),
         create: jest.fn(),
@@ -132,6 +137,17 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
     ]);
     // Only one of two groups applied -> job stays GENERATED, not APPROVED.
     expect(updateCall.data.status).toBe(AiGenerationJobStatus.GENERATED);
+  });
+
+  it('an exam published after Apply started is not rewritten (audit A8)', async () => {
+    tx.exam.findUnique.mockResolvedValue({ publicationStatus: 'PUBLISHED' });
+
+    await expect(service.apply('job-1', 7, ['LR:P1:G1'])).rejects.toThrow(
+      'Chỉ có thể Apply candidate vào Draft',
+    );
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.toeicQuestionGroup.create).not.toHaveBeenCalled();
+    expect(tx.toeicQuestionGroup.deleteMany).not.toHaveBeenCalled();
   });
 
   it('re-applying an already-applied key is a no-op (no duplicate group)', async () => {

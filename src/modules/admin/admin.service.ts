@@ -1067,30 +1067,37 @@ export class AdminService {
   }
 
   async publishVocabTopic(id: number) {
-    const topic = await this.prisma.vocabTopic.findUnique({
-      where: { id },
-      include: { words: { include: DECK_WORD_INCLUDE } },
-    });
-    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    if (!topic.words || topic.words.length === 0) {
-      throw new BadRequestException(
-        'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
+    // The words are read and counted with the topic locked (audit A8,
+    // 2026-11-18): a word added or deleted while publishing changed
+    // totalWords between the read and this write, and the count drifted.
+    // Adding or deleting a word waits for the lock.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabTopic" WHERE id = ${id} FOR UPDATE`;
+      const topic = await tx.vocabTopic.findUnique({
+        where: { id },
+        include: { words: { include: DECK_WORD_INCLUDE } },
+      });
+      if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+      if (!topic.words || topic.words.length === 0) {
+        throw new BadRequestException(
+          'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
+        );
+      }
+      const invalidWords = topic.words.filter(
+        (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
       );
-    }
-    const invalidWords = topic.words.filter(
-      (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
-    );
-    if (invalidWords.length > 0) {
-      throw new BadRequestException(
-        'Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa',
-      );
-    }
-    return this.prisma.vocabTopic.update({
-      where: { id },
-      data: {
-        publicationStatus: QuizPublicationStatus.PUBLISHED,
-        totalWords: topic.words.length,
-      },
+      if (invalidWords.length > 0) {
+        throw new BadRequestException(
+          'Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa',
+        );
+      }
+      return tx.vocabTopic.update({
+        where: { id },
+        data: {
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+          totalWords: topic.words.length,
+        },
+      });
     });
   }
 
