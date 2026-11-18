@@ -148,21 +148,54 @@ export class TrialService {
     }
   }
 
-  /** Counts one accepted paid-level grading against a running trial. */
-  async recordGrading(userId: number, skill: TrialSkill): Promise<void> {
-    if (!this.redis) return;
+  /**
+   * Takes one paid-level grading from a running trial before the work is
+   * done, or refuses it (403 TRIAL_GRADING_LIMIT) when none is left (audit
+   * R11, 2026-11-18). The check and the count are one HINCRBY: two answers
+   * sent at once both passed a check made before either was counted. Returns
+   * a refund for a grading that then fails, or null without a trial. A
+   * counter outage lets the grading through, as before.
+   */
+  async takeGrading(
+    userId: number,
+    skill: TrialSkill,
+  ): Promise<(() => Promise<void>) | null> {
+    if (!this.redis) return null;
+    const redis = this.redis;
     const trial = await this.activeTrial(userId);
-    if (!trial) return;
+    if (!trial) return null;
+    const key = this.key(trial.id);
+    let usedNow: number;
     try {
-      const key = this.key(trial.id);
-      await this.redis
+      const replies = await redis
         .multi()
         .hincrby(key, skill, 1)
         .pexpireat(key, trial.endsAt.getTime() + 24 * 60 * 60 * 1000)
         .exec();
+      const [error, value] = replies?.[0] ?? [null, null];
+      if (error) throw error;
+      usedNow = Number(value);
     } catch (error) {
       this.logger.warn(`trial_counter_write_failed: ${String(error)}`);
+      return null;
     }
+    const refund = async () => {
+      try {
+        await redis.hincrby(key, skill, -1);
+      } catch (error) {
+        this.logger.warn(`trial_counter_refund_failed: ${String(error)}`);
+      }
+    };
+    const message = trialLimitMessage(skill, usedNow - 1);
+    if (message) {
+      await refund();
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'TRIAL_GRADING_LIMIT',
+        message,
+      });
+    }
+    return refund;
   }
 
   /** For the plan banner: what is left of a running trial, or null. */

@@ -718,7 +718,13 @@ export class SpeakingService {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     let submission;
+    // The trial grading is taken here, after the early check above and before
+    // the row is made; a refusal or a failed save gives it back and deletes
+    // the upload (audit R11, 2026-11-18).
+    let refundTrial: (() => Promise<void>) | null | undefined;
     try {
+      if (trialCounted)
+        refundTrial = await this.trial?.takeGrading(userId, 'SPEAKING');
       submission = await this.prisma.$transaction(async (tx) => {
         // pg_advisory_xact_lock returns PostgreSQL `void`; use executeRaw so
         // Prisma does not try to deserialize a result row from the lock call.
@@ -754,6 +760,7 @@ export class SpeakingService {
         });
       });
     } catch (error) {
+      await refundTrial?.();
       try {
         await this.uploadService.deleteFile(uploadResult.key);
       } catch (cleanupError) {
@@ -763,8 +770,6 @@ export class SpeakingService {
       }
       throw error;
     }
-
-    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Pipeline dispatch: BullMQ queue vs legacy DB-polling fallback
     const pipelineMode = getSpeakingPipelineMode();
@@ -1343,7 +1348,11 @@ export class SpeakingService {
     startOfDay.setHours(0, 0, 0, 0);
 
     let submission: SpeakingSubmission | null;
+    // Taken before the row is made, given back if it is not (audit R11).
+    let refundTrial: (() => Promise<void>) | null | undefined;
     try {
+      if (trialCounted)
+        refundTrial = await this.trial?.takeGrading(userId, 'SPEAKING');
       submission = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           SELECT pg_advisory_xact_lock(
@@ -1405,6 +1414,7 @@ export class SpeakingService {
         return newSub;
       });
     } catch (txError) {
+      await refundTrial?.();
       // Recoverable transient failure: revert FINALIZING -> PENDING with token fencing if submission was not created
       const current = await this.prisma.speakingUploadIntent.findUnique({
         where: { id: uploadIntentId },
@@ -1434,11 +1444,11 @@ export class SpeakingService {
     }
 
     if (!submission) {
+      await refundTrial?.();
       throw new InternalServerErrorException(
         'Không hoàn tất được bài nộp Nói.',
       );
     }
-    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Enqueue BullMQ job only AFTER transaction commits
     const pipelineMode = getSpeakingPipelineMode();
