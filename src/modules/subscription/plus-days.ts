@@ -34,6 +34,13 @@ export async function givePlusDays(
   },
 ): Promise<PlusDaysResult | null> {
   const { userId, days, now } = input;
+  // The learner's row is locked first, like every other plan write (purchase
+  // confirmation, admin extend, trial): the end read here stays the end
+  // until this commits (audit R3, 2026-11-18). Two grants, or a grant and a
+  // confirmation, at once each kept only one of their days before.
+  await tx.$queryRaw(
+    Prisma.sql`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`,
+  );
   const terms = await tx.subscription.findMany({
     where: {
       userId,

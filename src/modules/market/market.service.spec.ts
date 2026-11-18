@@ -185,6 +185,8 @@ describe('MarketService', () => {
     };
     const txFor = (plusVersion: { id: number } | null) => ({
       $executeRaw: jest.fn(),
+      // The learner's row lock (audit R3): taken before deductBanh.
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
       marketOrder: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest
@@ -233,6 +235,11 @@ describe('MarketService', () => {
       );
 
       expect(result.success).toBe(true);
+      // User row locked before the Bánh Mì debit (UserStats), the order a
+      // purchase confirmation uses (audit R3).
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        mockGamificationService.deductBanh.mock.invocationCallOrder[0],
+      );
       const created = tx.subscription.create.mock.calls[0][0].data;
       expect(created).toMatchObject({
         userId: 3,

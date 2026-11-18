@@ -235,6 +235,12 @@ export class MarketService {
     // 2. Bọc toàn bộ luồng trong 1 prisma.$transaction nguyên tử
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`market_order:${checkoutKey}`}))`;
+      // A Plus card writes the learner's plan (givePlusDays locks the User
+      // row). That lock is taken here, before deductBanh locks UserStats, so
+      // the order is User then UserStats as in a purchase confirmation and the
+      // two cannot deadlock (audit R3, 2026-11-18).
+      if (resolvedItems.some(({ product }) => product.slug === PLUS_CARD_SLUG))
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
 
       const duplicate = await tx.marketOrder.findUnique({
         where: { idempotencyKey: checkoutKey },
