@@ -399,23 +399,48 @@ describe('MistakesService', () => {
     answerable: true,
     ref: {},
   };
-  function setup(row: Record<string, unknown> | null) {
-    const prisma = {
+  function setup(
+    row: Record<string, unknown> | null,
+    fresh: Record<string, unknown> | null = row,
+  ) {
+    const prisma: any = {
+      // The answer is applied to the row read again under its lock (C8).
+      $executeRaw: jest.fn().mockResolvedValue(0),
       learnerMistake: {
         findFirst: jest.fn().mockResolvedValue(row),
+        findUnique: jest.fn().mockResolvedValue(fresh),
         update: jest.fn(),
       },
     };
-    return { prisma, service: new MistakesService(prisma as any) };
+    prisma.$transaction = jest.fn((fn: (t: unknown) => unknown) => fn(prisma));
+    return { prisma, service: new MistakesService(prisma) };
   }
   const open = {
     id: 5,
     userId: 10,
+    sourceType: 'QUIZ_QUESTION',
+    itemKey: 'quiz:1:q:1',
     wrongCount: 1,
     correctStreak: 0,
     resolvedAt: null,
     detail,
   };
+
+  it('a right answer moves on from the row as it is now, not as it was read (audit C8)', async () => {
+    // Another tab's right answer landed after this one read the row.
+    const { service, prisma } = setup(open, { ...open, correctStreak: 1 });
+
+    await expect(service.answer(10, 5, 1)).resolves.toMatchObject({
+      correctStreak: 2,
+      resolved: true,
+    });
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.learnerMistake.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ correctStreak: 2 }),
+      }),
+    );
+  });
 
   it('answers "not found" for a mistake of another learner', async () => {
     const { service, prisma } = setup(null);
@@ -463,6 +488,7 @@ describe('MistakesService', () => {
 
   it('reads recordings from the microphone fix on, once each, as one row per sentence', async () => {
     const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(0),
       learnerMistakeIngest: {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -601,6 +627,7 @@ describe('MistakesService', () => {
 
   it('reads each attempt once: a second pass on the same marker stores nothing', async () => {
     const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(0),
       learnerMistakeIngest: {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -677,6 +704,7 @@ describe('MistakesService', () => {
     const at = new Date('2026-11-12T10:02:56Z');
     function run(quiz: Record<string, unknown>) {
       const tx = {
+        $executeRaw: jest.fn().mockResolvedValue(0),
         learnerMistakeIngest: {
           createMany: jest.fn().mockResolvedValue({ count: 1 }),
         },

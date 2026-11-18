@@ -254,6 +254,8 @@ export class MistakesService {
         itemKey: obs.itemKey,
       },
     };
+    // The same lock as a review answer (audit C8).
+    await this.lockMistake(tx, userId, obs.sourceType, obs.itemKey);
     const row = await tx.learnerMistake.findUnique({ where });
     const next = applyObservation(
       row
@@ -442,6 +444,34 @@ export class MistakesService {
    * mistake at RESOLVE_AFTER_CORRECT), wrong counts it and starts again.
    */
   private async moveOn(
+    row: { id: number; userId: number; sourceType: string; itemKey: string },
+    correct: boolean,
+  ) {
+    // Read again and written under the row's lock (audit C8, 2026-11-18): an
+    // answer from another tab, or an attempt ingested meanwhile, was
+    // overwritten by a streak computed from the read above.
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockMistake(tx, row.userId, row.sourceType, row.itemKey);
+      const fresh = await tx.learnerMistake.findUnique({
+        where: { id: row.id },
+      });
+      if (!fresh) throw new NotFoundException('Không tìm thấy lỗi này.');
+      return this.nextState(tx, fresh, correct);
+    });
+  }
+
+  /** The row locked by its natural key: an ingest and a review answer wait. */
+  private async lockMistake(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    sourceType: string,
+    itemKey: string,
+  ) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`mistake:${userId}:${sourceType}:${itemKey}`}, 0))`;
+  }
+
+  private async nextState(
+    tx: Prisma.TransactionClient,
     row: Pick<MistakeState, 'wrongCount' | 'correctStreak' | 'resolvedAt'> & {
       id: number;
     },
@@ -460,7 +490,7 @@ export class MistakesService {
             (row.correctStreak + 1 >= RESOLVE_AFTER_CORRECT ? now : null),
         }
       : { wrongCount: row.wrongCount + 1, correctStreak: 0, resolvedAt: null };
-    await this.prisma.learnerMistake.update({
+    await tx.learnerMistake.update({
       where: { id: row.id },
       data: { ...next, lastSeenAt: now },
     });
