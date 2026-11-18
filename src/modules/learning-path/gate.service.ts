@@ -35,6 +35,7 @@ import {
   GATE_QUESTIONS,
   nextLevel,
 } from './progression.logic';
+import { lockSkillLevel } from './skill-level-lock';
 
 const GATE_QUIZ_TYPE: Record<GateSkill, QuizType> = {
   LISTENING: 'LISTENING_PRACTICE',
@@ -252,6 +253,8 @@ export class GateService {
   ) {
     const { userId, skill, level, attemptId } = input;
     const where = { userId_skill: { userId, skill } };
+    // The same lock as progress and placement (audit C6, 2026-11-18).
+    await lockSkillLevel(tx, userId, skill);
     const row = await tx.learnerSkillLevel.findUnique({ where });
     await tx.learnerSkillLevel.upsert({
       where,

@@ -39,6 +39,12 @@ function setup(overrides: { skillRow?: Record<string, unknown> | null } = {}) {
         skillRow = { ...data };
         return Promise.resolve(skillRow);
       },
+      // INSERT ... ON CONFLICT DO NOTHING (audit C6).
+      createMany: ({ data }: any) => {
+        if (skillRow) return Promise.resolve({ count: 0 });
+        skillRow = { ...data[0] };
+        return Promise.resolve({ count: 1 });
+      },
       update: ({ data }: any) => {
         skillRow = { ...skillRow, ...data };
         return Promise.resolve(skillRow);

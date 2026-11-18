@@ -17,6 +17,7 @@ import { parseCefrRange } from '../subscription/practice-level';
 import { itemLevel, seedDifficulty, updateAfterAttempt } from './ability.logic';
 import { ABILITY_SEED, levelsUpTo, maxLevel } from './placement.logic';
 import { progressUnlockTarget, UNPLACED_UNLOCKED } from './progression.logic';
+import { lockSkillLevel } from './skill-level-lock';
 
 type Attempt = {
   userId: number;
@@ -192,7 +193,7 @@ export class LearnerProgressService {
   private async record(attempt: Attempt): Promise<PracticeLevel | null> {
     return this.prisma.$transaction(async (tx) => {
       // Ability is read, then written from the read value.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`learner-progress:${attempt.userId}:${attempt.skill}`}, 0))`;
+      await lockSkillLevel(tx, attempt.userId, attempt.skill);
       const { count } = await tx.learnerProgressEvent.createMany({
         data: [
           {
@@ -217,19 +218,24 @@ export class LearnerProgressService {
     attempt: Attempt,
   ): Promise<PracticeLevel | null> {
     const { userId, skill } = attempt;
-    const row =
-      (await tx.learnerSkillLevel.findUnique({
-        where: { userId_skill: { userId, skill } },
-      })) ??
-      (await tx.learnerSkillLevel.create({
-        data: {
+    // INSERT ... ON CONFLICT DO NOTHING (audit C6): a gate test or placement
+    // creating the row at the same moment made the create fail on the
+    // unique key, and this attempt's progress was lost.
+    await tx.learnerSkillLevel.createMany({
+      data: [
+        {
           userId,
           skill,
           level: UNPLACED_UNLOCKED,
           unlockedLevel: UNPLACED_UNLOCKED,
           ability: ABILITY_SEED[UNPLACED_UNLOCKED],
         },
-      }));
+      ],
+      skipDuplicates: true,
+    });
+    const row = (await tx.learnerSkillLevel.findUnique({
+      where: { userId_skill: { userId, skill } },
+    }))!;
     const item = await tx.contentDifficulty.findUnique({
       where: {
         contentType_contentId: {
