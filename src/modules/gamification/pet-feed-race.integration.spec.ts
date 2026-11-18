@@ -93,9 +93,7 @@ describeWithIsolatedDatabase('pet page versus feeding', () => {
                   const row = await fn.apply(d, args);
                   if (firstRead) {
                     firstRead = false;
-                    fed = (await feeder.feedPet(userId)) as unknown as {
-                      satiety: number;
-                    };
+                    fed = await feeder.feedPet(userId);
                   }
                   return row;
                 };
@@ -109,7 +107,7 @@ describeWithIsolatedDatabase('pet page versus feeding', () => {
       },
     });
     const page = new GamificationService(
-      pausing as never,
+      pausing,
       { emit: jest.fn() } as never,
       {} as never,
     );
