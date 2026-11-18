@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { QuizPublicationStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import { GenericExamService, lrSourceIsLive } from './generic-exam.service';
@@ -190,15 +190,49 @@ describe('GenericExamService internal sources', () => {
 });
 
 describe('GenericExamService.update title', () => {
+  it('an edit that lands after the exam was published is refused (audit A8 follow-up)', async () => {
+    const service: any = Object.create(GenericExamService.prototype);
+    service.prisma = {
+      exam: {
+        update: jest.fn(),
+        // Read DRAFT first; PUBLISHED under the lock.
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+        }),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    service.prisma.$transaction = jest.fn((cb: (tx: unknown) => unknown) =>
+      cb(service.prisma),
+    );
+    service.findExam = jest
+      .fn()
+      .mockResolvedValue({ publicationStatus: QuizPublicationStatus.DRAFT });
+
+    await expect(service.update(5, { title: 'Đề 02' })).rejects.toThrow(
+      'bản nháp',
+    );
+    expect(service.prisma.exam.update).not.toHaveBeenCalled();
+  });
+
   it('renames what learners read, not only the exam row', async () => {
     const service: any = Object.create(GenericExamService.prototype);
     const update = () => jest.fn().mockResolvedValue({});
     service.prisma = {
-      exam: { update: update() },
+      exam: {
+        update: update(),
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
       toeicAssessment: { update: update() },
       speakingPracticeSet: { update: update() },
       toeicWritingSet: { update: update() },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
+    service.prisma.$transaction = jest.fn((cb: (tx: unknown) => unknown) =>
+      cb(service.prisma),
+    );
     service.project = jest.fn();
     service.findExam = jest.fn().mockResolvedValue({
       publicationStatus: QuizPublicationStatus.DRAFT,
@@ -326,6 +360,52 @@ describe('GenericExamService publish builds the recording', () => {
     expect(service.prisma.$transaction).toHaveBeenCalled();
     expect(ensure.mock.invocationCallOrder[0]).toBeLessThan(
       service.prisma.$transaction.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('content emptied while the slow checks ran is refused where the status changes (audit A8)', async () => {
+    const service = build(jest.fn().mockResolvedValue({ examId: 3 }));
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest.fn().mockResolvedValue(draft),
+        update: jest.fn(),
+      },
+      toeicExamSet: { update: jest.fn() },
+    };
+    service.prisma.$transaction = jest.fn((run: any) => run(tx));
+    service.productReadiness = jest
+      .fn()
+      .mockReturnValueOnce({ learnerReady: true })
+      .mockReturnValueOnce({
+        learnerReady: false,
+        lrValidation: { issues: ['Part 5 không còn câu nào'] },
+      });
+
+    await expect(service.publish(5)).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.exam.update).not.toHaveBeenCalled();
+  });
+
+  it('locks the exam row before it reads the content again, so a Speaking or Writing edit is checked too', async () => {
+    const service = build(jest.fn().mockResolvedValue({ examId: 3 }));
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest.fn().mockResolvedValue(draft),
+        update: jest.fn(),
+      },
+      toeicExamSet: { update: jest.fn() },
+    };
+    service.prisma.$transaction = jest.fn((run: any) => run(tx));
+
+    await service.publish(5);
+
+    const locks = tx.$queryRaw.mock.calls.map((call: any) => call[0].join('?'));
+    expect(locks[0]).toContain('FROM "ToeicExamSet"');
+    expect(locks[1]).toContain('FROM "Exam"');
+    expect(tx.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      tx.exam.findUnique.mock.invocationCallOrder[0],
     );
   });
 
@@ -526,4 +606,69 @@ describe('GenericExamService publish readiness guard', () => {
     );
     expect(service.prisma.$transaction).not.toHaveBeenCalled();
   });
+});
+
+describe('Speaking edits of an exam run under the exam lock (2026-11-18)', () => {
+  const user = { id: 1, role: 'ADMIN' };
+  const build = (underLock: QuizPublicationStatus) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ publicationStatus: underLock }),
+      },
+    };
+    // The early check reads DRAFT; the read under the lock may not.
+    service.prisma = {
+      exam: {
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
+      $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    };
+    service.speakingContext = jest.fn().mockResolvedValue({ setId: 'sw-set' });
+    service.skillCms = {
+      createSpeakingStimulus: jest.fn().mockResolvedValue('ok'),
+      addSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+      updateSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+      reorderSpeakingExercises: jest.fn().mockResolvedValue('ok'),
+      deleteSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+    };
+    return { service, tx };
+  };
+  const calls: Array<[string, (service: any) => Promise<unknown>]> = [
+    ['createSpeakingStimulus', (s) => s.createSpeakingStimulus(5, {}, user)],
+    ['addSpeakingExercise', (s) => s.createSpeakingExercise(5, {}, user)],
+    ['updateSpeakingExercise', (s) => s.updateSpeakingExercise(5, 1, {}, user)],
+    [
+      'reorderSpeakingExercises',
+      (s) => s.reorderSpeakingExercises(5, { exerciseIds: [1] }, user),
+    ],
+    ['deleteSpeakingExercise', (s) => s.deleteSpeakingExercise(5, 1, user)],
+  ];
+
+  it.each(calls)(
+    '%s: an exam published between the check and the write is refused; SkillCms never runs',
+    async (method, run) => {
+      const { service } = build(QuizPublicationStatus.PUBLISHED);
+
+      await expect(run(service)).rejects.toThrow('bản nháp');
+      expect(service.skillCms[method]).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(calls)(
+    '%s: a draft hands the lock transaction to SkillCms',
+    async (method, run) => {
+      const { service, tx } = build(QuizPublicationStatus.DRAFT);
+
+      await run(service);
+
+      const args = service.skillCms[method].mock.calls[0];
+      expect(args[args.length - 1]).toBe(tx);
+    },
+  );
 });

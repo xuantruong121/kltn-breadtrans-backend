@@ -18,7 +18,7 @@ import {
   SpeakingStimulusKind,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
-import { DelayedError, Job, Queue, Worker } from 'bullmq';
+import { DelayedError, Job, Queue, UnrecoverableError, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
@@ -109,6 +109,7 @@ import type {
   QuestionReview,
   QuestionVerdict,
 } from './toeic-answer-review.types';
+import { ExamNotDraftException, inDraftSet } from './draft-set-lock';
 
 const TOEIC_AI_QUEUE = 'breadtrans-toeic-ai-exam';
 /** Tries per batch: the first draft plus these, each told why it was refused. */
@@ -306,6 +307,37 @@ function imageDimensions(
   return null;
 }
 
+/**
+ * The admin cancelled the job while the worker ran (audit A6, 2026-11-18).
+ * Unrecoverable, so BullMQ never retries it; process() stops without
+ * writing FAILED over CANCELLED.
+ */
+class GenerationCancelledError extends UnrecoverableError {
+  constructor() {
+    super('Generation cancelled by Admin');
+  }
+}
+
+/** Statuses after which a job can no longer be cancelled. */
+const UNCANCELLABLE: AiGenerationJobStatus[] = [
+  AiGenerationJobStatus.GENERATED,
+  AiGenerationJobStatus.APPROVED,
+  AiGenerationJobStatus.PUBLISHED,
+];
+
+/** Statuses in which the worker owns the candidate (audit A7). */
+const CANDIDATE_BUSY: AiGenerationJobStatus[] = [
+  AiGenerationJobStatus.QUEUED,
+  AiGenerationJobStatus.PROCESSING,
+];
+
+/** How long one Apply may hold its job; a crashed one frees it after this. */
+const APPLY_LOCK_MS = 15 * 60_000;
+/** Redis must answer the lock within this, or Apply is refused (503). */
+const APPLY_LOCK_WAIT_MS = 3_000;
+const UNLOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 @Injectable()
 export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ToeicAiExamService.name);
@@ -430,7 +462,24 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * One start per admin at a time (audit A13, 2026-11-18): two requests (a
+   * retry with the same key, two tabs) both made a draft exam; the second
+   * job then failed on the unique key with a 500 and left its draft behind.
+   */
   async start(
+    dto: CreateToeicAiExamDto,
+    adminId: number,
+    idempotencyKey?: string,
+  ) {
+    return this.withRedisLock(
+      `toeic-ai-start:${adminId}`,
+      'Đề AI đang được tạo từ yêu cầu trước. Vui lòng chờ giây lát.',
+      () => this.startOnce(dto, adminId, idempotencyKey),
+    );
+  }
+
+  private async startOnce(
     dto: CreateToeicAiExamDto,
     adminId: number,
     idempotencyKey?: string,
@@ -730,7 +779,26 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * job's draftSnapshot JSON; never touches real Exam/ToeicQuestionGroup
    * tables (EXAM_AI_CANDIDATE_EDIT_MUTATES_DRAFT=false).
    */
+  /**
+   * Candidate writes (edit, regenerate, confirm, retry) and Apply run one at a
+   * time per job, under the job lock (audit A7, 2026-11-18): each read the
+   * whole candidate, changed it and wrote it back, so a "Tạo lại nhóm" still
+   * running erased an edit saved meanwhile. A job the worker is still
+   * generating is not edited.
+   */
   async updateCandidate(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    patch: Record<string, unknown>,
+  ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.updateCandidateLocked(jobId, adminId, candidateKey, patch);
+    });
+  }
+
+  private async updateCandidateLocked(
     jobId: string,
     adminId: number,
     candidateKey: string,
@@ -826,10 +894,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('candidateKey không hợp lệ');
     }
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -841,6 +906,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * territory, not a silent candidate swap under an applied item).
    */
   async regenerateCandidateGroup(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+  ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.regenerateCandidateGroupLocked(jobId, adminId, candidateKey);
+    });
+  }
+
+  private async regenerateCandidateGroupLocked(
     jobId: string,
     adminId: number,
     candidateKey: string,
@@ -906,10 +982,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     this.assertNoDuplicateBatches(lrBatches);
     this.resolveReviewFailures(candidate);
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -919,6 +992,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * Bounded to this Part's groups only — never re-runs the whole Exam.
    */
   async regenerateCandidatePart(jobId: string, adminId: number, part: number) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.regenerateCandidatePartLocked(jobId, adminId, part);
+    });
+  }
+
+  private async regenerateCandidatePartLocked(
+    jobId: string,
+    adminId: number,
+    part: number,
+  ) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -965,10 +1049,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     }
     this.resolveReviewFailures(candidate);
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -1019,6 +1100,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   }
 
   async retry(jobId: string, adminId: number) {
+    return this.withJobLock(jobId, () => this.retryLocked(jobId, adminId));
+  }
+
+  private async retryLocked(jobId: string, adminId: number) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -1069,8 +1154,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       legacyFailedScope?.kind === 'speaking-writing';
     if (!failedUnits.length && !speakingWritingFailed)
       throw new ConflictException('Chỉ job lỗi mới có thể thử lại');
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
+    // Not over a run that another tab started meanwhile (audit A7).
+    const queuedNow = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: CANDIDATE_BUSY } },
       data: {
         status: AiGenerationJobStatus.QUEUED,
         errorSummary: null,
@@ -1089,6 +1175,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+    if (queuedNow.count === 0)
+      throw new ConflictException('Job đang chạy lại rồi.');
     const existing = await this.queue.getJob(jobId);
     if (existing) await existing.remove();
     await this.queue.add('generate', { version: 1, jobId }, { jobId });
@@ -1101,18 +1189,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!job || job.createdByAdminId !== adminId)
       throw new NotFoundException('Không tìm thấy job tạo đề TOEIC AI');
-    const terminalStatuses: AiGenerationJobStatus[] = [
-      AiGenerationJobStatus.GENERATED,
-      AiGenerationJobStatus.APPROVED,
-      AiGenerationJobStatus.PUBLISHED,
-    ];
-    if (terminalStatuses.includes(job.status)) {
-      throw new ConflictException(
+    const refused = () =>
+      new ConflictException(
         'Bản nháp đã sẵn sàng review nên không thể hủy job',
       );
-    }
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
+    if (UNCANCELLABLE.includes(job.status)) throw refused();
+    // Only a job still running or waiting is cancelled: a worker that wrote
+    // GENERATED meanwhile keeps its candidate (audit A6, 2026-11-18).
+    const { count } = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: UNCANCELLABLE } },
       data: {
         status: AiGenerationJobStatus.CANCELLED,
         resultSnapshot: {
@@ -1121,12 +1206,118 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+    if (count === 0) throw refused();
     const queued = await this.queue.getJob(jobId);
-    if (queued) await queued.remove();
+    // A job the worker is running is locked and cannot be removed: it stops
+    // at its next checkpoint instead. Removing it used to answer 500.
+    if (queued)
+      await queued
+        .remove()
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `toeic_ai_job_cancel_running jobId=${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
     return this.status(jobId);
   }
 
+  /**
+   * One Apply per job at a time (audit A3, 2026-11-18). A double click ran
+   * two: the groups are written in a transaction, but images, audio and the
+   * Speaking and Writing sets are made outside it, and were made twice. The
+   * lock covers the whole Apply. When Redis does not answer, Apply is refused
+   * (503) rather than run unlocked; it is an admin action and can wait.
+   */
   async apply(
+    jobId: string,
+    adminId: number,
+    selectedCandidateKeys?: string[],
+  ) {
+    return this.withJobLock(jobId, () =>
+      this.applyLocked(jobId, adminId, selectedCandidateKeys),
+    );
+  }
+
+  /**
+   * The job lock (audit A3/A7): SET NX PX, released with a compare-and-delete
+   * on this run's token. Held: 409. Redis silent for 3 s: 503, nothing run.
+   */
+  private async withJobLock<T>(jobId: string, work: () => Promise<T>) {
+    return this.withRedisLock(
+      `toeic-ai-apply:${jobId}`,
+      'Đề đang được áp dụng. Vui lòng chờ lần áp dụng trước hoàn tất.',
+      work,
+    );
+  }
+
+  private async withRedisLock<T>(
+    key: string,
+    busyMessage: string,
+    work: () => Promise<T>,
+  ) {
+    const owner = randomUUID();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let locked: string | null;
+    try {
+      locked = await Promise.race([
+        this.connection.set(key, owner, 'PX', APPLY_LOCK_MS, 'NX'),
+        new Promise<never>((_, fail) => {
+          timer = setTimeout(
+            () => fail(new Error('lock timed out')),
+            APPLY_LOCK_WAIT_MS,
+          );
+        }),
+      ]);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Chưa khoá được đề để áp dụng (Redis không phản hồi). Vui lòng thử lại sau.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    if (locked !== 'OK') throw new ConflictException(busyMessage);
+    try {
+      return await work();
+    } finally {
+      await this.connection
+        .eval(UNLOCK_SCRIPT, 1, key, owner)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `toeic_ai_unlock_failed key=${key}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+    }
+  }
+
+  /** A job the worker is generating has no candidate to edit yet. */
+  private async assertCandidateIdle(jobId: string) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
+    if (job && CANDIDATE_BUSY.includes(job.status))
+      throw new ConflictException(
+        'Job đang tạo đề. Đợi tạo xong rồi mới sửa candidate.',
+      );
+  }
+
+  /**
+   * Saves a changed candidate only while the worker is not generating (a
+   * retry from another tab could have queued it): it would overwrite the
+   * save with its own copy (audit A7).
+   */
+  private async writeCandidate(jobId: string, candidate: unknown) {
+    const { count } = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: CANDIDATE_BUSY } },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    if (count === 0)
+      throw new ConflictException(
+        'Job vừa được chạy lại nên candidate chưa được lưu. Đợi xong rồi thử lại.',
+      );
+  }
+
+  private async applyLocked(
     jobId: string,
     adminId: number,
     selectedCandidateKeys?: string[],
@@ -1208,6 +1399,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         toApply.includes(g.candidateKey),
       );
       await this.prisma.$transaction(async (tx) => {
+        // Still a draft where the groups are written, with the exam set
+        // locked (audit A8, 2026-11-18): a publish between the check at the
+        // start of Apply and here had its content rewritten under learners.
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet!.id} FOR UPDATE`;
+        const still = await tx.exam.findUnique({
+          where: { id: exam.id },
+          select: { publicationStatus: true },
+        });
+        if (still?.publicationStatus !== QuizPublicationStatus.DRAFT)
+          throw new ConflictException('Chỉ có thể Apply candidate vào Draft');
         if (!isSelective) {
           // Full apply-all (default, backward-compatible): replace the
           // entire L&R content set in one shot, as before.
@@ -1300,6 +1501,51 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         })
         .catch(() => undefined);
     return { ...(await this.status(jobId)), skipped };
+  }
+
+  /**
+   * One content write of an AI path, with the exam set locked and still a
+   * draft (audit A8 follow-up, 2026-11-18). The AI calls before it take
+   * seconds to minutes; a publish meanwhile had its content rewritten.
+   */
+  private draftWrite<T>(
+    setId: number,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return inDraftSet(
+      this.prisma,
+      setId,
+      work,
+      'Đề vừa được xuất bản. Chỉ Draft mới có thể tạo lại nội dung AI.',
+    );
+  }
+
+  /**
+   * A refused or failed write leaves no new file. The admin paths upload to
+   * a new key each time (uploadSuffix), so this never deletes a file a row
+   * shows.
+   */
+  private async writeOrDropUpload<T>(
+    setId: number,
+    uploadedKey: string,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    try {
+      return await this.draftWrite(setId, work);
+    } catch (error) {
+      await this.r2.deleteFile(uploadedKey).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * A new key for every regenerated file (audit follow-up 2026-11-18): a
+   * fixed key was written over before the draft check, so an exam published
+   * meanwhile played or showed the new file. The old file is kept: a cloned
+   * exam may point at it too.
+   */
+  private uploadSuffix() {
+    return randomUUID().slice(0, 8);
   }
 
   private async editableDraft(examId: number) {
@@ -1441,6 +1687,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const missing: string[] = [];
     const attempt = async (slot: string, fill: () => Promise<boolean>) => {
       const done = await fill().catch((error) => {
+        if (error instanceof ExamNotDraftException) throw error;
         this.logger.warn(`Exam image still missing ${slot}: ${String(error)}`);
         return false;
       });
@@ -1485,14 +1732,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (!brief) continue;
         await attempt(`Speaking câu ${exercise.order}`, async () => {
           const image = await this.sourceExamImage(
-            `exam-${examId}/speaking/${exercise.order}`,
+            `exam-${examId}/speaking/${exercise.order}-${this.uploadSuffix()}`,
             brief,
             1,
           );
-          await this.prisma.speakingExercise.update({
-            where: { id: exercise.id },
-            data: { imageUrl: image.url },
-          });
+          await this.writeOrDropUpload(setId, image.key, (tx) =>
+            tx.speakingExercise.update({
+              where: { id: exercise.id },
+              data: { imageUrl: image.url },
+            }),
+          );
           return true;
         });
       }
@@ -1511,20 +1760,22 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (!brief || !question || content.imageUrl) continue;
         await attempt(`Writing câu ${item.order}`, async () => {
           const image = await this.sourceExamImage(
-            `exam-${examId}/writing/${item.order}`,
+            `exam-${examId}/writing/${item.order}-${this.uploadSuffix()}`,
             brief,
             1,
           );
-          await this.prisma.question.update({
-            where: { id: question.id },
-            data: {
-              content: {
-                ...content,
-                imageUrl: image.url,
-                aiMedia: image.metadata,
-              } as Prisma.InputJsonValue,
-            },
-          });
+          await this.writeOrDropUpload(setId, image.key, (tx) =>
+            tx.question.update({
+              where: { id: question.id },
+              data: {
+                content: {
+                  ...content,
+                  imageUrl: image.url,
+                  aiMedia: image.metadata,
+                } as Prisma.InputJsonValue,
+              },
+            }),
+          );
           return true;
         });
       }
@@ -1551,7 +1802,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         );
       try {
         const image = await this.sourceExamImage(
-          `exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated`,
+          `exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated-${this.uploadSuffix()}`,
           group.imageBrief,
           1,
         );
@@ -1571,18 +1822,24 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           image,
           image.url,
         );
-        const updated = await this.prisma.toeicQuestionGroup.update({
-          where: { id: group.id },
-          data: {
-            imageUrl: image.url,
-            mediaMetadata: metadata as Prisma.InputJsonValue,
-          },
-        });
+        const updated = await this.writeOrDropUpload(
+          group.examId,
+          image.key,
+          (tx) =>
+            tx.toeicQuestionGroup.update({
+              where: { id: group.id },
+              data: {
+                imageUrl: image.url,
+                mediaMetadata: metadata as Prisma.InputJsonValue,
+              },
+            }),
+        );
         // Part 1 audio reads the statements, which the photo just replaced.
         return metadata.image.questionStatus === 'READY_FOR_REVIEW'
           ? await this.regenerateMedia(examId, groupId, 'audio')
           : updated;
-      } catch {
+      } catch (error) {
+        if (error instanceof ExamNotDraftException) throw error;
         throw new BadRequestException(mediaRetryMessage('image'));
       }
     }
@@ -1597,7 +1854,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       // Exam Listening audio goes to the private bucket; the group stores the
       // key and learners hear it only through /toeic/groups/:id/audio.
       const uploaded = await this.r2.putPrivateObjectAtKey(
-        `premium/listening/toeic/exams/${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
+        `premium/listening/toeic/exams/${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated-${this.uploadSuffix()}.mp3`,
         audio,
         'audio/mpeg',
       );
@@ -1611,14 +1868,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         sourceHash,
         scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
       };
-      return this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          audioUrl: uploaded.key,
-          mediaMetadata: metadata as Prisma.InputJsonValue,
-        },
-      });
-    } catch {
+      return await this.writeOrDropUpload(group.examId, uploaded.key, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            audioUrl: uploaded.key,
+            mediaMetadata: metadata as Prisma.InputJsonValue,
+          },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof ExamNotDraftException) throw error;
       throw new BadRequestException(mediaRetryMessage('audio'));
     }
   }
@@ -1778,14 +2038,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         questionStatus: 'STALE',
       };
       const mediaMetadata = { ...current, image: imageMetadata };
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          imageUrl: uploaded.url,
-          imageBrief,
-          mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
-        },
-      });
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            imageUrl: uploaded.url,
+            imageBrief,
+            mediaMetadata: mediaMetadata as Prisma.InputJsonValue,
+          },
+        }),
+      );
+      // The group shows the file now: a later failure must not delete it.
+      uploadedKey = undefined;
       let vision: ToeicPart1QuestionCandidate | undefined;
       let visionError: string | undefined;
       try {
@@ -1807,16 +2071,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       if (vision) {
         const question = group.questions[0];
         const data = part1QuestionData(vision);
-        if (question) {
-          await this.prisma.toeicQuestion.update({
-            where: { id: question.id },
-            data,
-          });
-        } else {
-          await this.prisma.toeicQuestion.create({
-            data: { ...data, groupId: group.id, questionNumber: 1 },
-          });
-        }
+        await this.draftWrite(group.examId, async (tx) => {
+          if (question)
+            await tx.toeicQuestion.update({
+              where: { id: question.id },
+              data,
+            });
+          else
+            await tx.toeicQuestion.create({
+              data: { ...data, groupId: group.id, questionNumber: 1 },
+            });
+        });
         imageMetadata.questionStatus = 'READY_FOR_REVIEW';
         imageMetadata.questionImageHash = imageHash;
         imageMetadata.sceneSummary = vision.sceneSummary;
@@ -1840,15 +2105,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           uploaded.url,
         );
       }
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          mediaMetadata: {
-            ...current,
-            image: imageMetadata,
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            mediaMetadata: {
+              ...current,
+              image: imageMetadata,
+            },
           },
-        },
-      });
+        }),
+      );
       this.imageCandidates.delete(candidateId);
       return {
         imageUrl: uploaded.url,
@@ -1857,7 +2124,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         error: visionError,
       };
     } catch (error) {
-      if (uploadedKey)
+      // Kept when the group already showed this file (the same photo again).
+      if (uploadedKey && !group.imageUrl?.endsWith(`/${uploadedKey}`))
         await this.r2.deleteFile(uploadedKey).catch(() => undefined);
       this.imageCandidates.delete(candidateId);
       throw error;
@@ -1899,15 +2167,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const imageHash = sha256(image.buffer);
     const question = group.questions[0];
     const data = part1QuestionData(vision);
-    if (question)
-      await this.prisma.toeicQuestion.update({
-        where: { id: question.id },
-        data,
-      });
-    else
-      await this.prisma.toeicQuestion.create({
-        data: { ...data, groupId: group.id, questionNumber: 1 },
-      });
     const imageMeta: Record<string, any> = {
       ...(current.image ?? {}),
       status: 'READY',
@@ -1925,14 +2184,27 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       image,
       group.imageUrl,
     );
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: {
-          ...current,
-          image: imageMeta,
-        } as Prisma.InputJsonValue,
-      },
+    // The review above reads the question from memory, so the question and
+    // its review are written together here.
+    await this.draftWrite(group.examId, async (tx) => {
+      if (question)
+        await tx.toeicQuestion.update({
+          where: { id: question.id },
+          data,
+        });
+      else
+        await tx.toeicQuestion.create({
+          data: { ...data, groupId: group.id, questionNumber: 1 },
+        });
+      await tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: {
+            ...current,
+            image: imageMeta,
+          } as Prisma.InputJsonValue,
+        },
+      });
     });
     return { question: vision, review: imageMeta.review ?? null };
   }
@@ -1963,7 +2235,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       select: { resultSnapshot: true, status: true },
     });
     if (job.status === AiGenerationJobStatus.CANCELLED)
-      throw new Error('Generation cancelled by Admin');
+      throw new GenerationCancelledError();
     const current = (job.resultSnapshot as any) ?? {};
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -2418,6 +2690,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     candidateKey: string,
     method: ConfirmationMethod,
   ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.confirmCandidateLocked(jobId, adminId, candidateKey, method);
+    });
+  }
+
+  private async confirmCandidateLocked(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    method: ConfirmationMethod,
+  ) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -2451,10 +2735,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       at: new Date().toISOString(),
       method,
     });
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -3266,12 +3547,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const group = await this.part1DraftGroup(examId, groupId);
     const { metadata, image, stored } = await this.currentPart1Review(group);
     await this.reviewPart1DraftGroup(group, image, stored, group.imageUrl);
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-      },
-    });
+    await this.draftWrite(group.examId, (tx) =>
+      tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+        },
+      }),
+    );
     return { groupId: group.id, image };
   }
 
@@ -3289,12 +3572,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     const { metadata, image, review, currentHash, changed } =
       await this.currentPart1Review(group);
     if (changed) {
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: group.id },
-        data: {
-          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-        },
-      });
+      await this.draftWrite(group.examId, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+          },
+        }),
+      );
       throw new ConflictException(
         'Nội dung hoặc ảnh đã thay đổi sau lần kiểm định; kết quả cũ đã chuyển vào lịch sử. Hãy chạy lại kiểm tra Vision hoặc xác nhận thủ công.',
       );
@@ -3312,18 +3597,23 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       at: new Date().toISOString(),
       method,
     });
-    await this.prisma.toeicQuestionGroup.update({
-      where: { id: group.id },
-      data: {
-        mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
-      },
-    });
+    await this.draftWrite(group.examId, (tx) =>
+      tx.toeicQuestionGroup.update({
+        where: { id: group.id },
+        data: {
+          mediaMetadata: { ...metadata, image } as Prisma.InputJsonValue,
+        },
+      }),
+    );
     return { groupId: group.id, image };
   }
 
   /** A library photo is not the scene the question was written for. */
   private async matchPart1QuestionToImage(
-    group: { questions: Array<{ id: number; options?: unknown }> },
+    group: {
+      examId: number;
+      questions: Array<{ id: number; options?: unknown }>;
+    },
     metadata: { image?: Record<string, unknown> },
     image: { buffer?: Buffer; mimeType?: string; metadata: object },
   ) {
@@ -3340,10 +3630,12 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       this.assertPart1QuestionCandidate(vision);
       if (question) {
         const data = part1QuestionData(vision);
-        await this.prisma.toeicQuestion.update({
-          where: { id: question.id },
-          data,
-        });
+        await this.draftWrite(group.examId, (tx) =>
+          tx.toeicQuestion.update({
+            where: { id: question.id },
+            data,
+          }),
+        );
         // The audio and the answer review read this same object right after.
         Object.assign(question, data);
       }
@@ -3494,14 +3786,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       | { kind: 'speaking-writing' }
       | undefined;
     try {
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      // Not over a cancel that landed after the read above (audit A6).
+      const started = await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: { not: AiGenerationJobStatus.CANCELLED } },
         data: {
           status: AiGenerationJobStatus.PROCESSING,
           startedAt: new Date(),
           errorSummary: null,
         },
       });
+      if (started.count === 0) return;
       const existingAttempts = exam.toeicExamSet
         ? await this.prisma.toeicAttempt.count({
             where: { examId: exam.toeicExamSet.id },
@@ -3721,8 +4015,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         where: { id: jobId },
         select: { resultSnapshot: true },
       });
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      // Only from PROCESSING: a cancel after the last checkpoint wins.
+      await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: AiGenerationJobStatus.PROCESSING },
         data: {
           status: AiGenerationJobStatus.GENERATED,
           completedAt: new Date(),
@@ -3749,6 +4044,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       });
     } catch (error) {
+      // Cancelled by the admin: stop here, CANCELLED stays (audit A6).
+      if (error instanceof GenerationCancelledError) {
+        this.logger.log(`toeic_ai_job_cancelled jobId=${jobId}`);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       // Every provider out (quota spent or down): wait for the reset and
       // resume from the checkpoint rather than failing (ai-job-quota-wait).
@@ -3772,8 +4072,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           })
         : null;
       if (resumeAt && token) {
-        await this.prisma.aiGenerationJob.update({
-          where: { id: jobId },
+        const waiting = await this.prisma.aiGenerationJob.updateMany({
+          where: {
+            id: jobId,
+            status: { not: AiGenerationJobStatus.CANCELLED },
+          },
           data: {
             status: AiGenerationJobStatus.QUEUED,
             errorSummary: message.slice(0, 1000),
@@ -3794,14 +4097,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             ] as Prisma.InputJsonValue,
           },
         });
+        if (waiting.count === 0) return;
         this.logger.warn(
           `toeic_ai_job_waiting_quota jobId=${jobId} resumeAt=${resumeAt.toISOString()} wait=${waitsSoFar + 1}`,
         );
         await queueJob.moveToDelayed(resumeAt.getTime(), token);
         throw new DelayedError();
       }
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      const failed = await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: { not: AiGenerationJobStatus.CANCELLED } },
         data: {
           status: AiGenerationJobStatus.FAILED,
           completedAt: new Date(),
@@ -3817,6 +4121,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           ] as Prisma.InputJsonValue,
         },
       });
+      // Cancelled while failing: nothing to retry.
+      if (failed.count === 0) return;
       throw error;
     }
   }

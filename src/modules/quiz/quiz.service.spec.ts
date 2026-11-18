@@ -622,6 +622,28 @@ describe('QuizService', () => {
     });
   });
 
+  describe('a submission names its attempt (audit C11)', () => {
+    it('a Reading submission without its attempt id is refused', async () => {
+      mockPrismaService.quiz.findUnique.mockResolvedValue({
+        id: 24,
+        type: 'BILINGUAL_READING',
+        questions: [
+          {
+            id: 1,
+            type: 'MULTIPLE_CHOICE',
+            content: { options: ['A', 'B'], correctIndex: 1 },
+          },
+        ],
+      });
+      await expect(
+        service.submitQuiz(24, 7, {
+          answers: [{ questionId: 1, answer: 'B' }],
+        }),
+      ).rejects.toThrow('clientAttemptId');
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Reading submission integrity', () => {
     const questions = [
       {
@@ -702,6 +724,7 @@ describe('QuizService', () => {
           { questionId: 1, answer: 'B' },
           { questionId: 2, answer: 'D' },
         ],
+        clientAttemptId: '3f0f8c4e-5b6a-4c1d-9e2f-1a2b3c4d5e6f',
       });
 
       expect(tx.submission.create).toHaveBeenCalledWith(
@@ -909,6 +932,7 @@ describe('QuizService', () => {
       mockPrismaService.$transaction.mockRejectedValue(
         new Error('database unavailable'),
       );
+      mockPrismaService.submission.findFirst.mockResolvedValue(null);
 
       await expect(
         service.submitQuiz(24, 7, {
@@ -916,6 +940,7 @@ describe('QuizService', () => {
             { questionId: 1, answer: 'B' },
             { questionId: 2, answer: 'C' },
           ],
+          clientAttemptId: '3f0f8c4e-5b6a-4c1d-9e2f-1a2b3c4d5e6f',
         }),
       ).rejects.toThrow('database unavailable');
       expect(
@@ -978,7 +1003,14 @@ describe('QuizService', () => {
         submission: {
           create: jest.fn().mockResolvedValue({ id: 79, results: [] }),
         },
+        listeningPracticeAttempt: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
       };
+      // No attemptId sent: the learner's open attempt is used (audit C11).
+      jest
+        .spyOn(service, 'getOrCreateListeningAttempt')
+        .mockResolvedValue({ id: 55 } as never);
       mockPrismaService.$transaction.mockImplementation(
         (callback: (transaction: typeof tx) => Promise<unknown>) =>
           callback(tx),
@@ -993,6 +1025,10 @@ describe('QuizService', () => {
           { questionId: 92, answer: '' },
         ],
       });
+      // The open attempt is completed with the submission (audit C11).
+      expect(tx.listeningPracticeAttempt.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: 55 }) }),
+      );
 
       expect(tx.submission.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1059,7 +1095,13 @@ describe('QuizService', () => {
         submission: {
           create: jest.fn().mockResolvedValue({ id: 78, results: [] }),
         },
+        listeningPracticeAttempt: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
       };
+      jest
+        .spyOn(service, 'getOrCreateListeningAttempt')
+        .mockResolvedValue({ id: 55 } as never);
       mockPrismaService.$transaction.mockImplementation(
         (callback: (transaction: typeof tx) => Promise<unknown>) =>
           callback(tx),

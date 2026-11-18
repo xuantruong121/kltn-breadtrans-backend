@@ -10,6 +10,8 @@ function service() {
       [...db.levels.values()].filter((r: any) => r.userId === where.userId),
     );
   db.$transaction = (fn: (tx: unknown) => unknown) => fn(db);
+  // The skill-level lock (audit C6).
+  db.$executeRaw = () => Promise.resolve(0);
   db.diagnosticAttempt = { findFirst: () => Promise.resolve(null) };
   db.learnerProgressEvent.findMany = () => Promise.resolve([]);
   return {

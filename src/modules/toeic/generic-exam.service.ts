@@ -54,6 +54,7 @@ import {
 import { SpeakingStimulusDto } from '../content/speaking-stimulus.dto';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import { examListFacets, filterExamList } from './exam-admin-list';
+import { inDraftExam, inDraftSet } from './draft-set-lock';
 
 type ProductRecord = any;
 
@@ -265,16 +266,22 @@ export class GenericExamService {
    * An Exam with attempts must keep its historical content/structure and
    * publication semantics; mutation goes through Duplicate instead.
    */
-  async hasLearnerAttempts(exam: ProductRecord): Promise<boolean> {
+  async hasLearnerAttempts(
+    exam: ProductRecord,
+    client: Pick<
+      Prisma.TransactionClient,
+      'toeicAttempt' | 'toeicAssessmentAttempt'
+    > = this.prisma,
+  ): Promise<boolean> {
     const [lrAttempt, assessmentAttempt] = await Promise.all([
       exam.toeicExamSet
-        ? this.prisma.toeicAttempt.findFirst({
+        ? client.toeicAttempt.findFirst({
             where: { examId: exam.toeicExamSet.id },
             select: { id: true },
           })
         : Promise.resolve(null),
       exam.toeicAssessment
-        ? this.prisma.toeicAssessmentAttempt.findFirst({
+        ? client.toeicAssessmentAttempt.findFirst({
             where: { assessmentId: exam.toeicAssessment.id },
             select: { id: true },
           })
@@ -757,6 +764,19 @@ export class GenericExamService {
       throw new ConflictException(EXAM_NOT_DRAFT);
   }
 
+  /**
+   * A Speaking edit of an exam, written with the exam row locked and still a
+   * draft (2026-11-18). The check above runs first and answers 409 fast; it
+   * ran alone before, so a publish between it and the write had the change
+   * land in the live exam.
+   */
+  private inDraftSpeaking<T>(
+    id: number,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return inDraftExam(this.prisma, id, work, EXAM_NOT_DRAFT);
+  }
+
   private async assertDraftExamById(id: number) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },
@@ -899,7 +919,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     await this.speakingContext(id);
-    return this.skillCms.createSpeakingStimulus(dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.createSpeakingStimulus(dto, user, tx),
+    );
   }
 
   async createSpeakingExercise(
@@ -909,7 +931,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.addSpeakingExercise('speaking', setId, dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.addSpeakingExercise('speaking', setId, dto, user, tx),
+    );
   }
 
   async updateSpeakingExercise(
@@ -920,12 +944,15 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.updateSpeakingExercise(
-      'speaking',
-      setId,
-      String(exerciseId),
-      dto,
-      user,
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.updateSpeakingExercise(
+        'speaking',
+        setId,
+        String(exerciseId),
+        dto,
+        user,
+        tx,
+      ),
     );
   }
 
@@ -936,7 +963,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user, tx),
+    );
   }
 
   async deleteSpeakingExercise(
@@ -946,11 +975,14 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.deleteSpeakingExercise(
-      'speaking',
-      setId,
-      String(exerciseId),
-      user,
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.deleteSpeakingExercise(
+        'speaking',
+        setId,
+        String(exerciseId),
+        user,
+        tx,
+      ),
     );
   }
 
@@ -1178,28 +1210,51 @@ export class GenericExamService {
             dto.durationSeconds ?? child.durationSeconds,
           )
         : undefined;
-    const updated = await this.prisma.exam.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined && { title: dto.title }),
-        ...(dto.description !== undefined && { description: dto.description }),
-      },
-      include: this.include,
-    });
-    if (child) {
-      await this.prisma.toeicExamSet.update({
-        where: { id: child.id },
+    const write = async (tx: Prisma.TransactionClient) => {
+      const row = await tx.exam.update({
+        where: { id },
         data: {
           ...(dto.title !== undefined && { title: dto.title }),
           ...(dto.description !== undefined && {
             description: dto.description,
           }),
-          ...(dto.type !== undefined && { type: dto.type as any }),
-          ...(dto.difficulty !== undefined && { difficulty: dto.difficulty }),
-          ...(durationSeconds !== undefined && { durationSeconds }),
         },
+        include: this.include,
       });
-    }
+      if (child) {
+        await tx.toeicExamSet.update({
+          where: { id: child.id },
+          data: {
+            ...(dto.title !== undefined && { title: dto.title }),
+            ...(dto.description !== undefined && {
+              description: dto.description,
+            }),
+            ...(dto.type !== undefined && { type: dto.type as any }),
+            ...(dto.difficulty !== undefined && {
+              difficulty: dto.difficulty,
+            }),
+            ...(durationSeconds !== undefined && { durationSeconds }),
+          },
+        });
+      }
+      return row;
+    };
+    // Written under the lock a publish takes, in its order (audit A8
+    // follow-up, 2026-11-18): an edit checked as a draft above could land
+    // just after the exam went live. Without an L&R set, the exam row.
+    const updated = child
+      ? await inDraftSet(this.prisma, child.id, write, EXAM_NOT_DRAFT)
+      : await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${id} FOR UPDATE`;
+          const still = await tx.exam.findUnique({
+            where: { id },
+            select: { publicationStatus: true },
+          });
+          if (!still)
+            throw new NotFoundException(`Exam với ID ${id} không tồn tại`);
+          this.assertDraftExam(still);
+          return write(tx);
+        });
     if (dto.title !== undefined) await this.renameSources(exam, dto.title);
     return this.project(updated);
   }
@@ -1251,6 +1306,30 @@ export class GenericExamService {
     }
     await this.ensureListeningMaster(exam);
     await this.prisma.$transaction(async (tx) => {
+      // Checked again where the status changes, with the exam set locked
+      // (audit A8, 2026-11-18): the image checks and the master audio above
+      // take seconds to minutes, and content deleted or emptied meanwhile was
+      // published unchecked. A new group (its foreign key) waits for this.
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      // The exam row too, before the content is read again (2026-11-18): a
+      // Speaking or Writing edit (inDraftExam) holds it, so it is checked
+      // here, or it waits and then sees the exam is no longer a draft.
+      await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${id} FOR UPDATE`;
+      const fresh = (await tx.exam.findUnique({
+        where: { id },
+        include: this.include,
+      })) as ProductRecord;
+      if (!fresh)
+        throw new NotFoundException(`Exam với ID ${id} không tồn tại`);
+      const again = this.productReadiness(fresh);
+      if (!again.learnerReady)
+        throw new ConflictException({
+          message:
+            'Nội dung đề vừa thay đổi trong lúc kiểm tra và chưa đủ điều kiện xuất bản. Tải lại trang rồi kiểm tra lại.',
+          issues: again.lrValidation?.issues,
+          readiness: again.readiness,
+        });
       await tx.exam.update({
         where: { id },
         data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
@@ -1405,38 +1484,51 @@ export class GenericExamService {
     exam: ProductRecord,
     publicationStatus: QuizPublicationStatus,
   ) {
-    await this.prisma.$transaction([
-      this.prisma.exam.update({
+    // One lock order for every status change and content edit: the exam
+    // set, then the exam (2026-11-18). This wrote the exam first and could
+    // deadlock with an edit that locks the set first; one side got a 500.
+    await this.prisma.$transaction(async (tx) => {
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "Exam" WHERE id = ${exam.id} FOR UPDATE`;
+      await tx.exam.update({
         where: { id: exam.id },
         data: { publicationStatus },
-      }),
-      ...(exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id
-        ? [
-            this.prisma.toeicExamSet.update({
-              where: { id: exam.toeicExamSet.id },
-              data: { publicationStatus },
-            }),
-          ]
-        : []),
-      ...(exam.toeicAssessment
-        ? [
-            this.prisma.toeicAssessment.update({
-              where: { id: exam.toeicAssessment.id },
-              data: { publicationStatus },
-            }),
-          ]
-        : []),
-    ]);
+      });
+      if (exam.toeicExamSet && this.lrSource(exam)?.id === exam.toeicExamSet.id)
+        await tx.toeicExamSet.update({
+          where: { id: exam.toeicExamSet.id },
+          data: { publicationStatus },
+        });
+      if (exam.toeicAssessment)
+        await tx.toeicAssessment.update({
+          where: { id: exam.toeicAssessment.id },
+          data: { publicationStatus },
+        });
+    });
   }
 
   async delete(id: number) {
     const exam = await this.findExam(id);
+    // The attempt check runs again in the transaction, with the rows an
+    // attempt points to locked (audit A5, 2026-11-18): a learner starting
+    // the exam either committed before the lock and is counted, or waits and
+    // then fails on the deleted exam set. The first check answers 409 fast.
     if (await this.hasLearnerAttempts(exam)) {
       throw new ConflictException(
         'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
       );
     }
     await this.prisma.$transaction(async (tx) => {
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      if (exam.toeicAssessment)
+        await tx.$queryRaw`SELECT id FROM "ToeicAssessment" WHERE id = ${exam.toeicAssessment.id} FOR UPDATE`;
+      if (await this.hasLearnerAttempts(exam, tx)) {
+        throw new ConflictException(
+          'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
+        );
+      }
       if (exam.toeicAssessment) {
         await tx.toeicAssessment.delete({
           where: { id: exam.toeicAssessment.id },

@@ -25,7 +25,12 @@ describe('SupportService: tutor replies and the AI/admin switch', () => {
   });
 
   const prisma = {
-    supportConversation: { findUnique: jest.fn(), update: jest.fn() },
+    supportConversation: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
     supportMessage: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -49,6 +54,19 @@ describe('SupportService: tutor replies and the AI/admin switch', () => {
     );
     prisma.supportConversation.update.mockImplementation(({ data }) =>
       Promise.resolve({ id: 100, studentId: 10, ...data }),
+    );
+    // The mode switch is a CAS on the mode (audit A11).
+    let mode: string | undefined;
+    prisma.supportConversation.updateMany.mockImplementation(
+      async ({ data }: any) => {
+        const current = await prisma.supportConversation.findUnique();
+        const changed = current?.mode !== data.mode;
+        mode = changed ? data.mode : current?.mode;
+        return { count: changed ? 1 : 0 };
+      },
+    );
+    prisma.supportConversation.findUniqueOrThrow.mockImplementation(() =>
+      Promise.resolve({ id: 100, studentId: 10, mode }),
     );
     prisma.user.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     prisma.user.findUnique.mockResolvedValue({
@@ -138,8 +156,8 @@ describe('SupportService: tutor replies and the AI/admin switch', () => {
 
     await service.sendAdminMessage(1, 100, { content: 'Mình hỗ trợ bạn nhé.' });
 
-    expect(prisma.supportConversation.update).toHaveBeenCalledWith({
-      where: { id: 100 },
+    expect(prisma.supportConversation.updateMany).toHaveBeenCalledWith({
+      where: { id: 100, mode: { not: 'HUMAN' } },
       data: { mode: 'HUMAN' },
     });
     expect(events.emit).toHaveBeenCalledWith(

@@ -155,6 +155,9 @@ const REVEAL_WRONG_MS = 1600;
  * each learner has one run open, the day's dungeon once a day, and the
  * money moves only here.
  */
+const UNLOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 @Injectable()
 export class DungeonService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DungeonService.name);
@@ -186,6 +189,17 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
   async start(userId: number, mode: DungeonMode): Promise<DungeonView> {
     if (!DUNGEON_MODES.includes(mode))
       throw new BadRequestException('Chế độ không hợp lệ.');
+    // One start per learner at a time (audit R5, 2026-11-18): two starts of
+    // the free dungeon both paid a ticket and the first run was lost.
+    return this.withLock(`start:${userId}`, () =>
+      this.startUnlocked(userId, mode),
+    );
+  }
+
+  private async startUnlocked(
+    userId: number,
+    mode: DungeonMode,
+  ): Promise<DungeonView> {
     const open = await this.current(userId);
     if (open) return open;
 
@@ -572,17 +586,12 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
 
   private async awardXp(userId: number, correct: number): Promise<number> {
     try {
-      const today = await this.prisma.pointHistory.aggregate({
-        where: {
-          userId,
-          reason: ARENA_XP_REASON,
-          createdAt: { gte: vietnamDayStart(new Date()) },
-        },
-        _sum: { points: true },
-      });
-      const xp = dungeonXp(correct, today._sum.points ?? 0);
-      if (xp > 0) await this.gamification.awardXp(userId, xp, ARENA_XP_REASON);
-      return xp;
+      // Under the shared Arena cap, read and awarded under one lock (audit R6).
+      return await this.gamification.awardArenaXp(
+        userId,
+        ARENA_XP_REASON,
+        (earnedToday) => dungeonXp(correct, earnedToday),
+      );
     } catch (err) {
       this.logger.error(`[Dungeon] XP for user ${userId} failed`, err);
       return 0;
@@ -667,8 +676,8 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         try {
           return await work();
         } finally {
-          if ((await this.redis.get(KEY.lock(id))) === owner)
-            await this.redis.del(KEY.lock(id));
+          // Deletes the lock only while it is still this request's.
+          await this.redis.eval(UNLOCK_SCRIPT, 1, KEY.lock(id), owner);
         }
       }
       await new Promise((ok) => setTimeout(ok, 25));

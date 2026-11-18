@@ -10,7 +10,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { getRedisConnectionToken } from '@nestjs-modules/ioredis';
 import { getOtpSecret } from './auth.constants';
 import { EmailService } from '../../common/email/email.service';
@@ -87,6 +87,26 @@ describe('AuthService', () => {
           acceptTerms: true,
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('two sign-ups with one e-mail at once: the second gets 409, not 500 (audit A14)', async () => {
+      // Both passed the check; the second create hits the unique e-mail.
+      mockCtx.prisma.user.findUnique.mockResolvedValue(null);
+      mockCtx.prisma.user.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '6.2.1',
+        }),
+      );
+
+      await expect(
+        service.register({
+          email: 'test@example.com',
+          password: '123456',
+          fullName: 'Test',
+          acceptTerms: true,
+        }),
+      ).rejects.toThrow('Email này đã được đăng ký.');
     });
 
     it('should create a student immediately without email verification', async () => {

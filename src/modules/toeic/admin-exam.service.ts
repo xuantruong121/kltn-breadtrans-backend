@@ -20,6 +20,7 @@ import {
   TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
   toeicListeningAudioFingerprint,
 } from './toeic-listening-audio';
+import { inDraftSet } from './draft-set-lock';
 
 @Injectable()
 export class AdminExamService {
@@ -196,20 +197,27 @@ export class AdminExamService {
   }
 
   async deleteExam(id: number) {
-    const exam = await this.prisma.toeicExamSet.findUnique({ where: { id } });
-    if (!exam) throw new NotFoundException(`Đề thi với ID ${id} không tồn tại`);
+    // One transaction with the exam set locked, as GenericExamService.delete
+    // (audit A5, 2026-11-18): an attempt started meanwhile is counted, or
+    // waits and then fails on the deleted set.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${id} FOR UPDATE`;
+      const exam = await tx.toeicExamSet.findUnique({ where: { id } });
+      if (!exam)
+        throw new NotFoundException(`Đề thi với ID ${id} không tồn tại`);
 
-    // History safety guard: cannot delete exam if attempts exist
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId: id },
+      // History safety guard: cannot delete exam if attempts exist
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId: id },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa',
+        );
+      }
+
+      return tx.toeicExamSet.delete({ where: { id } });
     });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa',
-      );
-    }
-
-    return this.prisma.toeicExamSet.delete({ where: { id } });
   }
 
   /** Exam content changes only while the exam is a draft. */
@@ -227,246 +235,261 @@ export class AdminExamService {
   // ============== GROUP MANAGEMENT ==============
   async addGroup(examId: number, dto: CreateExamGroupDto) {
     await this.assertDraftSet(examId);
-    const exam = await this.prisma.toeicExamSet.findUnique({
-      where: { id: examId },
-    });
-    if (!exam)
-      throw new NotFoundException(`Đề thi với ID ${examId} không tồn tại`);
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const exam = await tx.toeicExamSet.findUnique({
+        where: { id: examId },
+      });
+      if (!exam)
+        throw new NotFoundException(`Đề thi với ID ${examId} không tồn tại`);
 
-    // History guard: if attempts exist, block modifying exam structure
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể thêm nhóm câu hỏi mới',
-      );
-    }
+      // History guard: if attempts exist, block modifying exam structure
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể thêm nhóm câu hỏi mới',
+        );
+      }
 
-    const mediaMetadata: Record<string, any> = {};
-    if (dto.imageUrl) {
-      Object.assign(
-        mediaMetadata,
-        withManualMedia({}, 'image', toeicMediaHash(dto.imageBrief)),
-      );
-    }
-    if (dto.audioUrl) {
-      Object.assign(
-        mediaMetadata,
-        withManualMedia({}, 'audio', toeicMediaHash(dto.transcriptText)),
-      );
-    }
+      const mediaMetadata: Record<string, any> = {};
+      if (dto.imageUrl) {
+        Object.assign(
+          mediaMetadata,
+          withManualMedia({}, 'image', toeicMediaHash(dto.imageBrief)),
+        );
+      }
+      if (dto.audioUrl) {
+        Object.assign(
+          mediaMetadata,
+          withManualMedia({}, 'audio', toeicMediaHash(dto.transcriptText)),
+        );
+      }
 
-    return this.prisma.toeicQuestionGroup.create({
-      data: {
-        examId,
-        part: dto.part,
-        canonicalAccent: dto.canonicalAccent || 'US',
-        audioUrl: dto.audioUrl,
-        imageUrl: dto.imageUrl,
-        passageText: dto.passageText,
-        transcriptText: dto.transcriptText,
-        imageBrief: dto.imageBrief,
-        mediaMetadata,
-        groupOrder: dto.groupOrder ?? 0,
-      },
+      return tx.toeicQuestionGroup.create({
+        data: {
+          examId,
+          part: dto.part,
+          canonicalAccent: dto.canonicalAccent || 'US',
+          audioUrl: dto.audioUrl,
+          imageUrl: dto.imageUrl,
+          passageText: dto.passageText,
+          transcriptText: dto.transcriptText,
+          imageBrief: dto.imageBrief,
+          mediaMetadata,
+          groupOrder: dto.groupOrder ?? 0,
+        },
+      });
     });
   }
 
   async updateGroup(examId: number, groupId: number, dto: UpdateExamGroupDto) {
     await this.assertDraftSet(examId);
-    const group = await this.prisma.toeicQuestionGroup.findUnique({
-      where: { id: groupId },
-      include: { questions: { orderBy: { questionNumber: 'asc' } } },
-    });
-    if (!group || group.examId !== examId) {
-      throw new NotFoundException(
-        'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
-      );
-    }
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const group = await tx.toeicQuestionGroup.findUnique({
+        where: { id: groupId },
+        include: { questions: { orderBy: { questionNumber: 'asc' } } },
+      });
+      if (!group || group.examId !== examId) {
+        throw new NotFoundException(
+          'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
+        );
+      }
 
-    // History guard: if attempts exist, block structural changes
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể sửa nhóm câu hỏi',
-      );
-    }
+      // History guard: if attempts exist, block structural changes
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể sửa nhóm câu hỏi',
+        );
+      }
 
-    const mediaMetadata = (group.mediaMetadata as any) ?? {};
-    if (
-      ['transcriptText', 'passageText', 'part', 'canonicalAccent'].some(
-        (field) =>
-          (dto as Record<string, unknown>)[field] !== undefined &&
-          (dto as Record<string, unknown>)[field] !==
-            (group as Record<string, unknown>)[field],
-      ) &&
-      mediaMetadata.audio
-    ) {
-      mediaMetadata.audio = { ...mediaMetadata.audio, stale: true };
-    }
-    if (
-      dto.imageBrief !== undefined &&
-      dto.imageBrief !== group.imageBrief &&
-      mediaMetadata.image
-    ) {
-      mediaMetadata.image = {
-        ...mediaMetadata.image,
-        stale: true,
-        ...(mediaMetadata.image.questionImageHash
-          ? { questionStatus: 'STALE' }
-          : {}),
-      };
-    }
-    if (dto.imageUrl !== undefined && dto.imageUrl !== group.imageUrl) {
-      if (dto.imageUrl.trim()) {
-        const previousImage = mediaMetadata.image ?? {};
+      const mediaMetadata = (group.mediaMetadata as any) ?? {};
+      if (
+        ['transcriptText', 'passageText', 'part', 'canonicalAccent'].some(
+          (field) =>
+            (dto as Record<string, unknown>)[field] !== undefined &&
+            (dto as Record<string, unknown>)[field] !==
+              (group as Record<string, unknown>)[field],
+        ) &&
+        mediaMetadata.audio
+      ) {
+        mediaMetadata.audio = { ...mediaMetadata.audio, stale: true };
+      }
+      if (
+        dto.imageBrief !== undefined &&
+        dto.imageBrief !== group.imageBrief &&
+        mediaMetadata.image
+      ) {
         mediaMetadata.image = {
-          ...withManualMedia(
-            mediaMetadata,
-            'image',
-            toeicMediaHash(
-              dto.imageBrief !== undefined ? dto.imageBrief : group.imageBrief,
-            ),
-          ).image,
-          ...(previousImage.questionImageHash
-            ? { questionStatus: 'STALE', stale: true }
+          ...mediaMetadata.image,
+          stale: true,
+          ...(mediaMetadata.image.questionImageHash
+            ? { questionStatus: 'STALE' }
             : {}),
         };
-      } else {
-        mediaMetadata.image = {
-          ...(mediaMetadata.image ?? {}),
-          status: 'MISSING',
-        };
       }
-    }
-    if (dto.audioUrl !== undefined && dto.audioUrl !== group.audioUrl) {
-      if (dto.audioUrl.trim()) {
-        const audioGroup = {
-          ...group,
-          part: dto.part ?? group.part,
-          canonicalAccent: dto.canonicalAccent ?? group.canonicalAccent,
-          transcriptText: dto.transcriptText ?? group.transcriptText,
-          passageText: dto.passageText ?? group.passageText,
-        };
-        let sourceHash: string | undefined;
-        try {
-          sourceHash = toeicListeningAudioFingerprint(audioGroup);
-        } catch {
-          // The admin can attach audio before completing content; readiness
-          // remains fail-closed until a valid semantic script can be built.
-        }
-        Object.assign(
-          mediaMetadata,
-          withManualMedia(
-            mediaMetadata,
-            'audio',
-            toeicMediaHash(
-              dto.transcriptText !== undefined
-                ? dto.transcriptText
-                : group.transcriptText,
-            ),
-          ),
-        );
-        if (sourceHash) {
-          mediaMetadata.audio = {
-            ...mediaMetadata.audio,
-            sourceHash,
-            scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
+      if (dto.imageUrl !== undefined && dto.imageUrl !== group.imageUrl) {
+        if (dto.imageUrl.trim()) {
+          const previousImage = mediaMetadata.image ?? {};
+          mediaMetadata.image = {
+            ...withManualMedia(
+              mediaMetadata,
+              'image',
+              toeicMediaHash(
+                dto.imageBrief !== undefined
+                  ? dto.imageBrief
+                  : group.imageBrief,
+              ),
+            ).image,
+            ...(previousImage.questionImageHash
+              ? { questionStatus: 'STALE', stale: true }
+              : {}),
+          };
+        } else {
+          mediaMetadata.image = {
+            ...(mediaMetadata.image ?? {}),
+            status: 'MISSING',
           };
         }
-      } else {
-        mediaMetadata.audio = {
-          ...(mediaMetadata.audio ?? {}),
-          status: 'MISSING',
-        };
       }
-    }
-    return this.prisma.toeicQuestionGroup.update({
-      where: { id: groupId },
-      data: {
-        ...(dto.part !== undefined && { part: dto.part }),
-        ...(dto.canonicalAccent !== undefined && {
-          canonicalAccent: dto.canonicalAccent,
-        }),
-        ...(dto.audioUrl !== undefined && { audioUrl: dto.audioUrl }),
-        ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
-        ...(dto.passageText !== undefined && {
-          passageText: dto.passageText,
-        }),
-        ...(dto.transcriptText !== undefined && {
-          transcriptText: dto.transcriptText,
-        }),
-        ...(dto.imageBrief !== undefined && { imageBrief: dto.imageBrief }),
-        ...((dto.transcriptText !== undefined ||
-          dto.passageText !== undefined ||
-          dto.part !== undefined ||
-          dto.canonicalAccent !== undefined ||
-          dto.imageBrief !== undefined ||
-          dto.audioUrl !== undefined ||
-          dto.imageUrl !== undefined) && {
-          mediaMetadata,
-        }),
-        ...(dto.groupOrder !== undefined && {
-          groupOrder: dto.groupOrder,
-        }),
-      },
+      if (dto.audioUrl !== undefined && dto.audioUrl !== group.audioUrl) {
+        if (dto.audioUrl.trim()) {
+          const audioGroup = {
+            ...group,
+            part: dto.part ?? group.part,
+            canonicalAccent: dto.canonicalAccent ?? group.canonicalAccent,
+            transcriptText: dto.transcriptText ?? group.transcriptText,
+            passageText: dto.passageText ?? group.passageText,
+          };
+          let sourceHash: string | undefined;
+          try {
+            sourceHash = toeicListeningAudioFingerprint(audioGroup);
+          } catch {
+            // The admin can attach audio before completing content; readiness
+            // remains fail-closed until a valid semantic script can be built.
+          }
+          Object.assign(
+            mediaMetadata,
+            withManualMedia(
+              mediaMetadata,
+              'audio',
+              toeicMediaHash(
+                dto.transcriptText !== undefined
+                  ? dto.transcriptText
+                  : group.transcriptText,
+              ),
+            ),
+          );
+          if (sourceHash) {
+            mediaMetadata.audio = {
+              ...mediaMetadata.audio,
+              sourceHash,
+              scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
+            };
+          }
+        } else {
+          mediaMetadata.audio = {
+            ...(mediaMetadata.audio ?? {}),
+            status: 'MISSING',
+          };
+        }
+      }
+      return tx.toeicQuestionGroup.update({
+        where: { id: groupId },
+        data: {
+          ...(dto.part !== undefined && { part: dto.part }),
+          ...(dto.canonicalAccent !== undefined && {
+            canonicalAccent: dto.canonicalAccent,
+          }),
+          ...(dto.audioUrl !== undefined && { audioUrl: dto.audioUrl }),
+          ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
+          ...(dto.passageText !== undefined && {
+            passageText: dto.passageText,
+          }),
+          ...(dto.transcriptText !== undefined && {
+            transcriptText: dto.transcriptText,
+          }),
+          ...(dto.imageBrief !== undefined && { imageBrief: dto.imageBrief }),
+          ...((dto.transcriptText !== undefined ||
+            dto.passageText !== undefined ||
+            dto.part !== undefined ||
+            dto.canonicalAccent !== undefined ||
+            dto.imageBrief !== undefined ||
+            dto.audioUrl !== undefined ||
+            dto.imageUrl !== undefined) && {
+            mediaMetadata,
+          }),
+          ...(dto.groupOrder !== undefined && {
+            groupOrder: dto.groupOrder,
+          }),
+        },
+      });
     });
   }
 
   async deleteGroup(examId: number, groupId: number) {
     await this.assertDraftSet(examId);
-    const group = await this.prisma.toeicQuestionGroup.findUnique({
-      where: { id: groupId },
-    });
-    if (!group || group.examId !== examId) {
-      throw new NotFoundException(
-        'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
-      );
-    }
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const group = await tx.toeicQuestionGroup.findUnique({
+        where: { id: groupId },
+      });
+      if (!group || group.examId !== examId) {
+        throw new NotFoundException(
+          'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
+        );
+      }
 
-    // History guard
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa nhóm câu hỏi',
-      );
-    }
+      // History guard
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa nhóm câu hỏi',
+        );
+      }
 
-    return this.prisma.toeicQuestionGroup.delete({ where: { id: groupId } });
+      return tx.toeicQuestionGroup.delete({ where: { id: groupId } });
+    });
   }
 
   async reorderGroups(examId: number, groupIds: number[]) {
     await this.assertDraftSet(examId);
-    const exam = await this.prisma.toeicExamSet.findUnique({
-      where: { id: examId },
-      include: { groups: { select: { id: true } } },
-    });
-    if (!exam)
-      throw new NotFoundException(`Đề thi với ID ${examId} không tồn tại`);
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const exam = await tx.toeicExamSet.findUnique({
+        where: { id: examId },
+        include: { groups: { select: { id: true } } },
+      });
+      if (!exam)
+        throw new NotFoundException(`Đề thi với ID ${examId} không tồn tại`);
 
-    const existingIds = new Set(exam.groups.map((g) => g.id));
-    for (const gid of groupIds) {
-      if (!existingIds.has(gid)) {
-        throw new BadRequestException(
-          `Nhóm câu hỏi ID ${gid} không thuộc bộ đề thi này`,
-        );
+      const existingIds = new Set(exam.groups.map((g) => g.id));
+      for (const gid of groupIds) {
+        if (!existingIds.has(gid)) {
+          throw new BadRequestException(
+            `Nhóm câu hỏi ID ${gid} không thuộc bộ đề thi này`,
+          );
+        }
       }
-    }
 
-    await this.prisma.$transaction(
-      groupIds.map((id, index) =>
-        this.prisma.toeicQuestionGroup.update({
+      for (const [index, id] of groupIds.entries())
+        await tx.toeicQuestionGroup.update({
           where: { id },
           data: { groupOrder: index },
-        }),
-      ),
-    );
-    return { success: true };
+        });
+      return { success: true };
+    });
   }
 
   // ============== QUESTION MANAGEMENT ==============
@@ -476,63 +499,67 @@ export class AdminExamService {
     dto: CreateExamQuestionDto,
   ) {
     await this.assertDraftSet(examId);
-    const group = await this.prisma.toeicQuestionGroup.findUnique({
-      where: { id: groupId },
-    });
-    if (!group || group.examId !== examId) {
-      throw new NotFoundException(
-        'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
-      );
-    }
-
-    // History guard
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể thêm câu hỏi mới',
-      );
-    }
-
-    const expectedOptions = group.part === 2 ? 3 : 4;
-    if (!Array.isArray(dto.options) || dto.options.length < expectedOptions) {
-      throw new BadRequestException(
-        `Part ${group.part} yêu cầu ít nhất ${expectedOptions} đáp án lựa chọn`,
-      );
-    }
-
-    if (dto.correctIndex < 0 || dto.correctIndex >= dto.options.length) {
-      throw new BadRequestException(
-        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-      );
-    }
-
-    const created = await this.prisma.toeicQuestion.create({
-      data: {
-        groupId,
-        questionNumber: dto.questionNumber,
-        text: dto.text,
-        options: dto.options,
-        correctIndex: dto.correctIndex,
-        explanation: dto.explanation,
-      },
-    });
-    if (group.part <= 2 && group.mediaMetadata) {
-      await this.prisma.toeicQuestionGroup.update({
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const group = await tx.toeicQuestionGroup.findUnique({
         where: { id: groupId },
+      });
+      if (!group || group.examId !== examId) {
+        throw new NotFoundException(
+          'Nhóm câu hỏi không tồn tại trong bộ đề thi này',
+        );
+      }
+
+      // History guard
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể thêm câu hỏi mới',
+        );
+      }
+
+      const expectedOptions = group.part === 2 ? 3 : 4;
+      if (!Array.isArray(dto.options) || dto.options.length < expectedOptions) {
+        throw new BadRequestException(
+          `Part ${group.part} yêu cầu ít nhất ${expectedOptions} đáp án lựa chọn`,
+        );
+      }
+
+      if (dto.correctIndex < 0 || dto.correctIndex >= dto.options.length) {
+        throw new BadRequestException(
+          'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
+        );
+      }
+
+      const created = await tx.toeicQuestion.create({
         data: {
-          mediaMetadata: {
-            ...((group.mediaMetadata as any) ?? {}),
-            audio: {
-              ...(((group.mediaMetadata as any) ?? {}).audio ?? {}),
-              stale: true,
-            },
-          },
+          groupId,
+          questionNumber: dto.questionNumber,
+          text: dto.text,
+          options: dto.options,
+          correctIndex: dto.correctIndex,
+          explanation: dto.explanation,
         },
       });
-    }
-    return created;
+      if (group.part <= 2 && group.mediaMetadata) {
+        await tx.toeicQuestionGroup.update({
+          where: { id: groupId },
+          data: {
+            mediaMetadata: {
+              ...((group.mediaMetadata as any) ?? {}),
+              audio: {
+                ...(((group.mediaMetadata as any) ?? {}).audio ?? {}),
+                stale: true,
+              },
+            },
+          },
+        });
+      }
+      return created;
+    });
   }
 
   async updateQuestion(
@@ -542,118 +569,126 @@ export class AdminExamService {
     dto: UpdateExamQuestionDto,
   ) {
     await this.assertDraftSet(examId);
-    const question = await this.prisma.toeicQuestion.findUnique({
-      where: { id: questionId },
-      include: { group: true },
-    });
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const question = await tx.toeicQuestion.findUnique({
+        where: { id: questionId },
+        include: { group: true },
+      });
 
-    if (
-      !question ||
-      question.groupId !== groupId ||
-      question.group.examId !== examId
-    ) {
-      throw new NotFoundException(
-        'Câu hỏi không tồn tại trong nhóm và đề thi này',
-      );
-    }
+      if (
+        !question ||
+        question.groupId !== groupId ||
+        question.group.examId !== examId
+      ) {
+        throw new NotFoundException(
+          'Câu hỏi không tồn tại trong nhóm và đề thi này',
+        );
+      }
 
-    // History guard
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể chỉnh sửa câu hỏi',
-      );
-    }
+      // History guard
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể chỉnh sửa câu hỏi',
+        );
+      }
 
-    const finalOptions = dto.options ?? (question.options as string[]);
-    const finalCorrectIndex = dto.correctIndex ?? question.correctIndex;
-    if (
-      Array.isArray(finalOptions) &&
-      (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)
-    ) {
-      throw new BadRequestException(
-        'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-      );
-    }
+      const finalOptions = dto.options ?? (question.options as string[]);
+      const finalCorrectIndex = dto.correctIndex ?? question.correctIndex;
+      if (
+        Array.isArray(finalOptions) &&
+        (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)
+      ) {
+        throw new BadRequestException(
+          'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
+        );
+      }
 
-    const updated = await this.prisma.toeicQuestion.update({
-      where: { id: questionId },
-      data: {
-        ...(dto.questionNumber !== undefined && {
-          questionNumber: dto.questionNumber,
-        }),
-        ...(dto.text !== undefined && { text: dto.text }),
-        ...(dto.options !== undefined && { options: dto.options }),
-        ...(dto.correctIndex !== undefined && {
-          correctIndex: dto.correctIndex,
-        }),
-        ...(dto.explanation !== undefined && {
-          explanation: dto.explanation,
-        }),
-      },
-    });
-    if (
-      question.group.part <= 2 &&
-      (dto.options !== undefined || dto.correctIndex !== undefined)
-    ) {
-      const current = (question.group.mediaMetadata as any) ?? {};
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: groupId },
+      const updated = await tx.toeicQuestion.update({
+        where: { id: questionId },
         data: {
-          mediaMetadata: {
-            ...current,
-            audio: { ...(current.audio ?? {}), stale: true },
-          },
+          ...(dto.questionNumber !== undefined && {
+            questionNumber: dto.questionNumber,
+          }),
+          ...(dto.text !== undefined && { text: dto.text }),
+          ...(dto.options !== undefined && { options: dto.options }),
+          ...(dto.correctIndex !== undefined && {
+            correctIndex: dto.correctIndex,
+          }),
+          ...(dto.explanation !== undefined && {
+            explanation: dto.explanation,
+          }),
         },
       });
-    }
-    return updated;
+      if (
+        question.group.part <= 2 &&
+        (dto.options !== undefined || dto.correctIndex !== undefined)
+      ) {
+        const current = (question.group.mediaMetadata as any) ?? {};
+        await tx.toeicQuestionGroup.update({
+          where: { id: groupId },
+          data: {
+            mediaMetadata: {
+              ...current,
+              audio: { ...(current.audio ?? {}), stale: true },
+            },
+          },
+        });
+      }
+      return updated;
+    });
   }
 
   async deleteQuestion(examId: number, groupId: number, questionId: number) {
     await this.assertDraftSet(examId);
-    const question = await this.prisma.toeicQuestion.findUnique({
-      where: { id: questionId },
-      include: { group: true },
-    });
-
-    if (
-      !question ||
-      question.groupId !== groupId ||
-      question.group.examId !== examId
-    ) {
-      throw new NotFoundException(
-        'Câu hỏi không tồn tại trong nhóm và đề thi này',
-      );
-    }
-
-    // History guard
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId },
-    });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa câu hỏi',
-      );
-    }
-
-    const deleted = await this.prisma.toeicQuestion.delete({
-      where: { id: questionId },
-    });
-    if (question.group.part <= 2 && question.group.mediaMetadata) {
-      const current = (question.group.mediaMetadata as any) ?? {};
-      await this.prisma.toeicQuestionGroup.update({
-        where: { id: groupId },
-        data: {
-          mediaMetadata: {
-            ...current,
-            audio: { ...(current.audio ?? {}), stale: true },
-          },
-        },
+    // The reads and writes run with the exam set locked and still a
+    // draft (audit A8 follow-up, 2026-11-18); see inDraftSet.
+    return inDraftSet(this.prisma, examId, async (tx) => {
+      const question = await tx.toeicQuestion.findUnique({
+        where: { id: questionId },
+        include: { group: true },
       });
-    }
-    return deleted;
+
+      if (
+        !question ||
+        question.groupId !== groupId ||
+        question.group.examId !== examId
+      ) {
+        throw new NotFoundException(
+          'Câu hỏi không tồn tại trong nhóm và đề thi này',
+        );
+      }
+
+      // History guard
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa câu hỏi',
+        );
+      }
+
+      const deleted = await tx.toeicQuestion.delete({
+        where: { id: questionId },
+      });
+      if (question.group.part <= 2 && question.group.mediaMetadata) {
+        const current = (question.group.mediaMetadata as any) ?? {};
+        await tx.toeicQuestionGroup.update({
+          where: { id: groupId },
+          data: {
+            mediaMetadata: {
+              ...current,
+              audio: { ...(current.audio ?? {}), stale: true },
+            },
+          },
+        });
+      }
+      return deleted;
+    });
   }
 }

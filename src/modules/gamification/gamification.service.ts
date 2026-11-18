@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  NotFoundException,
   Optional,
   Logger,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import {
   getBusinessWeekStart,
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
+import { vietnamDayStart } from '../events/arena-questions.logic';
 import { arenaStats } from './arena-stats.logic';
 import { streakMilestone, xpLevel } from './ranking.logic';
 import {
@@ -348,14 +350,14 @@ export class GamificationService {
   ) {
     if (points <= 0) return null;
     const client = options?.tx ?? this.prisma;
-    let myLeaderboard = await client.leaderboard.findUnique({
-      where: { userId },
+    // INSERT ... ON CONFLICT DO NOTHING: of two first awards at once, the
+    // second no longer fails on the unique userId (audit C4, 2026-11-18).
+    // An upsert with nothing to update runs as SELECT then INSERT in Prisma
+    // and failed the same way.
+    await client.leaderboard.createMany({
+      data: [{ userId, tier: 'Đồng' }],
+      skipDuplicates: true,
     });
-    if (!myLeaderboard) {
-      myLeaderboard = await client.leaderboard.create({
-        data: { userId, tier: 'Đồng' },
-      });
-    }
 
     // Record EXP history
     await client.pointHistory.create({
@@ -373,7 +375,9 @@ export class GamificationService {
 
     // A new XP level is a moment for the ranking's activity feed.
     const levelAfter = xpLevel(updatedLeaderboard.totalPoints);
-    if (levelAfter > xpLevel(myLeaderboard.totalPoints)) {
+    // The level before this award, from the same row: exact even when another
+    // award landed at the same moment.
+    if (levelAfter > xpLevel(updatedLeaderboard.totalPoints - points)) {
       await client.learnerEvent.create({
         data: { userId, type: 'LEVEL_UP', value: levelAfter },
       });
@@ -388,6 +392,38 @@ export class GamificationService {
     }
 
     return updatedLeaderboard;
+  }
+
+  /**
+   * XP from an Arena game (Song Đấu, Pháo, Hầm) under their shared daily cap
+   * (audit R6, 2026-11-18). `xpFor` turns the Arena XP earned today into
+   * this game's XP. Reading today's total and awarding run under one lock
+   * per learner: two games ending together each read the total before the
+   * other's award and went past the cap.
+   */
+  async awardArenaXp(
+    userId: number,
+    reason: string,
+    xpFor: (earnedToday: number) => number,
+  ): Promise<number> {
+    const xp = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`arena_xp:${userId}`}))`;
+      const today = await tx.pointHistory.aggregate({
+        where: {
+          userId,
+          reason,
+          createdAt: { gte: vietnamDayStart(new Date()) },
+        },
+        _sum: { points: true },
+      });
+      const amount = xpFor(today._sum.points ?? 0);
+      if (amount > 0) await this.awardXp(userId, amount, reason, { tx });
+      return amount;
+    });
+    // awardXp leaves this to the caller when it runs in a transaction.
+    if (xp > 0)
+      this.eventEmitter.emit('gamification.xp_earned', { userId, points: xp });
+    return xp;
   }
 
   /**
@@ -430,6 +466,8 @@ export class GamificationService {
     applied: boolean;
     alreadyApplied: boolean;
     balanceAfter: number;
+    /** The gap is no longer `delta`: nothing written, run the report again. */
+    gapChanged?: boolean;
   }> {
     if (delta === 0) {
       const stats = await this.prisma.userStats.findUnique({
@@ -460,6 +498,26 @@ export class GamificationService {
           balanceAfter: stats?.totalBanhRan ?? 0,
         };
       }
+
+      // The gap is measured again with the balance row locked (audit R13,
+      // 2026-11-18): the report's four reads were not one snapshot, and a
+      // reward between them gave a false gap that this one-shot correction
+      // would make permanent. Every balance writer locks UserStats before its
+      // ledger row, so the sum read after the lock matches the balance.
+      const [locked] = await tx.$queryRaw<{ totalBanhRan: number }[]>`
+        SELECT "totalBanhRan" FROM "UserStats" WHERE "userId" = ${userId} FOR UPDATE`;
+      const ledger = await tx.banhTransaction.aggregate({
+        where: { userId },
+        _sum: { amount: true },
+      });
+      const balance = locked?.totalBanhRan ?? 0;
+      if (balance - (ledger._sum.amount ?? 0) !== delta)
+        return {
+          applied: false,
+          alreadyApplied: false,
+          balanceAfter: balance,
+          gapChanged: true,
+        };
 
       await tx.banhTransaction.create({
         data: {
@@ -1064,14 +1122,14 @@ export class GamificationService {
     });
     if (!badge) return false;
 
-    const exists = await client.userBadge.findUnique({
-      where: { userId_badgeId: { userId, badgeId: badge.id } },
+    // INSERT ... ON CONFLICT DO NOTHING (audit C5, 2026-11-18): the same
+    // badge earned by two paths at once failed the second create on the
+    // unique key, and the quiz job then skipped the rest of its rewards.
+    const { count } = await client.userBadge.createMany({
+      data: [{ userId, badgeId: badge.id }],
+      skipDuplicates: true,
     });
-    if (exists) return false;
-
-    await client.userBadge.create({
-      data: { userId, badgeId: badge.id },
-    });
+    if (count === 0) return false;
 
     this.logger.log(`Awarded badge "${badgeName}" to user ${userId}`);
 
@@ -1095,6 +1153,10 @@ export class GamificationService {
     const run = async (client: Prisma.TransactionClient) => {
       try {
         await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`streak:${userId}`}))`;
+        // The row too: a nightly batch writing it now is waited for, and the
+        // read below sees what it committed (audit R4, 2026-11-18). The job
+        // never takes the advisory lock above, so this order cannot deadlock.
+        await client.$queryRaw`SELECT "id" FROM "UserStats" WHERE "userId" = ${userId} FOR UPDATE`;
         const now = new Date();
         // Use Vietnam timezone consistently for streak day boundaries
         const nowDateStr = getTodayDateKey('Asia/Ho_Chi_Minh');
@@ -1630,61 +1692,87 @@ export class GamificationService {
         },
       };
 
-      pet = await this.prisma.userPet.create({
-        data: {
-          userId,
-          name: 'Bánh Mì Dũng Cảm',
-          health: 100,
-          happiness: 100,
-          level: 1,
-          exp: 0,
-          roster: initialRoster as any,
-        } as any,
+      // INSERT ... ON CONFLICT DO NOTHING, then read (audit C5): two first
+      // visits at once (two tabs) failed the second create on the unique
+      // userId with a 500. The row that won is the one returned.
+      await this.prisma.userPet.createMany({
+        data: [
+          {
+            userId,
+            name: 'Bánh Mì Dũng Cảm',
+            health: 100,
+            happiness: 100,
+            level: 1,
+            exp: 0,
+            roster: initialRoster as any,
+          } as any,
+        ],
+        skipDuplicates: true,
       });
-
-      return this.withPetFeedStatus(pet, initialRoster.bready);
+      pet = (await this.prisma.userPet.findUnique({ where: { userId } }))!;
     }
 
-    const currentSpecies = this.normalizeSpeciesKey(pet.name);
-    const rawRoster = ((pet as any).roster as Record<string, any>) || {};
+    let settled = this.settlePet(pet, now, today);
+
+    // Persist if state changed or if legacy entry lacked stateUpdatedAt. The
+    // write takes the feed lock and settles the pet again from a fresh read
+    // (audit R10, 2026-11-18): a feed committed after the read above, Bánh
+    // Mì already spent, was overwritten by this page load before.
+    if (settled.needsWrite) {
+      const stale = pet;
+      pet = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
+        const fresh = await tx.userPet.findUnique({ where: { userId } });
+        if (!fresh) return stale;
+        settled = this.settlePet(fresh, now, today);
+        if (!settled.needsWrite) return fresh;
+        settled.roster[settled.species] = settled.state;
+        return tx.userPet.update({
+          where: { userId },
+          data: {
+            health: settled.state.health,
+            happiness: settled.state.happiness,
+            level: settled.state.level,
+            exp: settled.state.exp,
+            lastFedAt: settled.state.lastFedAt
+              ? new Date(settled.state.lastFedAt)
+              : null,
+            roster: settled.roster as any,
+          } as any,
+        });
+      });
+    }
+
+    return this.withPetFeedStatus(pet, settled.state);
+  }
+
+  /** The active pet with today's counters and decay applied, not saved. */
+  private settlePet(
+    pet: { name: string; roster?: unknown },
+    now: Date,
+    today: string,
+  ) {
+    const species = this.normalizeSpeciesKey(pet.name);
+    const roster = ((pet as any).roster as Record<string, any>) || {};
 
     // 1. Normalize active pet state from roster or root snapshot
     const currentEntry =
-      rawRoster[currentSpecies] ||
-      (currentSpecies === 'mimi' ? rawRoster['meo'] : undefined);
-    let activePetData = normalizeSpeciesPetState(currentEntry, pet, now);
+      roster[species] || (species === 'mimi' ? roster['meo'] : undefined);
+    let state = normalizeSpeciesPetState(currentEntry, pet as any, now);
 
     // 2. Normalize daily counters for today
-    const dailyNorm = normalizeDailyCounters(activePetData, today);
-    activePetData = dailyNorm.state;
+    const dailyNorm = normalizeDailyCounters(state, today);
+    state = dailyNorm.state;
 
     // 3. Reconcile decay using stateUpdatedAt
-    const decayResult = reconcilePetDecay(activePetData, now);
-    activePetData = decayResult.state;
+    const decayResult = reconcilePetDecay(state, now);
+    state = decayResult.state;
 
-    // 4. Persist if state changed or if legacy entry lacked stateUpdatedAt
-    if (
+    const needsWrite =
       decayResult.changed ||
       dailyNorm.reset ||
-      !rawRoster[currentSpecies]?.stateUpdatedAt
-    ) {
-      rawRoster[currentSpecies] = activePetData;
-      pet = await this.prisma.userPet.update({
-        where: { userId },
-        data: {
-          health: activePetData.health,
-          happiness: activePetData.happiness,
-          level: activePetData.level,
-          exp: activePetData.exp,
-          lastFedAt: activePetData.lastFedAt
-            ? new Date(activePetData.lastFedAt)
-            : null,
-          roster: rawRoster as any,
-        } as any,
-      });
-    }
-
-    return this.withPetFeedStatus(pet, activePetData);
+      !roster[species]?.stateUpdatedAt;
+    return { species, roster, state, needsWrite };
   }
 
   /**
@@ -1889,9 +1977,30 @@ export class GamificationService {
   }
 
   async changePetType(userId: number, targetPetName: string) {
+    // Creates the pet on a first visit and saves due decay.
+    await this.getMyPet(userId);
+    // The switch reads and writes under the feed lock (audit R10,
+    // 2026-11-18): it rebuilt the roster from a copy read before a feed and
+    // wrote it back, erasing the feed.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_feed:${userId}`}))`;
+      return this.switchPet(tx, userId, targetPetName);
+    });
+  }
+
+  private async switchPet(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    targetPetName: string,
+  ) {
     const today = getTodayDateKey('Asia/Ho_Chi_Minh');
     const now = new Date();
-    const pet = await this.getMyPet(userId);
+    const row = await tx.userPet.findUnique({ where: { userId } });
+    if (!row) throw new NotFoundException('Không tìm thấy thú ảo.');
+    const pet = this.withPetFeedStatus(
+      row,
+      this.settlePet(row, now, today).state,
+    );
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
     const targetSpecies = this.normalizeSpeciesKey(targetPetName);
 
@@ -1946,7 +2055,7 @@ export class GamificationService {
     roster[targetSpecies] = targetData;
 
     // 3. Switch active pet to target pet stats (without arbitrary +15 happiness bump)
-    const updatedPet = await this.prisma.userPet.update({
+    const updatedPet = await tx.userPet.update({
       where: { userId },
       data: {
         name: targetPetName,
@@ -2181,14 +2290,28 @@ export class GamificationService {
           take: batchSize,
         });
 
+        // Each write checks the row again (audit R4, 2026-11-18): a learner
+        // who studied after the read above (00:01) has a new
+        // lastStreakUpdate, so the shield is not taken twice and a restarted
+        // streak is not put back to 0. A write that waited on the learner's
+        // row lock re-checks against the committed row.
+        const stillMissed = {
+          streakCount: { gt: 0 },
+          lastStreakUpdate: { lt: previousDayStart },
+        };
         for (const stat of stats) {
           if (stat.streakFreezes > 0) {
-            await tx.userStats.update({
-              where: { id: stat.id },
+            const used = await tx.userStats.updateMany({
+              where: { id: stat.id, ...stillMissed, streakFreezes: { gt: 0 } },
               data: {
                 streakFreezes: { decrement: 1 },
                 lastStreakUpdate: processedAt,
               },
+            });
+            if (used.count === 0) continue;
+            const after = await tx.userStats.findUnique({
+              where: { id: stat.id },
+              select: { streakCount: true, streakFreezes: true },
             });
             // Same transaction as the shield it reports, so a retried batch
             // cannot tell the learner twice.
@@ -2196,14 +2319,14 @@ export class GamificationService {
               data: {
                 userId: stat.userId,
                 ...streakShieldUsedNotice({
-                  streak: stat.streakCount,
-                  remaining: stat.streakFreezes - 1,
+                  streak: after?.streakCount ?? stat.streakCount,
+                  remaining: after?.streakFreezes ?? stat.streakFreezes - 1,
                 }),
               },
             });
           } else {
-            await tx.userStats.update({
-              where: { id: stat.id },
+            await tx.userStats.updateMany({
+              where: { id: stat.id, ...stillMissed, streakFreezes: { lte: 0 } },
               data: { streakCount: 0 },
             });
           }

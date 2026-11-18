@@ -15,8 +15,11 @@ import {
   type ExamWritingInput,
 } from './exam-writing.logic';
 import { GenericExamService } from './generic-exam.service';
+import { inDraftExam } from './draft-set-lock';
 
 const SLOT_COUNT = 8;
+const NOT_EDITABLE =
+  'Chỉ sửa được Writing khi đề là bản nháp; đề đã xuất bản hãy nhân bản để sửa.';
 
 /**
  * The Writing section of one exam. Its tasks are created here and belong to
@@ -70,9 +73,7 @@ export class ExamWritingService {
 
   private assertEditable(exam: { publicationStatus: QuizPublicationStatus }) {
     if (exam.publicationStatus !== QuizPublicationStatus.DRAFT)
-      throw new ConflictException(
-        'Chỉ sửa được Writing khi đề là bản nháp; đề đã xuất bản hãy nhân bản để sửa.',
-      );
+      throw new ConflictException(NOT_EDITABLE);
   }
 
   async get(examId: number) {
@@ -112,57 +113,77 @@ export class ExamWritingService {
     if (!slot) throw new BadRequestException('Writing chỉ có 8 câu');
     const problem = examWritingProblem(slot.taskKind, input);
     if (problem) throw new BadRequestException(problem);
-    const item = set.items.find((row) => row.order === order);
-    const question = item?.writingQuiz.questions[0];
     const title = input.title.trim();
 
-    if (item && question) {
-      const content = examWritingContent(
-        slot.taskKind,
-        input,
-        question.content as Record<string, unknown>,
-      );
-      await this.prisma.$transaction([
-        this.prisma.quiz.update({
-          where: { id: item.writingQuizId },
-          data: { title },
-        }),
-        this.prisma.question.update({
-          where: { id: question.id },
-          data: { content: content as Prisma.InputJsonValue },
-        }),
-      ]);
-      return this.get(examId);
-    }
+    // Written with the exam row locked and still a draft (2026-11-18). The
+    // check above ran alone before, so a publish between it and the write
+    // had the change land in the live exam. The slot is read again under the
+    // lock: two saves of one empty slot each made a task.
+    await inDraftExam(
+      this.prisma,
+      examId,
+      async (tx) => {
+        const item = await tx.toeicWritingSetItem.findFirst({
+          where: { writingSetId: set.id, order },
+          include: this.setInclude.items.include,
+        });
+        const question = item?.writingQuiz.questions[0];
+        if (item && question) {
+          const content = examWritingContent(
+            slot.taskKind,
+            input,
+            question.content as Record<string, unknown>,
+          );
+          await tx.quiz.update({
+            where: { id: item.writingQuizId },
+            data: { title },
+          });
+          await tx.question.update({
+            where: { id: question.id },
+            data: { content: content as Prisma.InputJsonValue },
+          });
+          return;
+        }
+        await this.createSlotTask(tx, set.id, order, slot, title, input);
+      },
+      NOT_EDITABLE,
+    );
+    return this.get(examId);
+  }
 
-    await this.prisma.$transaction(async (tx) => {
-      const quiz = await tx.quiz.create({
-        data: {
-          title,
-          type: slot.quizType,
-          publicationStatus: QuizPublicationStatus.DRAFT,
-          questions: {
-            create: {
-              type: 'WRITING',
-              order: 0,
-              content: examWritingContent(
-                slot.taskKind,
-                input,
-              ) as Prisma.InputJsonValue,
-            },
+  private async createSlotTask(
+    tx: Prisma.TransactionClient,
+    setId: number,
+    order: number,
+    slot: NonNullable<ReturnType<typeof examWritingSlot>>,
+    title: string,
+    input: ExamWritingInput,
+  ) {
+    const quiz = await tx.quiz.create({
+      data: {
+        title,
+        type: slot.quizType,
+        publicationStatus: QuizPublicationStatus.DRAFT,
+        questions: {
+          create: {
+            type: 'WRITING',
+            order: 0,
+            content: examWritingContent(
+              slot.taskKind,
+              input,
+            ) as Prisma.InputJsonValue,
           },
         },
-      });
-      await tx.toeicWritingSetItem.create({
-        data: {
-          writingSetId: set.id,
-          order,
-          taskKind: slot.taskKind,
-          writingQuizId: quiz.id,
-        },
-      });
+      },
     });
-    return this.get(examId);
+    await tx.toeicWritingSetItem.create({
+      data: {
+        writingSetId: setId,
+        order,
+        taskKind: slot.taskKind,
+        writingQuizId: quiz.id,
+      },
+    });
   }
 
   async publish(examId: number) {

@@ -76,10 +76,21 @@ describe('ToeicAiExamService — targeted candidate regeneration', () => {
           },
         }),
         update: jest.fn().mockResolvedValue({}),
+        // Candidate saves are CAS on the job status (audit A7).
+        updateMany: jest.fn((args: any) => {
+          prisma.aiGenerationJob.update(args);
+          return Promise.resolve({ count: 1 });
+        }),
       },
     };
     service = Object.create(ToeicAiExamService.prototype);
     (service as any).prisma = prisma;
+    // The job lock (audit A3/A7): always free here.
+    (service as any).connection = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
+
     (service as any).ai = ai;
     (service as any).assertBatch = jest.fn();
     withAgreeingReview(service);

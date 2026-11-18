@@ -848,11 +848,15 @@ export class SkillCmsService {
     rawSetId: string,
     dto: SpeakingExerciseDto,
     user: Admin,
+    client?: Prisma.TransactionClient,
   ) {
     this.admin(user);
+    // An exam's Speaking section passes the transaction that holds the exam
+    // lock (inDraftExam); the skill practice CMS passes none.
+    const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
       throw new BadRequestException('Exercises chỉ dùng cho Speaking');
-    const set = await this.prisma.speakingPracticeSet.findUnique({
+    const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
     });
     if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
@@ -860,7 +864,7 @@ export class SkillCmsService {
       throw new BadRequestException('Câu Speaking mới phải có loại bài');
     }
     const stimulus = dto.stimulusId
-      ? await this.prisma.speakingStimulus.findUnique({
+      ? await db.speakingStimulus.findUnique({
           where: { id: dto.stimulusId },
         })
       : null;
@@ -893,7 +897,8 @@ export class SkillCmsService {
       publicationStatus: QuizPublicationStatus.DRAFT,
     };
     if (this.speakingCategoryService) data.categoryId = category?.id ?? null;
-    return this.prisma.$transaction(
+    return this.inTransaction(
+      client,
       async (tx) => {
         const existing = await tx.speakingExercise.findMany({
           where: { practiceSetId: rawSetId },
@@ -934,12 +939,16 @@ export class SkillCmsService {
     rawExerciseId: string,
     dto: SpeakingExerciseDto,
     user: Admin,
+    client?: Prisma.TransactionClient,
   ) {
     this.admin(user);
+    // An exam's Speaking section passes the transaction that holds the exam
+    // lock (inDraftExam); the skill practice CMS passes none.
+    const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
       throw new BadRequestException('Exercises chỉ dùng cho Speaking');
     const exerciseId = this.id(rawExerciseId);
-    const exercise = await this.prisma.speakingExercise.findFirst({
+    const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
       include: {
         categoryTaxonomy: true,
@@ -953,14 +962,14 @@ export class SkillCmsService {
         'Dùng API reorder để thay đổi thứ tự câu trong bộ luyện',
       );
     }
-    const hasHistory = await this.assertSpeakingEditable(rawSetId);
+    const hasHistory = await this.assertSpeakingEditable(rawSetId, db);
     const taskType = dto.taskType ?? exercise.taskType;
     if (hasHistory && taskType !== exercise.taskType)
       throw new ConflictException(
         'Nội dung Speaking đã có lịch sử làm bài; không thể đổi loại câu.',
       );
     const stimulus = dto.stimulusId
-      ? await this.prisma.speakingStimulus.findUnique({
+      ? await db.speakingStimulus.findUnique({
           where: { id: dto.stimulusId },
         })
       : dto.stimulusId === null
@@ -1007,7 +1016,7 @@ export class SkillCmsService {
     if (hasCategoryInput && this.speakingCategoryService) {
       data.categoryId = category?.id ?? null;
     }
-    return this.prisma.speakingExercise.update({
+    return db.speakingExercise.update({
       where: { id: exerciseId },
       data,
     });
@@ -1074,8 +1083,15 @@ export class SkillCmsService {
     });
   }
 
-  async createSpeakingStimulus(dto: SpeakingStimulusDto, user: Admin) {
+  async createSpeakingStimulus(
+    dto: SpeakingStimulusDto,
+    user: Admin,
+    client?: Prisma.TransactionClient,
+  ) {
     this.admin(user);
+    // An exam's Speaking section passes the transaction that holds the exam
+    // lock (inDraftExam); the skill practice CMS passes none.
+    const db: Prisma.TransactionClient = client ?? this.prisma;
     if (!dto.kind) {
       throw new BadRequestException('Stimulus cần có kind hợp lệ');
     }
@@ -1085,7 +1101,7 @@ export class SkillCmsService {
     if (dto.kind === 'IMAGE' && !dto.imageUrl?.trim()) {
       throw new BadRequestException('IMAGE stimulus cần imageUrl');
     }
-    return this.prisma.speakingStimulus.create({
+    return db.speakingStimulus.create({
       data: {
         kind: dto.kind,
         title: dto.title?.trim() || null,
@@ -1136,58 +1152,68 @@ export class SkillCmsService {
   async deleteContent(rawDomain: string, rawId: string, user: Admin) {
     this.admin(user);
     const domain = this.domain(rawDomain);
+    // Each branch checks and deletes in one transaction, with the rows a
+    // learner's recording or submission points to locked (audit A5,
+    // 2026-11-18): that insert either committed before the lock and is
+    // counted, or it waits and then fails on the deleted row. Before, one
+    // saved between the count and the delete went with the content.
     if (domain === 'speaking') {
-      const set = await this.prisma.speakingPracticeSet.findUnique({
-        where: { id: rawId },
-        select: { id: true, scope: true, publicationStatus: true },
+      return this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "SpeakingPracticeSet" WHERE id = ${rawId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "SpeakingExercise" WHERE "practiceSetId" = ${rawId} FOR UPDATE`;
+        const set = await tx.speakingPracticeSet.findUnique({
+          where: { id: rawId },
+          select: { id: true, scope: true, publicationStatus: true },
+        });
+        if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
+        const attempts = await tx.speakingSubmission.count({
+          where: { exercise: { practiceSetId: set.id } },
+        });
+        const refusal = skillDeleteRefusal({
+          domain,
+          status: set.publicationStatus,
+          attempts,
+          examInternal: set.scope === 'EXAM_INTERNAL',
+        });
+        if (refusal) throw new ConflictException(refusal);
+        // practiceSet on SpeakingExercise is SetNull: delete the exercises
+        // first so none is left behind without a set.
+        await tx.speakingExercise.deleteMany({
+          where: { practiceSetId: set.id },
+        });
+        await tx.speakingPracticeSet.delete({ where: { id: set.id } });
+        return { id: set.id, deleted: true };
       });
-      if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
-      const attempts = await this.prisma.speakingSubmission.count({
-        where: { exercise: { practiceSetId: set.id } },
+    }
+    const id = this.id(rawId);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Quiz" WHERE id = ${id} FOR UPDATE`;
+      const quiz = await tx.quiz.findFirst({
+        where: { id, ...this.contentTypeWhere(domain) },
+        select: { id: true, publicationStatus: true },
+      });
+      if (!quiz) throw new NotFoundException('Không tìm thấy bài này.');
+      const attempts = await tx.submission.count({
+        where: { quizId: id },
       });
       const refusal = skillDeleteRefusal({
         domain,
-        status: set.publicationStatus,
+        status: quiz.publicationStatus,
         attempts,
-        examInternal: set.scope === 'EXAM_INTERNAL',
+        examInternal: await this.isExamTask(id),
       });
       if (refusal) throw new ConflictException(refusal);
-      // practiceSet on SpeakingExercise is SetNull: delete the exercises first
-      // so none is left behind without a set.
-      await this.prisma.$transaction([
-        this.prisma.speakingExercise.deleteMany({
-          where: { practiceSetId: set.id },
-        }),
-        this.prisma.speakingPracticeSet.delete({ where: { id: set.id } }),
-      ]);
-      return { id: set.id, deleted: true };
-    }
-    const id = this.id(rawId);
-    const quiz = await this.prisma.quiz.findFirst({
-      where: { id, ...this.contentTypeWhere(domain) },
-      select: { id: true, publicationStatus: true },
+      try {
+        await tx.quiz.delete({ where: { id } });
+      } catch (error) {
+        if ((error as { code?: string }).code === 'P2003')
+          throw new ConflictException(
+            'Bài đang được dùng ở nơi khác nên chưa xoá được.',
+          );
+        throw error;
+      }
+      return { id, deleted: true };
     });
-    if (!quiz) throw new NotFoundException('Không tìm thấy bài này.');
-    const attempts = await this.prisma.submission.count({
-      where: { quizId: id },
-    });
-    const refusal = skillDeleteRefusal({
-      domain,
-      status: quiz.publicationStatus,
-      attempts,
-      examInternal: await this.isExamTask(id),
-    });
-    if (refusal) throw new ConflictException(refusal);
-    try {
-      await this.prisma.quiz.delete({ where: { id } });
-    } catch (error) {
-      if ((error as { code?: string }).code === 'P2003')
-        throw new ConflictException(
-          'Bài đang được dùng ở nơi khác nên chưa xoá được.',
-        );
-      throw error;
-    }
-    return { id, deleted: true };
   }
 
   async deleteSpeakingExercise(
@@ -1195,18 +1221,29 @@ export class SkillCmsService {
     rawSetId: string,
     rawExerciseId: string,
     user: Admin,
+    client?: Prisma.TransactionClient,
   ) {
     this.admin(user);
+    // An exam's Speaking section passes the transaction that holds the exam
+    // lock (inDraftExam); the skill practice CMS passes none.
+    const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
       throw new BadRequestException('Exercises chỉ dùng cho Speaking');
     const exerciseId = this.id(rawExerciseId);
-    const exercise = await this.prisma.speakingExercise.findFirst({
+    const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
-    await this.assertNoSpeakingHistory(rawSetId);
-    return this.prisma.$transaction(
+    await this.assertNoSpeakingHistory(rawSetId, db);
+    return this.inTransaction(
+      client,
       async (tx) => {
+        // Counted again with the exercise row locked (audit A5 follow-up,
+        // 2026-11-18): a recording saved between the check above and the
+        // delete was removed with the exercise. A recording on it now waits,
+        // then fails on its foreign key.
+        await tx.$queryRaw`SELECT id FROM "SpeakingExercise" WHERE id = ${exerciseId} FOR UPDATE`;
+        await this.assertNoSpeakingHistory(rawSetId, tx);
         const deleted = await tx.speakingExercise.delete({
           where: { id: exerciseId },
         });
@@ -1236,11 +1273,15 @@ export class SkillCmsService {
     rawSetId: string,
     dto: SpeakingExerciseReorderDto,
     user: Admin,
+    client?: Prisma.TransactionClient,
   ) {
     this.admin(user);
+    // An exam's Speaking section passes the transaction that holds the exam
+    // lock (inDraftExam); the skill practice CMS passes none.
+    const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
       throw new BadRequestException('Exercises chỉ dùng cho Speaking');
-    const set = await this.prisma.speakingPracticeSet.findUnique({
+    const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
       select: { id: true, publicationStatus: true },
     });
@@ -1250,9 +1291,9 @@ export class SkillCmsService {
         'Hãy chuyển bộ luyện về bản nháp trước khi sắp xếp lại câu',
       );
     }
-    await this.assertNoSpeakingHistory(rawSetId);
+    await this.assertNoSpeakingHistory(rawSetId, db);
 
-    const current = await this.prisma.speakingExercise.findMany({
+    const current = await db.speakingExercise.findMany({
       where: { practiceSetId: rawSetId },
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
       select: { id: true },
@@ -1268,7 +1309,8 @@ export class SkillCmsService {
       );
     }
 
-    return this.prisma.$transaction(
+    return this.inTransaction(
+      client,
       async (tx) => {
         await tx.speakingExercise.updateMany({
           where: { practiceSetId: rawSetId },
@@ -1786,8 +1828,20 @@ export class SkillCmsService {
     };
   }
 
-  private async assertNoSpeakingHistory(setId: string) {
-    const count = await this.prisma.speakingSubmission.count({
+  /** Runs on the caller's transaction when given one: Prisma cannot nest them. */
+  private inTransaction<T>(
+    client: Prisma.TransactionClient | undefined,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+    options?: { isolationLevel?: Prisma.TransactionIsolationLevel },
+  ): Promise<T> {
+    return client ? work(client) : this.prisma.$transaction(work, options);
+  }
+
+  private async assertNoSpeakingHistory(
+    setId: string,
+    client: Pick<Prisma.TransactionClient, 'speakingSubmission'> = this.prisma,
+  ) {
+    const count = await client.speakingSubmission.count({
       where: { exercise: { practiceSetId: setId } },
     });
     if (count > 0)
@@ -1797,12 +1851,18 @@ export class SkillCmsService {
   }
 
   /** True when the set has attempts. Exam sets with attempts stay locked. */
-  private async assertSpeakingEditable(setId: string) {
-    const count = await this.prisma.speakingSubmission.count({
+  private async assertSpeakingEditable(
+    setId: string,
+    client: Pick<
+      Prisma.TransactionClient,
+      'speakingSubmission' | 'toeicAssessmentComponent'
+    > = this.prisma,
+  ) {
+    const count = await client.speakingSubmission.count({
       where: { exercise: { practiceSetId: setId } },
     });
     if (count === 0) return false;
-    const examParts = await this.prisma.toeicAssessmentComponent.count({
+    const examParts = await client.toeicAssessmentComponent.count({
       where: { speakingPracticeSetId: setId },
     });
     if (examParts > 0) throw new ConflictException(EXAM_CONTENT_LOCKED);

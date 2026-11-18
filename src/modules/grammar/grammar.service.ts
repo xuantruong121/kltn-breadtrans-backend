@@ -22,6 +22,7 @@ import {
   normalizeOptionExplanations,
   questionProblems,
 } from './grammar-question.logic';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 
 @Injectable()
 export class GrammarService {
@@ -137,8 +138,11 @@ export class GrammarService {
   }
 
   /** Attempts by learners; an admin trying a topic does not lock it. */
-  private learnerAttempts(topicId: number) {
-    return this.prisma.grammarAttempt.count({
+  private learnerAttempts(
+    topicId: number,
+    client: Pick<Prisma.TransactionClient, 'grammarAttempt'> = this.prisma,
+  ) {
+    return client.grammarAttempt.count({
       where: { topicId, user: { role: Role.STUDENT } },
     });
   }
@@ -200,6 +204,17 @@ export class GrammarService {
   }
 
   async submitAttempt(
+    topicId: number,
+    userId: number,
+    answers: Record<string, number>,
+  ) {
+    return notFoundIfGone(
+      this.submitAttemptOnce(topicId, userId, answers),
+      `Không tìm thấy chủ đề #${topicId}.`,
+    );
+  }
+
+  private async submitAttemptOnce(
     topicId: number,
     userId: number,
     answers: Record<string, number>,
@@ -366,16 +381,24 @@ export class GrammarService {
   }
 
   async deleteTopic(id: number) {
-    const topic = await this.prisma.grammarTopic.findUnique({ where: { id } });
-    if (!topic)
-      throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
-    // History safety guard
-    if (await this.learnerAttempts(id)) {
-      throw new ConflictException(
-        'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa',
-      );
-    }
-    return this.prisma.grammarTopic.delete({ where: { id } });
+    // The check and the delete in one transaction, with the topic row locked
+    // (audit A5, 2026-11-18). A learner's attempt needs that row (foreign
+    // key): it either committed before the lock and is counted here, or it
+    // waits and then fails on the deleted topic. Before, an attempt saved
+    // between the check and the delete went with the topic.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "GrammarTopic" WHERE id = ${id} FOR UPDATE`;
+      const topic = await tx.grammarTopic.findUnique({ where: { id } });
+      if (!topic)
+        throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
+      // History safety guard
+      if (await this.learnerAttempts(id, tx)) {
+        throw new ConflictException(
+          'Chủ đề ngữ pháp đã có bài làm của học viên, không thể xóa',
+        );
+      }
+      return tx.grammarTopic.delete({ where: { id } });
+    });
   }
 
   async createQuestion(topicId: number, dto: CreateGrammarQuestionDto) {

@@ -31,6 +31,8 @@ describe('AdminGrammarCMS (Phase 4)', () => {
         create: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
@@ -450,6 +452,16 @@ describe('AdminGrammarCMS (Phase 4)', () => {
         findUnique: jest.fn().mockResolvedValue({ id: 1 }),
         create: jest.fn(),
       };
+      // The topic deleted while the attempt is saved: its foreign key fails.
+      prisma.grammarAttempt.create.mockRejectedValueOnce(
+        Object.assign(new Error('Foreign key constraint failed'), {
+          code: 'P2003',
+        }),
+      );
+      await expect(
+        grammarService.submitAttempt(201, 5, { 10: 1 }),
+      ).rejects.toThrow('Không tìm thấy chủ đề #201.');
+
       const result = await grammarService.submitAttempt(201, 5, { 10: 1 });
       expect(result.questionsResult[0]).toEqual(
         expect.objectContaining({

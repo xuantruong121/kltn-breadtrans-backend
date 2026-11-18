@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import {
   PayOSPaymentIntentStatus,
   PayOSPaymentIntentType,
@@ -117,14 +118,17 @@ describe('PayosPaymentService', () => {
         findFirst: jest.fn().mockResolvedValue({
           id: 21,
           amountVnd: 99000,
+          status: 'PENDING',
           paymentIntentExpiresAt: intent.expiresAt,
-          planPurchase: { userId: 7 },
+          planPurchase: { userId: 7, status: 'PENDING_PAYMENT' },
         }),
       },
       payOSPaymentIntent: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue(createdIntent),
-        update: jest.fn().mockResolvedValue({
+        // The link is written only while the intent is not PAID (audit R14).
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
           ...intent,
           status: PayOSPaymentIntentStatus.PENDING,
           paymentLinkId: 'provider-link',
@@ -175,6 +179,79 @@ describe('PayosPaymentService', () => {
     );
     expect(result.checkoutUrl).toBe('https://payos.test/checkout');
     jest.restoreAllMocks();
+  });
+
+  it('makes no PayOS link for a purchase that is no longer waiting for payment (audit R8)', async () => {
+    const prisma = {
+      planPayment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 21,
+          amountVnd: 99000,
+          status: 'EXPIRED',
+          paymentIntentExpiresAt: new Date(Date.now() + 60_000),
+          planPurchase: { userId: 7, status: 'EXPIRED' },
+        }),
+      },
+      payOSPaymentIntent: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      },
+    };
+    const provider = { isConfigured: () => true, createPayment: jest.fn() };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+
+    await expect(
+      service.createForPlanPayment(7, 21, 'Plus monthly'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.payOSPaymentIntent.create).not.toHaveBeenCalled();
+    expect(provider.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('two link requests for one payment: the second reuses the intent the first made (audit R8)', async () => {
+    const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    const ready = {
+      ...intent,
+      checkoutUrl: 'https://payos.test/checkout',
+      qrCode: 'qr',
+    };
+    const prisma = {
+      planPayment: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 21,
+          amountVnd: 99000,
+          status: 'PENDING',
+          paymentIntentExpiresAt: intent.expiresAt,
+          planPurchase: { userId: 7, status: 'PENDING_PAYMENT' },
+        }),
+      },
+      payOSPaymentIntent: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(ready),
+        create: jest.fn().mockRejectedValue(
+          Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+          }),
+        ),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: BigInt(18) }]),
+    };
+    const provider = { isConfigured: () => true, createPayment: jest.fn() };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+
+    const result = await service.createForPlanPayment(7, 21, 'Plus monthly');
+
+    expect(result.checkoutUrl).toBe('https://payos.test/checkout');
+    expect(provider.createPayment).not.toHaveBeenCalled();
   });
 
   it('returns PayOS users to the existing account plan route', () => {
@@ -259,15 +336,60 @@ describe('PayosPaymentService', () => {
     );
   });
 
+  it('a sync that read PENDING does not undo a PAID the webhook wrote meanwhile (audit R14)', async () => {
+    const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+    const paid = { ...intent, status: PayOSPaymentIntentStatus.PAID };
+    const prisma = {
+      payOSPaymentIntent: {
+        findUnique: jest.fn().mockResolvedValue(intent),
+        update: jest.fn(),
+        // The webhook's PAID landed while PayOS was being asked.
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(paid),
+      },
+    };
+    const provider = {
+      getPayment: jest.fn().mockResolvedValue({ status: 'PENDING' }),
+    };
+    const service = new PayosPaymentService(
+      prisma as never,
+      provider as never,
+      {} as never,
+    );
+
+    const result = await service.synchronize(Number(intent.orderCode));
+
+    expect(result.status).toBe(PayOSPaymentIntentStatus.PAID);
+    expect(prisma.payOSPaymentIntent.update).not.toHaveBeenCalled();
+    expect(prisma.payOSPaymentIntent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: intent.id,
+          status: { not: PayOSPaymentIntentStatus.PAID },
+        },
+      }),
+    );
+  });
+
   describe('closeUnpaid', () => {
     const setup = (remoteStatus: string, cancel = jest.fn()) => {
       const intent = makeIntent(PayOSPaymentIntentStatus.PENDING);
+      let row: Record<string, unknown> = { ...intent };
       const prisma = {
         payOSPaymentIntent: {
           findUnique: jest.fn().mockResolvedValue(intent),
-          update: jest.fn((args: { data: { status?: string } }) =>
-            Promise.resolve({ ...intent, ...args.data }),
-          ),
+          update: jest.fn((args: { data: Record<string, unknown> }) => {
+            row = { ...row, ...args.data };
+            return Promise.resolve(row);
+          }),
+          // Status writes skip a row that is PAID by now (audit R14).
+          updateMany: jest.fn((args: { data: Record<string, unknown> }) => {
+            if (row.status === PayOSPaymentIntentStatus.PAID)
+              return Promise.resolve({ count: 0 });
+            row = { ...row, ...args.data };
+            return Promise.resolve({ count: 1 });
+          }),
+          findUniqueOrThrow: jest.fn(() => Promise.resolve(row)),
         },
       };
       const provider = {
@@ -298,8 +420,11 @@ describe('PayosPaymentService', () => {
         orderCode,
         'Hết thời hạn thanh toán',
       );
-      expect(prisma.payOSPaymentIntent.update).toHaveBeenLastCalledWith(
+      expect(prisma.payOSPaymentIntent.updateMany).toHaveBeenLastCalledWith(
         expect.objectContaining({
+          where: expect.objectContaining({
+            status: { not: PayOSPaymentIntentStatus.PAID },
+          }),
           data: expect.objectContaining({
             status: PayOSPaymentIntentStatus.CANCELLED,
           }),

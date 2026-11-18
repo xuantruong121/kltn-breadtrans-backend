@@ -1211,15 +1211,19 @@ Task: ${instructions}`
     // A free PLUS trial grades at most 3 paid-level Writing answers.
     const trialCounted =
       !context && (this.quizContentAccess?.isPremium(quiz) ?? false);
-    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'WRITING');
+    // Taken before grading and handed back if grading fails (audit R11).
+    const refundTrial = trialCounted
+      ? await this.trial?.takeGrading(userId, 'WRITING')
+      : null;
 
-    const { evaluation, validatedEvaluation, detail } = await this.gradeAnswer(
-      quiz,
-      content,
-      answer,
-      practiceTask,
-    );
-    if (trialCounted) await this.trial?.recordGrading(userId, 'WRITING');
+    let graded: Awaited<ReturnType<WritingService['gradeAnswer']>>;
+    try {
+      graded = await this.gradeAnswer(quiz, content, answer, practiceTask);
+    } catch (error) {
+      await refundTrial?.();
+      throw error;
+    }
+    const { evaluation, validatedEvaluation, detail } = graded;
     const submission = await this.persistAssessment({
       detail,
       exercise,
@@ -1608,17 +1612,26 @@ Task: ${instructions}`
     // A free PLUS trial grades at most 3 paid-level Writing answers; a
     // revision is one more graded answer.
     const trialCounted = this.quizContentAccess?.isPremium(quiz) ?? false;
-    if (trialCounted) await this.trial?.assertGradingLeft(userId, 'WRITING');
+    // Taken before grading and handed back if grading fails (audit R11).
+    const refundTrial = trialCounted
+      ? await this.trial?.takeGrading(userId, 'WRITING')
+      : null;
 
     const previousAttempt = chain[chain.length - 1];
-    const { evaluation, validatedEvaluation, detail } = await this.gradeAnswer(
-      quiz,
-      content,
-      answer,
-      practiceTask,
-      revisionGraderInput(previousAttempt),
-    );
-    if (trialCounted) await this.trial?.recordGrading(userId, 'WRITING');
+    let graded: Awaited<ReturnType<WritingService['gradeAnswer']>>;
+    try {
+      graded = await this.gradeAnswer(
+        quiz,
+        content,
+        answer,
+        practiceTask,
+        revisionGraderInput(previousAttempt),
+      );
+    } catch (error) {
+      await refundTrial?.();
+      throw error;
+    }
+    const { evaluation, validatedEvaluation, detail } = graded;
 
     const feedback = JSON.stringify({
       ...(detail ?? {}),

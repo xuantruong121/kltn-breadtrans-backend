@@ -5,6 +5,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { GamificationService } from '../gamification/gamification.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  BadRequestException,
   ConflictException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -184,6 +185,8 @@ describe('MarketService', () => {
     };
     const txFor = (plusVersion: { id: number } | null) => ({
       $executeRaw: jest.fn(),
+      // The learner's row lock (audit R3): taken before deductBanh.
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
       marketOrder: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest
@@ -232,6 +235,11 @@ describe('MarketService', () => {
       );
 
       expect(result.success).toBe(true);
+      // User row locked before the Bánh Mì debit (UserStats), the order a
+      // purchase confirmation uses (audit R3).
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        mockGamificationService.deductBanh.mock.invocationCallOrder[0],
+      );
       const created = tx.subscription.create.mock.calls[0][0].data;
       expect(created).toMatchObject({
         userId: 3,
@@ -355,6 +363,37 @@ describe('MarketService', () => {
       expect(
         mockPrismaService.userShippingProfile.findUnique,
       ).not.toHaveBeenCalled();
+    });
+
+    it('a gift repriced or taken off sale after the catalog read is refused and charges nothing (audit R12)', async () => {
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockDigitalProduct,
+      ]);
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Digital Learner',
+      });
+      const stock = jest.fn().mockResolvedValue({ count: 0 });
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) =>
+          callback({
+            $executeRaw: jest.fn(),
+            marketOrder: { findUnique: jest.fn().mockResolvedValue(null) },
+            marketProduct: { updateMany: stock },
+          }),
+      );
+
+      await expect(
+        service.createOrder(1, {
+          items: [{ id: 'streak-freeze', quantity: 1 }],
+        }),
+      ).rejects.toThrow('đổi giá');
+      expect(stock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1, stock: { gte: 1 }, isActive: true, price: 20 },
+        }),
+      );
+      expect(mockGamificationService.deductBanh).not.toHaveBeenCalled();
     });
 
     it('blocks physical item redemption when user has no shipping profile, with 0 balance deduction', async () => {
@@ -503,6 +542,64 @@ describe('MarketService', () => {
         '12 Nguyễn Văn Bảo, Phường 1, Thành phố Hồ Chí Minh, Việt Nam',
       );
       expect(redemption.status).toBe('PENDING');
+    });
+  });
+
+  describe('reviewOrder — approve races a reject (audit R1, 2026-11-18)', () => {
+    const pendingOrder = {
+      id: 51,
+      userId: 7,
+      status: 'pending',
+      totalBanh: 100,
+      items: [{ productId: 1, quantity: 1 }],
+      studentName: 'Học viên',
+    };
+
+    it('approves only a still-pending order: a reject that committed first wins and nothing is written', async () => {
+      // Both admins read "pending"; the reject commits first.
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(pendingOrder);
+      const tx: any = {
+        marketOrder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          update: jest.fn(),
+          findUnique: jest.fn(),
+        },
+        marketPhysicalRedemption: { updateMany: jest.fn() },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      await expect(
+        service.reviewOrder(51, 'approved', 'admin@x.com'),
+      ).rejects.toThrow('đã được xử lý');
+      expect(tx.marketOrder.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 51, status: 'pending' } }),
+      );
+      expect(tx.marketPhysicalRedemption.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.marketOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('a pending order is approved and its physical redemption moves on, in one transaction', async () => {
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(pendingOrder);
+      const tx: any = {
+        marketOrder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...pendingOrder, status: 'approved' }),
+        },
+        marketPhysicalRedemption: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      const result = await service.reviewOrder(51, 'approved', 'admin@x.com');
+
+      expect(result).toMatchObject({ status: 'approved' });
+      expect(tx.marketPhysicalRedemption.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 51, status: 'PENDING' },
+        data: { status: 'PROCESSING' },
+      });
     });
   });
 
@@ -700,6 +797,13 @@ describe('MarketService', () => {
   });
 
   describe('getReconciliationReport — read-only drift detection', () => {
+    // One REPEATABLE READ snapshot for the four reads (audit R13).
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
+
     it('classifies CONSISTENT / DRIFT_POSITIVE / DRIFT_NEGATIVE without mutating anything', async () => {
       mockPrismaService.userStats.findMany.mockResolvedValue([
         { userId: 1, totalBanhRan: 100 }, // consistent
@@ -720,6 +824,10 @@ describe('MarketService', () => {
       );
 
       const report = await service.getReconciliationReport();
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: 'RepeatableRead' },
+      );
 
       expect(report.totalUsers).toBe(3);
       expect(report.driftCount).toBe(2);
@@ -750,6 +858,12 @@ describe('MarketService', () => {
   });
 
   describe('runLegacyReconciliation — explicitly-scoped, idempotent one-time correction', () => {
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
+
     beforeEach(() => {
       mockPrismaService.userStats.findMany.mockResolvedValue([
         { userId: 2, totalBanhRan: 101 },
@@ -872,6 +986,11 @@ describe('MarketService', () => {
   });
 
   describe('getUserLedgerHistory — per-learner ledger, never CurrencyTransaction', () => {
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
     it('returns current balance, reconciliation status and BanhTransaction history', async () => {
       mockPrismaService.userStats.findUnique.mockResolvedValue({
         totalBanhRan: 101,
@@ -1028,11 +1147,71 @@ describe('MarketService', () => {
 
         const result = await service.adminUpdateProduct(1, {
           price: 600,
-          stock: 15,
         });
 
         expect(result.price).toBe(600);
+        expect(
+          mockPrismaService.marketProduct.update.mock.calls[0][0].data.stock,
+        ).toBeUndefined();
+      });
+
+      it('writes a new stock only while the stock is still the one the form loaded (audit R9)', async () => {
+        mockPrismaService.marketProduct.findUnique
+          .mockResolvedValueOnce({ id: 1, slug: 'cu-slug', stock: 5 })
+          .mockResolvedValueOnce({ id: 1, slug: 'cu-slug', stock: 15 });
+        mockPrismaService.marketProduct.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const result = await service.adminUpdateProduct(1, {
+          stock: 15,
+          expectedStock: 5,
+        });
+
+        expect(mockPrismaService.marketProduct.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 1, stock: 5 },
+            data: expect.objectContaining({ stock: 15 }),
+          }),
+        );
         expect(result.stock).toBe(15);
+      });
+
+      it('refuses a stock from a form opened before a sale: 409, nothing written (audit R9)', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+          stock: 4,
+        });
+        // A learner bought one after the admin opened the form at 5.
+        mockPrismaService.marketProduct.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.adminUpdateProduct(1, {
+            name: 'Quà mới',
+            stock: 5,
+            expectedStock: 5,
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(mockPrismaService.marketProduct.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses a stock without the stock the form loaded', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+          stock: 4,
+        });
+
+        await expect(
+          service.adminUpdateProduct(1, { stock: 5 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(
+          mockPrismaService.marketProduct.updateMany,
+        ).not.toHaveBeenCalled();
+        expect(mockPrismaService.marketProduct.update).not.toHaveBeenCalled();
       });
 
       it('rejects update with price <= 0', async () => {
@@ -1091,6 +1270,22 @@ describe('MarketService', () => {
     });
 
     describe('reviewOrder — only a pending order', () => {
+      // The approve branch writes in a transaction with a pending-status guard.
+      const approveInTransaction = (order: Record<string, unknown>) => {
+        const tx: any = {
+          marketOrder: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ ...order, status: 'approved' }),
+          },
+          marketPhysicalRedemption: {
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+        };
+        mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+        return tx;
+      };
       it.each(['approved', 'completed', 'rejected', 'refunded'])(
         'refuses to reject an order that is already %s',
         async (status) => {
@@ -1111,10 +1306,7 @@ describe('MarketService', () => {
       it('tells the learner an order was approved', async () => {
         const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
         mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
-        mockPrismaService.marketOrder.update.mockResolvedValue({
-          ...order,
-          status: 'approved',
-        });
+        approveInTransaction(order);
 
         await service.reviewOrder(10, 'approved', 'Admin');
 
@@ -1132,10 +1324,7 @@ describe('MarketService', () => {
       it('keeps the review when the notification fails', async () => {
         const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
         mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
-        mockPrismaService.marketOrder.update.mockResolvedValue({
-          ...order,
-          status: 'approved',
-        });
+        approveInTransaction(order);
         mockNotificationsService.createNotification.mockRejectedValueOnce(
           new Error('down'),
         );

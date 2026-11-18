@@ -33,6 +33,8 @@ describe('AdminVocabCMS (Phase 4)', () => {
       userVocabWordProgress: {
         findFirst: jest.fn(),
       },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((arg) =>
         typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
       ),
@@ -98,6 +100,10 @@ describe('AdminVocabCMS (Phase 4)', () => {
           totalWords: 1,
         },
       });
+      // The words are counted with the topic locked (audit A8).
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.vocabTopic.findUnique.mock.invocationCallOrder[0],
+      );
     });
 
     it('unpublishes a topic back to DRAFT', async () => {

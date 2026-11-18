@@ -14,6 +14,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { isStreakShieldProduct } from '../gamification/streak-shield.logic';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
@@ -235,6 +236,12 @@ export class MarketService {
     // 2. Bọc toàn bộ luồng trong 1 prisma.$transaction nguyên tử
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`market_order:${checkoutKey}`}))`;
+      // A Plus card writes the learner's plan (givePlusDays locks the User
+      // row). That lock is taken here, before deductBanh locks UserStats, so
+      // the order is User then UserStats as in a purchase confirmation and the
+      // two cannot deadlock (audit R3, 2026-11-18).
+      if (resolvedItems.some(({ product }) => product.slug === PLUS_CARD_SLUG))
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
 
       const duplicate = await tx.marketOrder.findUnique({
         where: { idempotencyKey: checkoutKey },
@@ -249,12 +256,16 @@ export class MarketService {
         };
       }
 
-      // 2a. Trừ tồn kho Stock theo CAS nguyên tử
+      // 2a. Trừ tồn kho Stock theo CAS nguyên tử. The price and the on-sale
+      // flag are part of it (audit R12, 2026-11-18): a gift repriced or taken
+      // off sale after the catalog read above was sold at the old price.
       for (const { product, quantity } of resolvedItems) {
         const stockResult = await tx.marketProduct.updateMany({
           where: {
             id: product.id,
             stock: { gte: quantity },
+            isActive: true,
+            price: product.price,
           },
           data: {
             stock: { decrement: quantity },
@@ -264,7 +275,7 @@ export class MarketService {
 
         if (stockResult.count === 0) {
           throw new BadRequestException(
-            `Sản phẩm "${product.name}" đã hết hàng hoặc không đủ tồn kho (cần ${quantity})`,
+            `Quà "${product.name}" vừa đổi giá, ngừng bán hoặc không đủ tồn kho (cần ${quantity}). Tải lại trang rồi thử lại.`,
           );
         }
       }
@@ -369,14 +380,12 @@ export class MarketService {
             },
           });
           if (badge) {
-            const existing = await tx.userBadge.findUnique({
-              where: { userId_badgeId: { userId, badgeId: badge.id } },
+            // ON CONFLICT DO NOTHING (audit C5): two checkouts at once no
+            // longer roll the whole order back on the unique badge.
+            await tx.userBadge.createMany({
+              data: [{ userId, badgeId: badge.id }],
+              skipDuplicates: true,
             });
-            if (!existing) {
-              await tx.userBadge.create({
-                data: { userId, badgeId: badge.id },
-              });
-            }
           }
         }
       }
@@ -640,24 +649,43 @@ export class MarketService {
         return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
       });
     } else {
-      updatedOrder = await this.prisma.marketOrder.update({
-        where: { id: orderId },
-        data: {
-          status,
-          reviewedBy: reviewerName,
-          reviewedAt: new Date(),
-          bankSnapshot: reason?.trim()
-            ? { reason: reason.trim(), action: status, reviewerName }
-            : undefined,
-        },
-      });
-
-      if (status === 'approved' || status === 'completed') {
-        await this.prisma.marketPhysicalRedemption.updateMany({
-          where: { orderId, status: 'PENDING' },
-          data: { status: status === 'completed' ? 'DELIVERED' : 'PROCESSING' },
+      // Same guard as the reject branch: only a still-pending order changes.
+      // Without it a reject that committed first (refund, stock back) was
+      // overwritten with "approved" (audit R1, 2026-11-18).
+      updatedOrder = await this.prisma.$transaction(async (tx) => {
+        const casResult = await tx.marketOrder.updateMany({
+          where: { id: orderId, status: 'pending' },
+          data: {
+            status,
+            reviewedBy: reviewerName,
+            reviewedAt: new Date(),
+            ...(reason?.trim()
+              ? {
+                  bankSnapshot: {
+                    reason: reason.trim(),
+                    action: status,
+                    reviewerName,
+                  },
+                }
+              : {}),
+          },
         });
-      }
+        if (casResult.count === 0) {
+          throw new ConflictException(
+            'Đơn đổi quà đã được xử lý, vui lòng tải lại trang.',
+          );
+        }
+
+        if (status === 'approved' || status === 'completed') {
+          await tx.marketPhysicalRedemption.updateMany({
+            where: { orderId, status: 'PENDING' },
+            data: {
+              status: status === 'completed' ? 'DELIVERED' : 'PROCESSING',
+            },
+          });
+        }
+        return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
+      });
     }
 
     // Bắn sự kiện Real-time thông báo kết quả duyệt đơn cho học sinh
@@ -946,6 +974,14 @@ export class MarketService {
     if (dto.stock !== undefined && dto.stock < 0) {
       throw new BadRequestException('Số lượng tồn kho không được âm');
     }
+    // A new stock is written only while the stock is still the one the form
+    // loaded (audit R9, 2026-11-18): a sale or a refund since then would be
+    // overwritten, and a physical gift sold beyond what exists.
+    if (dto.stock !== undefined && dto.expectedStock === undefined) {
+      throw new BadRequestException(
+        'Thiếu số tồn kho lúc mở form (expectedStock).',
+      );
+    }
 
     let updateSlug = existing.slug;
     if (dto.slug?.trim()) {
@@ -963,27 +999,35 @@ export class MarketService {
       }
     }
 
-    return this.prisma.marketProduct.update({
-      where: { id },
-      data: {
-        name: dto.name !== undefined ? dto.name.trim() : undefined,
-        slug: updateSlug,
-        description:
-          dto.description !== undefined
-            ? dto.description?.trim() || null
-            : undefined,
-        category: dto.category !== undefined ? dto.category.trim() : undefined,
-        rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
-        price: dto.price !== undefined ? dto.price : undefined,
-        stock: dto.stock !== undefined ? dto.stock : undefined,
-        imageUrl:
-          dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
-        order: dto.order !== undefined ? dto.order : undefined,
-        isActive: dto.isActive !== undefined ? dto.isActive : undefined,
-        fulfillmentType:
-          dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
-      },
+    const data = {
+      name: dto.name !== undefined ? dto.name.trim() : undefined,
+      slug: updateSlug,
+      description:
+        dto.description !== undefined
+          ? dto.description?.trim() || null
+          : undefined,
+      category: dto.category !== undefined ? dto.category.trim() : undefined,
+      rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
+      price: dto.price !== undefined ? dto.price : undefined,
+      stock: dto.stock !== undefined ? dto.stock : undefined,
+      imageUrl:
+        dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
+      order: dto.order !== undefined ? dto.order : undefined,
+      isActive: dto.isActive !== undefined ? dto.isActive : undefined,
+      fulfillmentType:
+        dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
+    };
+    if (dto.stock === undefined)
+      return this.prisma.marketProduct.update({ where: { id }, data });
+    const { count } = await this.prisma.marketProduct.updateMany({
+      where: { id, stock: dto.expectedStock },
+      data,
     });
+    if (count === 0)
+      throw new ConflictException(
+        'Tồn kho vừa thay đổi (có người đổi quà hoặc được hoàn). Tải lại trang rồi nhập lại số tồn kho.',
+      );
+    return (await this.prisma.marketProduct.findUnique({ where: { id } }))!;
   }
 
   async adminToggleProductActive(id: number, isActive?: boolean) {
@@ -1044,22 +1088,29 @@ export class MarketService {
    * remediation, not a repair action.
    */
   async getReconciliationReport() {
-    const [allStats, ledgerSums, lastTx, users] = await Promise.all([
-      this.prisma.userStats.findMany({
-        select: { userId: true, totalBanhRan: true },
-      }),
-      this.prisma.banhTransaction.groupBy({
-        by: ['userId'],
-        _sum: { amount: true },
-      }),
-      this.prisma.banhTransaction.groupBy({
-        by: ['userId'],
-        _max: { createdAt: true },
-      }),
-      this.prisma.user.findMany({
-        select: { id: true, profile: { select: { fullName: true } } },
-      }),
-    ]);
+    // One snapshot for the four reads (audit R13, 2026-11-18): read apart, a
+    // reward between the balances and the ledger sums showed a false drift.
+    const [allStats, ledgerSums, lastTx, users] =
+      await this.prisma.$transaction(
+        (tx) =>
+          Promise.all([
+            tx.userStats.findMany({
+              select: { userId: true, totalBanhRan: true },
+            }),
+            tx.banhTransaction.groupBy({
+              by: ['userId'],
+              _sum: { amount: true },
+            }),
+            tx.banhTransaction.groupBy({
+              by: ['userId'],
+              _max: { createdAt: true },
+            }),
+            tx.user.findMany({
+              select: { id: true, profile: { select: { fullName: true } } },
+            }),
+          ]),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
 
     const ledgerByUser = new Map(
       ledgerSums.map((row) => [row.userId, row._sum.amount ?? 0]),
@@ -1147,6 +1198,12 @@ export class MarketService {
         delta: row.delta,
         applied: outcome.applied,
         alreadyApplied: outcome.alreadyApplied,
+        ...(outcome.gapChanged
+          ? {
+              skippedReason:
+                'Chênh lệch vừa thay đổi trong lúc chạy; hãy xem lại báo cáo rồi chạy lại.',
+            }
+          : {}),
       });
     }
 

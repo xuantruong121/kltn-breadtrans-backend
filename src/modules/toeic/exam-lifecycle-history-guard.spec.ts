@@ -18,6 +18,8 @@ describe('GenericExamService — attempt-aware unpublish/delete guard (P1-01)', 
       toeicAssessment: { update: jest.fn(), delete: jest.fn() },
       toeicAttempt: { findFirst: jest.fn() },
       toeicAssessmentAttempt: { findFirst: jest.fn() },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((ops: any) =>
         Array.isArray(ops) ? Promise.all(ops) : ops(prisma),
       ),
@@ -77,6 +79,16 @@ describe('GenericExamService — attempt-aware unpublish/delete guard (P1-01)', 
 
     await service.retire(5);
 
+    // The same lock order as publish and the content edits (Set, then Exam):
+    // the Exam written first could deadlock with an edit (2026-11-18).
+    const locks = prisma.$queryRaw.mock.calls.map((call: any) =>
+      call[0].join('?'),
+    );
+    expect(locks[0]).toContain('FROM "ToeicExamSet"');
+    expect(locks[1]).toContain('FROM "Exam"');
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.exam.update.mock.invocationCallOrder[0],
+    );
     const archived = { publicationStatus: QuizPublicationStatus.ARCHIVED };
     expect(prisma.exam.update).toHaveBeenCalledWith({
       where: { id: 5 },

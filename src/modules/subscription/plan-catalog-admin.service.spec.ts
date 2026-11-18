@@ -147,6 +147,29 @@ describe('PlanCatalogAdminService', () => {
     );
   });
 
+  it('an edit landing after the draft was published is refused, not written into the live version (audit A10)', async () => {
+    const prisma = makePrisma();
+    prisma.planVersion.findUnique.mockResolvedValue(draft());
+    prisma.subscription.count.mockResolvedValue(0);
+    prisma.planPurchase.count.mockResolvedValue(0);
+    // Published between the read above and the write.
+    prisma.planVersion.updateMany.mockResolvedValue({ count: 0 });
+    const service = new PlanCatalogAdminService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    await expect(
+      service.updateDraft(22, { priceVnd: 1000 }, 7),
+    ).rejects.toThrow('vừa được áp dụng');
+    expect(prisma.planVersion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 22, status: PlanVersionStatus.DRAFT, isCurrent: false },
+      }),
+    );
+    expect(prisma.planVersion.update).not.toHaveBeenCalled();
+  });
+
   it('refuses to publish a paid version that grants nothing', async () => {
     const prisma = makePrisma();
     const tx = {
@@ -232,7 +255,11 @@ describe('PlanCatalogAdminService', () => {
     const result = await service.publish(22, 7);
 
     expect(result.isCurrent).toBe(true);
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    // The plan, then the version, locked before the version is read (A10).
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      tx.planVersion.findUnique.mock.invocationCallOrder[1],
+    );
     expect(tx.planVersion.updateMany).toHaveBeenCalledWith({
       where: {
         planId: plan.id,
@@ -274,7 +301,7 @@ describe('PlanCatalogAdminService', () => {
     await expect(service.publish(22, 7)).rejects.toThrow(
       'Phiên bản trả phí khi xuất bản phải có giá lớn hơn 0.',
     );
-    expect(tx.$queryRaw).not.toHaveBeenCalled();
+    // The locks come before the validation now (audit A10); nothing is written.
     expect(tx.planVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.planVersion.update).not.toHaveBeenCalled();
   });

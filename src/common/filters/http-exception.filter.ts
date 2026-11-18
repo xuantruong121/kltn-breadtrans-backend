@@ -6,8 +6,38 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
+
+/**
+ * Database errors that are the client's, not the server's (audit A14,
+ * 2026-11-18): a row that two requests created at once, a row that was
+ * deleted meanwhile. They used to answer 500. Prisma's own message names
+ * tables and columns, so it never goes out.
+ */
+const PRISMA_CLIENT_ERRORS: Record<
+  string,
+  { status: number; error: string; message: string }
+> = {
+  P2002: {
+    status: HttpStatus.CONFLICT,
+    error: 'DUPLICATE',
+    message:
+      'Dữ liệu này vừa được tạo hoặc đã tồn tại. Tải lại trang rồi thử lại.',
+  },
+  P2003: {
+    status: HttpStatus.CONFLICT,
+    error: 'RELATED_CHANGED',
+    message:
+      'Dữ liệu liên quan vừa thay đổi hoặc đã bị xoá. Tải lại trang rồi thử lại.',
+  },
+  P2025: {
+    status: HttpStatus.NOT_FOUND,
+    error: 'NOT_FOUND',
+    message: 'Không tìm thấy dữ liệu. Có thể nó vừa bị xoá.',
+  },
+};
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -22,12 +52,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // `type: 'entity.too.large'`; it is a client error (413), not a server fault.
     const tooLarge =
       (exception as { type?: string } | null)?.type === 'entity.too.large';
+    const dbClientError =
+      exception instanceof Prisma.PrismaClientKnownRequestError
+        ? PRISMA_CLIENT_ERRORS[exception.code]
+        : undefined;
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : tooLarge
           ? HttpStatus.PAYLOAD_TOO_LARGE
-          : HttpStatus.INTERNAL_SERVER_ERROR;
+          : (dbClientError?.status ?? HttpStatus.INTERNAL_SERVER_ERROR);
     const requestId = randomUUID();
 
     let message = 'Internal server error';
@@ -63,6 +97,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (tooLarge) {
       message = 'Dữ liệu gửi lên quá lớn. Vui lòng dùng tệp hoặc ảnh nhỏ hơn.';
       errorDetails = 'PAYLOAD_TOO_LARGE';
+    } else if (dbClientError) {
+      message = dbClientError.message;
+      errorDetails = dbClientError.error;
     } else if (exception instanceof Error) {
       message = exception.message;
     }

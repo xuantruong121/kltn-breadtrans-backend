@@ -1112,24 +1112,6 @@ export class QuizService {
     });
   }
 
-  async deleteQuiz(id: number, user?: { id: number; role: Role }) {
-    const existing = await this.prisma.quiz.findUnique({
-      where: { id },
-    });
-    if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
-
-    if (user && user.role !== Role.ADMIN) {
-      throw new ForbiddenException(
-        'Chỉ Quản trị viên mới có quyền xóa bài kiểm tra',
-      );
-    }
-    this.assertGenericAdminOwnership(existing.type);
-
-    return this.prisma.quiz.delete({
-      where: { id },
-    });
-  }
-
   async getAllQuizzes() {
     return this.prisma.quiz.findMany({
       include: {
@@ -2343,20 +2325,25 @@ export class QuizService {
     } else if (quiz.type === QuizType.BILINGUAL_READING) {
       validateReadingSubmission(quiz.questions, dto.answers);
 
-      if (dto.clientAttemptId) {
-        const replay = await this.replayReadingSubmission(
-          userId,
-          quizId,
-          dto.clientAttemptId,
-          dto.answers,
+      // Every Reading submission names its attempt (audit C11, 2026-11-18):
+      // without one, a double click made two submissions, two progress
+      // events and the mistakes counted twice. The app always sends it.
+      if (!dto.clientAttemptId)
+        throw new BadRequestException(
+          'Thiếu mã lượt làm bài (clientAttemptId). Tải lại trang rồi nộp lại.',
         );
-        if (replay) return replay;
-        await this.assertReadingAttemptKeyScope(
-          userId,
-          quizId,
-          dto.clientAttemptId,
-        );
-      }
+      const replay = await this.replayReadingSubmission(
+        userId,
+        quizId,
+        dto.clientAttemptId,
+        dto.answers,
+      );
+      if (replay) return replay;
+      await this.assertReadingAttemptKeyScope(
+        userId,
+        quizId,
+        dto.clientAttemptId,
+      );
     }
 
     if (
@@ -2375,6 +2362,18 @@ export class QuizService {
       if (!attempt)
         throw new ForbiddenException('Phiên luyện nghe không còn hiệu lực');
     }
+
+    // A Listening submission without its attempt takes the learner's open
+    // one (audit C11): two at once then share it, and the attempt's
+    // completion lets only one of them through.
+    if (
+      dto.attemptId === undefined &&
+      quiz.type === QuizType.LISTENING_PRACTICE
+    )
+      dto = {
+        ...dto,
+        attemptId: (await this.getOrCreateListeningAttempt(userId, quizId)).id,
+      };
 
     let totalScore = 0;
     const answersByQuestionId = new Map(

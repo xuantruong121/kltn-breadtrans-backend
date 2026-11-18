@@ -307,6 +307,88 @@ describe('PlanPurchaseService', () => {
     expect(tx.planPayment.create).not.toHaveBeenCalled();
   });
 
+  describe('createPurchase with PayOS (audit R8)', () => {
+    const payosFake = (outcome: 'OPEN' | 'CLOSED' = 'CLOSED') => ({
+      isEnabled: () => true,
+      closeUnpaid: jest.fn().mockResolvedValue(outcome),
+      createForPlanPayment: jest.fn().mockResolvedValue({ intentId: 5 }),
+    });
+
+    it('a second Buy while the first is still making its PayOS link resumes that purchase', async () => {
+      const prisma = makePrisma();
+      const open = purchase();
+      open.payment = {
+        ...open.payment,
+        transferCode: 'BTP00000031',
+        paymentIntentExpiresAt: new Date(Date.now() + 60_000),
+        payosIntent: null,
+      } as never;
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: 7 }]),
+        planPurchase: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          findMany: jest.fn().mockResolvedValue([open]),
+          create: jest.fn(),
+          update: jest.fn(),
+        },
+        planPayment: { create: jest.fn(), update: jest.fn() },
+        planVersion: { findUnique: jest.fn() },
+      };
+      prisma.planVersion.findUnique.mockResolvedValue(version());
+      prisma.planPurchase.findMany.mockResolvedValue([]);
+      prisma.$transaction.mockImplementation(((
+        callback: (value: typeof tx) => unknown,
+      ) => callback(tx)) as never);
+      const payos = payosFake();
+      const service = new PlanPurchaseService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+        payos as never,
+      );
+
+      const result = await service.createPurchase(7, 12, 'second-key');
+
+      expect(result.id).toBe(31);
+      // Not expired under the first request's QR, not replaced.
+      expect(tx.planPayment.update).not.toHaveBeenCalled();
+      expect(tx.planPurchase.update).not.toHaveBeenCalled();
+      expect(tx.planPurchase.create).not.toHaveBeenCalled();
+      expect(payos.createForPlanPayment).toHaveBeenCalledWith(
+        7,
+        21,
+        expect.any(String),
+      );
+    });
+
+    it('a new code on a plan whose QR is live closes that QR at PayOS first, 409 while it is still open', async () => {
+      const prisma = makePrisma();
+      prisma.planPurchase.findMany.mockResolvedValue([
+        { id: 31, promoCode: null },
+      ]);
+      prisma.planPurchase.findFirst.mockResolvedValue({
+        status: PlanPurchaseStatus.PENDING_PAYMENT,
+        supersededByPurchaseId: null,
+        payment: {
+          status: PlanPaymentStatus.PENDING,
+          payosIntent: { orderCode: BigInt(1763450000123) },
+        },
+      });
+      prisma.planVersion.findUnique.mockResolvedValue(version());
+      const payos = payosFake('OPEN');
+      const service = new PlanPurchaseService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+        payos as never,
+      );
+
+      await expect(
+        service.createPurchase(7, 12, 'code-key', 'SALE20'),
+      ).rejects.toThrow('Mã thanh toán cũ đang được xử lý');
+      expect(payos.closeUnpaid).toHaveBeenCalledWith(1763450000123);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
   it('supersedes an active intent and creates one replacement atomically', async () => {
     const prisma = makePrisma();
     const active = purchase();

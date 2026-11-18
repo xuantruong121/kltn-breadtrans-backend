@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from './http-exception.filter';
 
 function run(exception: unknown) {
@@ -14,7 +15,30 @@ function run(exception: unknown) {
   return json.mock.calls[0][0] as Record<string, unknown>;
 }
 
+const prismaError = (code: string) =>
+  new Prisma.PrismaClientKnownRequestError(
+    'Unique constraint failed on the fields: (`email`) in table "User"',
+    { code, clientVersion: '6.2.1' },
+  );
+
 describe('HttpExceptionFilter', () => {
+  it.each([
+    ['P2002', 409, 'DUPLICATE'],
+    ['P2003', 409, 'RELATED_CHANGED'],
+    ['P2025', 404, 'NOT_FOUND'],
+  ])(
+    'a database %s is a %d client answer, without the table names (audit A14)',
+    (code, status, error) => {
+      const body = run(prismaError(code));
+      expect(body).toMatchObject({ statusCode: status, error });
+      expect(String(body.message)).not.toMatch(/User|email|constraint/i);
+    },
+  );
+
+  it('any other database error stays a 500', () => {
+    expect(run(prismaError('P2034'))).toMatchObject({ statusCode: 500 });
+  });
+
   it('keeps which plan ran out of AI gradings, for the notice (owner 2026-11-13)', () => {
     const body = run(
       new HttpException(

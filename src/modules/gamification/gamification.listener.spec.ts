@@ -7,7 +7,7 @@ describe('GamificationListener', () => {
   let prismaMock: {
     dailyQuest: { findMany: jest.Mock };
     badge: { findFirst: jest.Mock };
-    userBadge: { findUnique: jest.Mock; create: jest.Mock };
+    userBadge: { createMany: jest.Mock };
     userStats: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
     pointHistory: { findFirst: jest.Mock };
     dailyBanhEarning: { findUnique: jest.Mock; upsert: jest.Mock };
@@ -49,8 +49,7 @@ describe('GamificationListener', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       userBadge: {
-        findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({}),
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       userStats: {
         findUnique: jest.fn(),

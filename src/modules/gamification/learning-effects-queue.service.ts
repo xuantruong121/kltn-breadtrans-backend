@@ -10,6 +10,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { LearnerProgressService } from '../learning-path/learner-progress.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationListener } from './gamification.listener';
 import { getTodayDateKey } from './gamification.service';
 
@@ -38,6 +39,11 @@ export type QuizSubmittedPayload = Parameters<
  * submitted, even if the job runs after midnight. If the queue cannot be
  * reached the effects run at once, as before. LEARNING_EFFECTS_MODE=inline
  * (the default under NODE_ENV=test) always runs them at once.
+ *
+ * A submission's effects run once (audit C1, 2026-11-18): the job id is the
+ * submission, and run() claims the submission in LearningEffectClaim first.
+ * An enqueue that timed out but still landed, or a stalled job run again,
+ * finds the claim and stops.
  */
 @Injectable()
 export class LearningEffectsQueueService
@@ -52,6 +58,7 @@ export class LearningEffectsQueueService
   constructor(
     private readonly listener: GamificationListener,
     private readonly moduleRef: ModuleRef,
+    private readonly prisma: PrismaService,
     @Optional() private readonly events?: EventEmitter2,
   ) {}
 
@@ -115,7 +122,13 @@ export class LearningEffectsQueueService
       let timer: NodeJS.Timeout | undefined;
       try {
         await Promise.race([
-          this.queue.add('quiz.submitted', job),
+          this.queue.add(
+            'quiz.submitted',
+            job,
+            job.submissionId
+              ? { jobId: `quiz-effects-${job.submissionId}` }
+              : undefined,
+          ),
           new Promise((_, fail) => {
             timer = setTimeout(
               () => fail(new Error('enqueue timed out')),
@@ -145,6 +158,7 @@ export class LearningEffectsQueueService
 
   /** Both effects; one failing does not stop the other. */
   async run(payload: QuizSubmittedPayload): Promise<void> {
+    if (!(await this.claim(payload))) return;
     try {
       await this.listener.handleQuizSubmittedEvent(payload);
     } catch (error) {
@@ -161,5 +175,29 @@ export class LearningEffectsQueueService
     }
     // Open pages refetch the streak, XP and Bánh Mì now (no reload needed).
     this.events?.emit(LEARNING_EFFECTS_APPLIED, { userId: payload.userId });
+  }
+
+  /**
+   * True when this run is the first for its submission. INSERT ... ON
+   * CONFLICT DO NOTHING: of two runs at once, exactly one gets the row.
+   */
+  private async claim(payload: QuizSubmittedPayload): Promise<boolean> {
+    if (!payload.submissionId) return true;
+    try {
+      const { count } = await this.prisma.learningEffectClaim.createMany({
+        data: [{ submissionId: payload.submissionId, userId: payload.userId }],
+        skipDuplicates: true,
+      });
+      if (count === 0)
+        this.logger.log(
+          `Learning effects of submission ${payload.submissionId} already ran; skipping`,
+        );
+      return count > 0;
+    } catch (error) {
+      this.logger.error(
+        `Learning effects of submission ${payload.submissionId} not run, claim failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 }

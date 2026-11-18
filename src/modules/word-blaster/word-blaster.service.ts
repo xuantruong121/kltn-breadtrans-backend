@@ -12,10 +12,7 @@ import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
-import {
-  ARENA_XP_REASON,
-  vietnamDayStart,
-} from '../events/arena-questions.logic';
+import { ARENA_XP_REASON } from '../events/arena-questions.logic';
 import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
 import {
   BLASTER_BLOCKS,
@@ -92,6 +89,9 @@ const KEY = {
  * Pháo Bánh Mì, decided by the server: the answers never leave it, the clock
  * is its own, each learner has one game open, and the money moves only here.
  */
+const UNLOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 @Injectable()
 export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WordBlasterService.name);
@@ -131,6 +131,19 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Mức cược không hợp lệ.');
     if (!BLASTER_MODES.includes(mode))
       throw new BadRequestException('Chế độ chơi không hợp lệ.');
+    // One start per learner at a time (audit R5, 2026-11-18): two starts
+    // (two tabs) both saw no open game and both paid; the first game was then
+    // orphaned and lost to the sweep. The second now gets the open game.
+    return this.withLock(`start:${userId}`, () =>
+      this.startUnlocked(userId, stake, mode),
+    );
+  }
+
+  private async startUnlocked(
+    userId: number,
+    stake: number,
+    mode: BlasterMode,
+  ): Promise<BlasterView> {
     const open = await this.current(userId);
     if (open) return open;
 
@@ -209,7 +222,16 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       session.hits,
       Date.now() - session.startedAt,
     );
-    if (state.over) return this.view(await this.settle(session, false));
+    if (state.over) {
+      // Settled under the game's lock, from a fresh read: a finish or the
+      // sweep settling at the same moment paid the XP twice (audit R6).
+      const settled = await this.withLock(id, async () => {
+        const fresh = await this.load(id);
+        if (!fresh) return null;
+        return fresh.result ? fresh : this.settle(fresh, false);
+      });
+      return settled ? this.view(settled) : null;
+    }
     return this.view(session);
   }
 
@@ -350,17 +372,12 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
 
   private async awardXp(userId: number, destroyed: number): Promise<number> {
     try {
-      const today = await this.prisma.pointHistory.aggregate({
-        where: {
-          userId,
-          reason: ARENA_XP_REASON,
-          createdAt: { gte: vietnamDayStart(new Date()) },
-        },
-        _sum: { points: true },
-      });
-      const xp = blasterXp(destroyed, today._sum.points ?? 0);
-      if (xp > 0) await this.gamification.awardXp(userId, xp, ARENA_XP_REASON);
-      return xp;
+      // Under the shared Arena cap, read and awarded under one lock (audit R6).
+      return await this.gamification.awardArenaXp(
+        userId,
+        ARENA_XP_REASON,
+        (earnedToday) => blasterXp(destroyed, earnedToday),
+      );
     } catch (err) {
       this.logger.error(`[Blaster] XP for user ${userId} failed`, err);
       return 0;
@@ -422,8 +439,8 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
         try {
           return await work();
         } finally {
-          if ((await this.redis.get(KEY.lock(id))) === owner)
-            await this.redis.del(KEY.lock(id));
+          // Deletes the lock only while it is still this request's.
+          await this.redis.eval(UNLOCK_SCRIPT, 1, KEY.lock(id), owner);
         }
       }
       await new Promise((ok) => setTimeout(ok, 25));

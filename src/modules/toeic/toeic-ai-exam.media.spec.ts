@@ -142,6 +142,11 @@ describe('ToeicAiExamService partial media materialization', () => {
           updates.push(args);
           return args;
         }),
+        // Job status writes are CAS (audit A6): recorded like updates.
+        updateMany: jest.fn().mockImplementation((args) => {
+          updates.push(args);
+          return { count: 1 };
+        }),
       },
       exam: {
         findUnique: jest.fn().mockResolvedValue({

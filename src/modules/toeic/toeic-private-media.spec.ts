@@ -11,6 +11,19 @@ import {
 import { ToeicController } from './toeic.controller';
 import { ToeicService } from './toeic.service';
 
+/** The exam set lock of inDraftSet, on a hand-made Prisma mock. */
+const withDraftLock = (prisma: any, status = 'DRAFT') =>
+  Object.assign(prisma, {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+    toeicExamSet: {
+      findUnique: jest.fn().mockResolvedValue({
+        publicationStatus: 'DRAFT',
+        genericExam: { publicationStatus: status },
+      }),
+    },
+  });
+
 /**
  * Exam Listening media read from the private bucket by key (P04): the clip
  * proxy, the master stream and the admin player. No real storage: the S3
@@ -254,6 +267,62 @@ describe('admin exam view of migrated clips', () => {
 });
 
 describe('AI exam audio regeneration', () => {
+  it('an exam published while its audio was made keeps its content; the new file goes (audit A8 follow-up)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ToeicAiExamService } = require('./toeic-ai-exam.service');
+    const service: any = Object.create(ToeicAiExamService.prototype);
+    service.editableDraft = jest
+      .fn()
+      .mockResolvedValue({ toeicExamSet: { id: 9 } });
+    service.makeAudio = jest.fn().mockResolvedValue(Buffer.from('mp3'));
+    const group = {
+      id: 2,
+      examId: 9,
+      part: 1,
+      canonicalAccent: 'US',
+      // The live exam plays the file an earlier regeneration made.
+      audioUrl:
+        'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
+      transcriptText: null,
+      passageText: null,
+      mediaMetadata: {},
+      questions: [
+        {
+          text: null,
+          options: ['A man', 'A desk', 'A car', 'A door'],
+          correctIndex: 0,
+        },
+      ],
+    };
+    service.prisma = withDraftLock(
+      {
+        toeicQuestionGroup: {
+          findFirst: jest.fn().mockResolvedValue(group),
+          update: jest.fn((args: any) => args.data),
+        },
+      },
+      'PUBLISHED',
+    );
+    service.r2 = {
+      putPrivateObjectAtKey: jest.fn((key: string) =>
+        Promise.resolve({ key, url: '', contentType: 'audio/mpeg' }),
+      ),
+      privateObjectExists: jest.fn().mockResolvedValue(true),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(service.regenerateMedia(4, 2, 'audio')).rejects.toThrow(
+      'xuất bản',
+    );
+    expect(service.prisma.toeicQuestionGroup.update).not.toHaveBeenCalled();
+    // The new audio went to a new key: the live file was never written over,
+    // and only the new one is deleted.
+    const uploadedKey = service.r2.putPrivateObjectAtKey.mock.calls[0][0];
+    expect(uploadedKey).not.toBe(group.audioUrl);
+    expect(service.r2.deleteFile).toHaveBeenCalledWith(uploadedKey);
+    expect(service.r2.deleteFile).not.toHaveBeenCalledWith(group.audioUrl);
+  });
+
   it('writes the audio to the private bucket and stores the key', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ToeicAiExamService } = require('./toeic-ai-exam.service');
@@ -264,6 +333,7 @@ describe('AI exam audio regeneration', () => {
     service.makeAudio = jest.fn().mockResolvedValue(Buffer.from('mp3'));
     const group = {
       id: 2,
+      examId: 9,
       part: 1,
       canonicalAccent: 'US',
       transcriptText: null,
@@ -277,12 +347,12 @@ describe('AI exam audio regeneration', () => {
         },
       ],
     };
-    service.prisma = {
+    service.prisma = withDraftLock({
       toeicQuestionGroup: {
         findFirst: jest.fn().mockResolvedValue(group),
         update: jest.fn((args: any) => args.data),
       },
-    };
+    });
     service.r2 = {
       putPrivateObjectAtKey: jest.fn((key: string) =>
         Promise.resolve({ key, url: '', contentType: 'audio/mpeg' }),
@@ -291,12 +361,16 @@ describe('AI exam audio regeneration', () => {
       putObjectAtKey: jest.fn(),
     };
     const data = await service.regenerateMedia(4, 2, 'audio');
+    await service.regenerateMedia(4, 2, 'audio');
     expect(service.r2.putObjectAtKey).not.toHaveBeenCalled();
-    expect(service.r2.putPrivateObjectAtKey.mock.calls[0][0]).toBe(
-      'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
+    const [first, second] = service.r2.putPrivateObjectAtKey.mock.calls.map(
+      (call: string[]) => call[0],
     );
-    expect(data.audioUrl).toBe(
-      'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
+    // A new key each time: an earlier file stays as it was (2026-11-18).
+    expect(first).toMatch(
+      /^premium\/listening\/toeic\/exams\/9\/groups\/2\/audio-regenerated-[0-9a-f]{8}\.mp3$/,
     );
+    expect(second).not.toBe(first);
+    expect(data.audioUrl).toBe(first);
   });
 });

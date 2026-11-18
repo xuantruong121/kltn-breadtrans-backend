@@ -36,6 +36,8 @@ describe('AdminExamService (Phase 4)', () => {
       toeicAttempt: {
         findFirst: jest.fn(),
       },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
@@ -262,7 +264,30 @@ describe('AdminExamService (Phase 4)', () => {
       expect(result).toEqual({ id: 301 });
     });
 
+    it('a publish between the draft check and the write: the group is refused (audit A8 follow-up)', async () => {
+      // The early check read DRAFT; under the lock the set is PUBLISHED.
+      prisma.toeicExamSet.findUnique
+        .mockResolvedValueOnce({
+          id: 301,
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        })
+        .mockResolvedValueOnce({
+          id: 301,
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+        });
+
+      await expect(adminExamService.addGroup(301, { part: 5 })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.toeicQuestionGroup.create).not.toHaveBeenCalled();
+    });
+
     it('blocks group deletion if exam has attempts', async () => {
+      prisma.toeicExamSet.findUnique.mockResolvedValue({
+        id: 301,
+        publicationStatus: QuizPublicationStatus.DRAFT,
+      });
       prisma.toeicQuestionGroup.findUnique.mockResolvedValue({
         id: 1,
         examId: 301,
@@ -275,6 +300,10 @@ describe('AdminExamService (Phase 4)', () => {
     });
 
     it('blocks question deletion if exam has attempts', async () => {
+      prisma.toeicExamSet.findUnique.mockResolvedValue({
+        id: 301,
+        publicationStatus: QuizPublicationStatus.DRAFT,
+      });
       prisma.toeicQuestionGroup.findUnique.mockResolvedValue({
         id: 1,
         examId: 301,

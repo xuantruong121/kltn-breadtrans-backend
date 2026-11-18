@@ -13,11 +13,9 @@ describe('learner events for the ranking feed', () => {
     const lastStreakUpdate = new Date(Date.now() - streak.daysAgo * 86_400_000);
     const tx: any = {
       $executeRaw: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
       leaderboard: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ userId: 1, totalPoints: totalBefore }),
-        create: jest.fn(),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
         update: jest.fn(({ data }: any) =>
           Promise.resolve({
             userId: 1,

@@ -116,6 +116,16 @@ function speakingWritingDraft() {
   };
 }
 
+/** The status condition of a job write (audit A6/A7: writes are CAS). */
+function statusMatches(status: string, cond: any): boolean {
+  if (cond === undefined) return true;
+  if (typeof cond === 'string') return status === cond;
+  if (cond.not !== undefined) return status !== cond.not;
+  if (cond.in) return cond.in.includes(status);
+  if (cond.notIn) return !cond.notIn.includes(status);
+  return true;
+}
+
 function fixture(
   request: any,
   options?: { hasLr?: boolean; failOnCall?: number; malformed?: boolean },
@@ -158,6 +168,12 @@ function fixture(
           runtimeJob.resultSnapshot = data.resultSnapshot;
         return runtimeJob;
       }),
+      updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
+        if (!statusMatches(runtimeJob.status, where.status))
+          return { count: 0 };
+        prisma.aiGenerationJob.update({ data });
+        return { count: 1 };
+      }),
     },
     exam: {
       findUnique: jest.fn().mockResolvedValue({
@@ -176,6 +192,12 @@ function fixture(
   };
   const service: any = Object.create(ToeicAiExamService.prototype);
   service.prisma = prisma;
+  service.logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  // The job lock (audit A3/A7): always free here.
+  service.connection = {
+    set: jest.fn().mockResolvedValue('OK'),
+    eval: jest.fn().mockResolvedValue(1),
+  };
   service.ai = ai;
   service.queue = {
     getJob: jest.fn().mockResolvedValue(null),
@@ -452,6 +474,91 @@ describe('ToeicAiExamService controlled template pipeline', () => {
     });
   });
 
+  it('a cancel while a batch is drafted stops the job: no retry, no FAILED, no candidate (audit A6)', async () => {
+    const harness = fixture(requestFor('TOEIC_LR', { 5: fullPlan[5] }));
+    harness.ai.generateToeicExamBatch.mockImplementationOnce((input: any) => {
+      // The admin cancels while the first batch is being drafted.
+      harness.runtimeJob.status = AiGenerationJobStatus.CANCELLED;
+      return batchFor(input.part, input.groups);
+    });
+
+    await expect(
+      harness.service.process({ data: { jobId: 'qa-job' } }),
+    ).resolves.toBeUndefined();
+
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.CANCELLED);
+    const statuses = harness.updates
+      .map((u: any) => u.data.status)
+      .filter(Boolean);
+    expect(statuses).not.toContain(AiGenerationJobStatus.FAILED);
+    expect(statuses).not.toContain(AiGenerationJobStatus.GENERATED);
+  });
+
+  it('cancelling a job the worker is running answers instead of a 500 from the locked queue job (audit A6)', async () => {
+    const harness = fixture(requestFor('TOEIC_LR', { 5: fullPlan[5] }));
+    harness.runtimeJob.status = AiGenerationJobStatus.PROCESSING;
+    harness.queue.getJob.mockResolvedValue({
+      remove: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('Job qa-job could not be removed because it is locked'),
+        ),
+    });
+    harness.service.status = jest.fn().mockResolvedValue({ ok: true });
+
+    await expect(harness.service.cancel('qa-job', 1)).resolves.toEqual({
+      ok: true,
+    });
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.CANCELLED);
+  });
+
+  it('a cancel landing after the worker wrote GENERATED is refused and keeps the candidate (audit A6)', async () => {
+    const harness = fixture(requestFor('TOEIC_LR', { 5: fullPlan[5] }));
+    harness.prisma.aiGenerationJob.findUnique.mockImplementationOnce(() => {
+      const seen = {
+        ...harness.runtimeJob,
+        status: AiGenerationJobStatus.PROCESSING,
+      };
+      // The worker finishes right after the cancel read the job.
+      harness.runtimeJob.status = AiGenerationJobStatus.GENERATED;
+      return seen;
+    });
+
+    await expect(harness.service.cancel('qa-job', 1)).rejects.toThrow(
+      'không thể hủy',
+    );
+    expect(harness.runtimeJob.status).toBe(AiGenerationJobStatus.GENERATED);
+  });
+
+  it('a second start by the same admin while the first runs gets 409, no second draft (audit A13)', async () => {
+    const harness = fixture(requestFor('TOEIC_LR', { 5: fullPlan[5] }));
+    const held = new Set<string>();
+    harness.service.connection = {
+      set: jest.fn((key: string) => {
+        if (held.has(key)) return Promise.resolve(null);
+        held.add(key);
+        return Promise.resolve('OK');
+      }),
+      eval: jest.fn((_s: string, _n: number, key: string) => {
+        held.delete(key);
+        return Promise.resolve(1);
+      }),
+    };
+    let finish!: () => void;
+    harness.service.startOnce = jest.fn(
+      () => new Promise((resolve) => (finish = () => resolve({ id: 'job' }))),
+    );
+
+    const first = harness.service.start({}, 1, 'key-1');
+    await new Promise((r) => setTimeout(r, 5));
+    await expect(harness.service.start({}, 1, 'key-1')).rejects.toThrow(
+      'đang được tạo',
+    );
+    finish();
+    await expect(first).resolves.toEqual({ id: 'job' });
+    expect(harness.service.startOnce).toHaveBeenCalledTimes(1);
+  });
+
   it('returns the durable existing job for the same generation idempotency key', async () => {
     const existing: any = {
       id: 'same-job',
@@ -470,6 +577,11 @@ describe('ToeicAiExamService controlled template pipeline', () => {
     };
     service.genericExam = { createDraft: jest.fn() };
     service.queue = { add: jest.fn() };
+    // The per-admin start lock (audit A13): free here.
+    service.connection = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
     const result = await service.start(
       { variantCode: 'TOEIC_LR', mode: 'PART', part: 5, difficulty: 'medium' },
       1,

@@ -29,11 +29,30 @@ describe('ExamWritingService', () => {
   ];
   const build = (
     status: QuizPublicationStatus = QuizPublicationStatus.DRAFT,
-    items: unknown[] = [],
+    items: any[] = [],
+    underLock: QuizPublicationStatus = status,
   ) => {
     const tx = {
-      quiz: { create: jest.fn().mockResolvedValue({ id: 500 }) },
-      toeicWritingSetItem: { create: jest.fn() },
+      // The exam lock of saveSlot (inDraftExam), and the reads under it.
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ publicationStatus: underLock }),
+      },
+      quiz: {
+        create: jest.fn().mockResolvedValue({ id: 500 }),
+        update: jest.fn(),
+      },
+      question: { update: jest.fn() },
+      toeicWritingSetItem: {
+        create: jest.fn(),
+        findFirst: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            items.find((row) => row.order === where.order) ?? null,
+          ),
+        ),
+      },
     };
     const prisma = {
       exam: {
@@ -106,11 +125,46 @@ describe('ExamWritingService', () => {
     await service.saveSlot(3, 8, essay);
 
     expect(tx.quiz.create).not.toHaveBeenCalled();
-    expect(prisma.quiz.update).toHaveBeenCalledWith({
+    expect(tx.quiz.update).toHaveBeenCalledWith({
       where: { id: 108 },
       data: { title: 'Bài luận' },
     });
-    expect(prisma.question.update).toHaveBeenCalled();
+    expect(tx.question.update).toHaveBeenCalled();
+    expect(prisma.quiz.update).not.toHaveBeenCalled();
+  });
+
+  it('an exam published between the check and the write keeps its Writing as it was (2026-11-18)', async () => {
+    const { service, tx } = build(
+      QuizPublicationStatus.DRAFT,
+      [],
+      QuizPublicationStatus.PUBLISHED,
+    );
+
+    await expect(service.saveSlot(3, 8, essay)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.quiz.create).not.toHaveBeenCalled();
+    expect(tx.toeicWritingSetItem.create).not.toHaveBeenCalled();
+  });
+
+  it('two saves of one empty slot make one task: the second finds it under the lock (2026-11-18)', async () => {
+    const { service, tx } = build();
+    // The second save waited on the exam lock and reads the task the first
+    // one made; both read an empty slot before the lock.
+    tx.toeicWritingSetItem.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(item(8, 'OPINION_ESSAY'));
+
+    await service.saveSlot(3, 8, essay);
+    await service.saveSlot(3, 8, { ...essay, title: 'Bài luận 2' });
+
+    expect(tx.quiz.create).toHaveBeenCalledTimes(1);
+    expect(tx.toeicWritingSetItem.create).toHaveBeenCalledTimes(1);
+    expect(tx.quiz.update).toHaveBeenCalledWith({
+      where: { id: 108 },
+      data: { title: 'Bài luận 2' },
+    });
   });
 
   it('refuses to edit an exam that is not a draft', async () => {

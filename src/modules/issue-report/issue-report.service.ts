@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   HttpException,
@@ -245,8 +246,11 @@ export class IssueReportService {
         'Cần ghi chú xử lý trước khi đóng báo lỗi.',
       );
     }
-    const updated = await this.prisma.issueReport.update({
-      where: { id },
+    // Written only over the status read above (audit A15, 2026-11-18): two
+    // admins closing one report at once both saw it open, both wrote, and
+    // the learner got two result notices.
+    const { count } = await this.prisma.issueReport.updateMany({
+      where: { id, status: current.status },
       data: {
         status,
         resolutionNote,
@@ -254,6 +258,11 @@ export class IssueReportService {
           dto.assignedAdminId ?? current.assignedAdminId ?? adminId,
         resolvedAt: closing ? new Date() : current.resolvedAt,
       },
+    });
+    if (count === 0)
+      throw new ConflictException('Báo lỗi vừa được cập nhật, tải lại trang.');
+    const updated = await this.prisma.issueReport.findUniqueOrThrow({
+      where: { id },
     });
     if (closing && !isClosedStatus(current.status) && resolutionNote) {
       await this.notifyReporter(

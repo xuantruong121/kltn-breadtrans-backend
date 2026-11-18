@@ -105,13 +105,19 @@ describe('Dịch câu in the mistake notebook', () => {
       detail,
     };
     const setup = (r: Record<string, unknown>) => {
-      const prisma = {
+      const prisma: any = {
+        // A review answer is applied under the row lock (audit C8).
+        $executeRaw: jest.fn().mockResolvedValue(0),
         learnerMistake: {
           findFirst: jest.fn().mockResolvedValue(r),
+          findUnique: jest.fn().mockResolvedValue(r),
           update: jest.fn(),
         },
       };
-      return { prisma, service: new MistakesService(prisma as any) };
+      prisma.$transaction = jest.fn((fn: (t: unknown) => unknown) =>
+        fn(prisma),
+      );
+      return { prisma, service: new MistakesService(prisma) };
     };
 
     it('names the sentence behind the mistake', async () => {

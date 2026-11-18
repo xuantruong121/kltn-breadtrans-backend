@@ -157,6 +157,8 @@ function setup(
     diagnosticRubric: { findUnique: jest.fn(() => Promise.resolve(RUBRIC)) },
     diagnosticSpeakingResponse: speakingResponse,
     $executeRaw: jest.fn().mockResolvedValue(0),
+    // The attempt row lock (audit C10).
+    $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn((cb: (tx: any) => unknown) => cb(prisma)),
   };
   const objects = new Map<string, Buffer>();
@@ -440,6 +442,15 @@ describe('Speaking recording ownership and lifecycle', () => {
     await s.service.processGradingJob({ data: s.queued[0] });
     expect(s.calls).toHaveLength(0);
     expect(s.rows[0].status).toBe('SKIPPED');
+  });
+
+  it('a skip landing after the attempt was submitted changes nothing (audit C10)', async () => {
+    // The attempt was IN_PROGRESS when skip read it, COMPLETED under the lock.
+    const s = setup({ statusInsideLock: 'COMPLETED' });
+    await expect(s.service.skip(7, 2, 4, 10)).rejects.toThrow(
+      'Phiên kiểm tra đã hoàn tất',
+    );
+    expect(s.rows.filter((r: any) => r.status === 'SKIPPED')).toHaveLength(0);
   });
 
   it('never exposes the storage key; audio is reached only by its owner', async () => {

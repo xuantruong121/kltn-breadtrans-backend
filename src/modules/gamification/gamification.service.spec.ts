@@ -362,9 +362,12 @@ describe('GamificationService weekly cron hardening', () => {
     it('appends one compensating BanhTransaction row, leaving UserStats untouched', async () => {
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
+        // The gap measured again under the UserStats lock (audit R13).
+        $queryRaw: jest.fn().mockResolvedValue([{ totalBanhRan: 101 }]),
         banhTransaction: {
           findUnique: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({ id: 1 }),
+          aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 66 } }),
         },
         userStats: {
           findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 101 }),
@@ -399,6 +402,29 @@ describe('GamificationService weekly cron hardening', () => {
       // The whole point of this primitive: totalBanhRan is never written.
       expect(tx.userStats.update).not.toHaveBeenCalled();
       expect(tx.userStats.upsert).not.toHaveBeenCalled();
+    });
+
+    it('a gap that changed since the report was read is not written (audit R13)', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest.fn().mockResolvedValue([{ totalBanhRan: 101 }]),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn(),
+          // A reward landed after the report: the gap is now 21, not 35.
+          aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 80 } }),
+        },
+        userStats: { findUnique: jest.fn() },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(prisma, {} as any, {} as any);
+
+      const res = await service.appendLegacyReconciliationEntry(2, 35, 'r');
+
+      expect(res).toMatchObject({ applied: false, gapChanged: true });
+      expect(tx.banhTransaction.create).not.toHaveBeenCalled();
     });
 
     it('is idempotent — a second call for the same user is a no-op, not a duplicate entry', async () => {
@@ -647,6 +673,7 @@ describe('GamificationService weekly cron hardening', () => {
           .mockResolvedValueOnce([
             { id: 10, currentValue: 8, isCompleted: false },
           ]) // UserQuestProgress lock
+          .mockResolvedValueOnce([]) // UserStats row lock (streak, audit R4)
           .mockResolvedValueOnce([]) // INSERT DailyBanhEarning
           .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]), // SELECT DailyBanhEarning lock
         userQuestProgress: {
@@ -654,7 +681,7 @@ describe('GamificationService weekly cron hardening', () => {
           update: jest.fn().mockResolvedValue({}),
         },
         leaderboard: {
-          findUnique: jest.fn().mockResolvedValue({ id: 1, userId: 2 }),
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
           update: jest.fn().mockResolvedValue({}),
         },
         pointHistory: {
@@ -1118,6 +1145,9 @@ describe('GamificationService weekly cron hardening', () => {
             }),
           ),
         },
+        // The switch runs under the feed lock (audit R10).
+        $executeRaw: jest.fn(),
+        $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
       };
       const service = new GamificationService(
         prisma,
@@ -1270,9 +1300,10 @@ describe('GamificationService weekly cron hardening', () => {
               },
             ])
             .mockResolvedValueOnce([]),
-          update: jest.fn().mockImplementation((args) => {
+          // The rollover writes only while the row still misses a day (R4).
+          updateMany: jest.fn().mockImplementation((args) => {
             updates.push(args);
-            return Promise.resolve(args);
+            return Promise.resolve({ count: 1 });
           }),
         },
         gameSettings: {
@@ -1293,7 +1324,12 @@ describe('GamificationService weekly cron hardening', () => {
       const res = await service.triggerDailyCron('2026-09-16');
       expect(res.success).toBe(true);
       expect(updates[0]).toEqual({
-        where: { id: 10 },
+        where: {
+          id: 10,
+          streakCount: { gt: 0 },
+          lastStreakUpdate: { lt: expect.any(Date) },
+          streakFreezes: { lte: 0 },
+        },
         data: { streakCount: 0 },
       });
       // lastStreakUpdate should NOT be updated in the data payload
@@ -1303,6 +1339,7 @@ describe('GamificationService weekly cron hardening', () => {
     it('restores streak to 1 when user studies on same day if streakCount is 0', async () => {
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest.fn().mockResolvedValue([]),
         userStats: {
           findUnique: jest.fn().mockResolvedValue({
             userId: 15,

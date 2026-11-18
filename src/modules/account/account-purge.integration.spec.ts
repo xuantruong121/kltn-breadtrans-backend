@@ -88,6 +88,9 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
         )
         .map((s) => s.id),
     ];
+    await prisma.aiGenerationJob.deleteMany({
+      where: { createdByAdminId: { in: ids } },
+    });
     await prisma.marketOrder.deleteMany({ where: { userId: { in: ids } } });
     await prisma.banhTransaction.deleteMany({ where: { userId: { in: ids } } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
@@ -142,6 +145,25 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     );
   });
 
+  it('the job keeps an account whose deletion was cancelled after it was listed (audit A1)', async () => {
+    // runDue listed the account, then the learner cancelled: the purge must
+    // see the cancel under the row lock, not trust the list.
+    const cancelled = await makeUser('cancelled', null);
+
+    await expect(
+      service.purgeUser(cancelled.id, new Date(), { onlyIfDue: true }),
+    ).resolves.toBe('SKIPPED');
+    expect(
+      await prisma.user.findUnique({ where: { id: cancelled.id } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.profile.count({ where: { userId: cancelled.id } }),
+    ).toBe(1);
+
+    // An admin's delete still removes the account at once.
+    await expect(service.purgeUser(cancelled.id)).resolves.toBe('DELETED');
+  });
+
   it('runDue purges only accounts past their date', async () => {
     const due = await makeUser('due', new Date(Date.now() - 60_000));
     const later = await makeUser(
@@ -156,6 +178,40 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     const kept = await prisma.user.findUnique({ where: { id: later.id } });
     expect(kept?.deletionScheduledAt).not.toBeNull();
     expect(await prisma.profile.count({ where: { userId: later.id } })).toBe(1);
+  });
+
+  it('an admin with AI exam jobs leaves a shell that keeps them; running ones stop (audit A9 follow-up)', async () => {
+    const admin = await makeUser('ai-admin', null);
+    const other = await makeUser('ai-admin-2', null);
+    await prisma.user.updateMany({
+      where: { id: { in: [admin.id, other.id] } },
+      data: { role: 'ADMIN' },
+    });
+    const job = (id: string, status: 'QUEUED' | 'PUBLISHED') => ({
+      id: `purge-${id}-${suffix}`,
+      createdByAdminId: admin.id,
+      generationType: 'TOEIC_QUIZ' as const,
+      status,
+      requestSnapshot: {},
+    });
+    await prisma.aiGenerationJob.createMany({
+      data: [job('queued', 'QUEUED'), job('published', 'PUBLISHED')],
+    });
+
+    await expect(service.purgeUser(admin.id)).resolves.toBe('ANONYMIZED');
+
+    const shell = await prisma.user.findFirstOrThrow({
+      where: { email: { startsWith: `deleted-${admin.id}-` } },
+    });
+    const jobs = await prisma.aiGenerationJob.findMany({
+      where: { id: { startsWith: 'purge-' }, createdByAdminId: shell.id },
+      orderBy: { id: 'asc' },
+      select: { id: true, status: true },
+    });
+    expect(jobs).toEqual([
+      { id: `purge-published-${suffix}`, status: 'PUBLISHED' },
+      { id: `purge-queued-${suffix}`, status: 'CANCELLED' },
+    ]);
   });
 
   it('the database refuses to delete a user who still has an order', async () => {

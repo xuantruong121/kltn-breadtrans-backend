@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -97,6 +99,26 @@ export class PlanPurchaseService {
 
     await this.subscriptionService.assertPurchasablePlanVersion(planVersionId);
 
+    // An open purchase of this plan with another code is about to be
+    // replaced: its live PayOS QR is closed first, as replacePayment does, so
+    // it cannot be paid after it expires here (audit R8, 2026-11-18).
+    if (this.payos?.isEnabled()) {
+      const others = await this.prisma.planPurchase.findMany({
+        where: {
+          userId: studentId,
+          planVersionId,
+          status: PlanPurchaseStatus.PENDING_PAYMENT,
+          payment: { is: { payosIntent: { isNot: null } } },
+        },
+        select: { id: true, promoCode: { select: { code: true } } },
+      });
+      for (const other of others) {
+        if ((other.promoCode?.code ?? null) === wantedCode) continue;
+        const settled = await this.closeOldPayosLink(studentId, other.id);
+        if (settled) return settled;
+      }
+    }
+
     const purchase = await this.prisma.$transaction(async (tx) => {
       await this.lockUser(tx, studentId);
       const existing = await tx.planPurchase.findUnique({
@@ -134,6 +156,20 @@ export class PlanPurchaseService {
       ) {
         return activePurchase;
       }
+      // Two Buy clicks with different keys: the first request's PayOS link is
+      // still being made, so its purchase is not active yet. It is resumed,
+      // not expired under the QR that request is about to return (audit R8).
+      const linkInProgress = this.payos?.isEnabled()
+        ? openPurchases.find(
+            (candidate) =>
+              (candidate.promoCode?.code ?? null) === wantedCode &&
+              candidate.payment?.status === PlanPaymentStatus.PENDING &&
+              !candidate.payment.payosIntent?.checkoutUrl &&
+              (candidate.payment.paymentIntentExpiresAt?.getTime() ?? 0) >
+                Date.now(),
+          )
+        : undefined;
+      if (linkInProgress) return linkInProgress;
       for (const stalePurchase of openPurchases) {
         if (stalePurchase.payment) {
           await this.expirePaymentIntent(
@@ -251,6 +287,8 @@ export class PlanPurchaseService {
     if (this.payos && !this.payos.isEnabled()) {
       throw new ConflictException('Cổng thanh toán PayOS chưa được cấu hình.');
     }
+    const settled = await this.closeOldPayosLink(studentId, purchaseId);
+    if (settled) return settled;
     const result = await this.prisma.$transaction(async (tx) => {
       const owned = await tx.planPurchase.findFirst({
         where: { id: purchaseId, userId: studentId },
@@ -395,6 +433,64 @@ export class PlanPurchaseService {
     return response;
   }
 
+  /**
+   * Before a new QR replaces the old one, the old PayOS link is closed at
+   * PayOS (audit R2, 2026-11-18). Otherwise a learner who scanned the old QR
+   * could still pay it after the purchase was marked SUPERSEDED. CLOSED: go
+   * on. PAID: the money just arrived and synchronize confirmed it, so that
+   * purchase is returned. Part paid: held for an admin. Still open or being
+   * processed: 409, try again.
+   */
+  private async closeOldPayosLink(
+    studentId: number,
+    purchaseId: number,
+  ): Promise<PlanPurchaseResponseDto | null> {
+    if (!this.payos?.isEnabled()) return null;
+    const old = await this.prisma.planPurchase.findFirst({
+      where: { id: purchaseId, userId: studentId },
+      select: {
+        status: true,
+        supersededByPurchaseId: true,
+        payment: {
+          select: {
+            status: true,
+            payosIntent: { select: { orderCode: true } },
+          },
+        },
+      },
+    });
+    const orderCode = old?.payment?.payosIntent?.orderCode;
+    // Anything that is not a live PayOS payment is decided in the transaction.
+    if (
+      orderCode == null ||
+      old?.supersededByPurchaseId ||
+      old?.status !== PlanPurchaseStatus.PENDING_PAYMENT ||
+      (old.payment?.status !== PlanPaymentStatus.PENDING &&
+        old.payment?.status !== PlanPaymentStatus.REPORTED)
+    )
+      return null;
+    let outcome: 'PAID' | 'REVIEW' | 'OPEN' | 'CLOSED';
+    try {
+      outcome = await this.payos.closeUnpaid(Number(orderCode));
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException(
+        'Chưa kiểm tra được mã thanh toán cũ với PayOS. Vui lòng thử lại sau giây lát.',
+      );
+    }
+    if (outcome === 'CLOSED') return null;
+    if (outcome === 'PAID') return this.getMyPurchase(studentId, purchaseId);
+    if (outcome === 'REVIEW') {
+      await this.holdPaidPurchaseForReview(purchaseId);
+      throw new ConflictException(
+        'Khoản thanh toán đang được xem xét nên không thể thay thế.',
+      );
+    }
+    throw new ConflictException(
+      'Mã thanh toán cũ đang được xử lý. Vui lòng thử lại sau giây lát.',
+    );
+  }
+
   async getMyPurchase(
     studentId: number,
     purchaseId: number,
@@ -519,6 +615,26 @@ export class PlanPurchaseService {
     });
     this.announce(purchase.userId);
     return this.toAdminDto(purchase);
+  }
+
+  /**
+   * Money PayOS reports paid, from the webhook or from the learner's status
+   * check: confirmed, or, when it cannot be applied automatically (the
+   * purchase expired or was replaced, the plans changed), held for an admin.
+   * Throws only when neither works, so PayOS retries (audit R2, 2026-11-18).
+   */
+  async confirmPaidOrHold(purchaseId: number): Promise<'CONFIRMED' | 'REVIEW'> {
+    try {
+      await this.confirmPurchaseFromWebhook(purchaseId, undefined);
+      return 'CONFIRMED';
+    } catch (error) {
+      if (
+        error instanceof ConflictException &&
+        (await this.holdPaidPurchaseForReview(purchaseId))
+      )
+        return 'REVIEW';
+      throw error;
+    }
   }
 
   async confirmPurchaseFromWebhook(
@@ -944,7 +1060,11 @@ export class PlanPurchaseService {
           }
           const outcome = await this.payos.closeUnpaid(Number(orderCode));
           if (outcome === 'PAID') {
-            result.paid += 1;
+            // synchronize confirms a paid order, or holds the money for an
+            // admin when it cannot be applied (audit R2 note, 2026-11-18):
+            // count what the payment really became.
+            if (await this.heldForReview(purchase.id)) result.review += 1;
+            else result.paid += 1;
             continue;
           }
           if (outcome === 'OPEN') {
@@ -982,10 +1102,12 @@ export class PlanPurchaseService {
 
   /**
    * Money PayOS received that cannot be applied automatically: the purchase
-   * had already expired, the amount was short, or confirming it failed. The
-   * payment becomes REVIEW_REQUIRED for an admin to confirm or reject. The
-   * purchase is EXPIRED either way, so it never blocks the learner's next
-   * purchase of the same plan (one open purchase per plan version).
+   * had already expired or been replaced by a new QR, the amount was short,
+   * or confirming it failed. The payment becomes REVIEW_REQUIRED for an admin
+   * to confirm or reject. The purchase is EXPIRED either way, so it never
+   * blocks the learner's next purchase of the same plan (one open purchase
+   * per plan version). A payment already held answers true again, so the
+   * webhook and the status check can both report the same money.
    */
   async holdPaidPurchaseForReview(purchaseId: number): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
@@ -1001,13 +1123,16 @@ export class PlanPurchaseService {
         include: { payment: true },
       });
       const payment = current.payment;
+      if (payment?.status === PlanPaymentStatus.REVIEW_REQUIRED) return true;
       if (
         !payment ||
         (current.status !== PlanPurchaseStatus.PENDING_PAYMENT &&
-          current.status !== PlanPurchaseStatus.EXPIRED) ||
+          current.status !== PlanPurchaseStatus.EXPIRED &&
+          current.status !== PlanPurchaseStatus.SUPERSEDED) ||
         (payment.status !== PlanPaymentStatus.PENDING &&
           payment.status !== PlanPaymentStatus.REPORTED &&
-          payment.status !== PlanPaymentStatus.EXPIRED)
+          payment.status !== PlanPaymentStatus.EXPIRED &&
+          payment.status !== PlanPaymentStatus.SUPERSEDED)
       ) {
         return false;
       }
@@ -1024,6 +1149,14 @@ export class PlanPurchaseService {
       );
       return true;
     });
+  }
+
+  private async heldForReview(purchaseId: number): Promise<boolean> {
+    const purchase = await this.prisma.planPurchase.findUnique({
+      where: { id: purchaseId },
+      select: { payment: { select: { status: true } } },
+    });
+    return purchase?.payment?.status === PlanPaymentStatus.REVIEW_REQUIRED;
   }
 
   private async expireIfStillPending(purchaseId: number): Promise<boolean> {
@@ -1196,7 +1329,7 @@ export class PlanPurchaseService {
     tx: Prisma.TransactionClient,
     input: {
       studentId: number;
-      version: { priceVnd: number | null; plan: { code: string } };
+      version: { id: number; priceVnd: number | null; plan: { code: string } };
       code?: string | null;
       promoCodeId?: number | null;
     },
@@ -1226,9 +1359,22 @@ export class PlanPurchaseService {
     if (promo) {
       const lockKey = `promo:${promo.id}`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
-      const [mine, redeemed, openByOthers] = await Promise.all([
+      const [mine, mineOpen, redeemed, openByOthers] = await Promise.all([
         tx.promoRedemption.count({
           where: { promoCodeId: promo.id, userId: input.studentId },
+        }),
+        // The learner's own open purchases of another plan version that hold
+        // the code count as a use (audit R7, 2026-11-18): otherwise Plus and
+        // Pro could both be opened, and paid, at the once-only discount. An
+        // open purchase of this version is about to be replaced, so it is not
+        // counted.
+        tx.planPurchase.count({
+          where: {
+            promoCodeId: promo.id,
+            status: PlanPurchaseStatus.PENDING_PAYMENT,
+            userId: input.studentId,
+            planVersionId: { not: input.version.id },
+          },
         }),
         tx.promoRedemption.count({ where: { promoCodeId: promo.id } }),
         tx.planPurchase.count({
@@ -1239,7 +1385,7 @@ export class PlanPurchaseService {
           },
         }),
       ]);
-      usedByUser = mine;
+      usedByUser = mine + mineOpen;
       usedTotal = redeemed + openByOthers;
     }
     const decision = evaluatePromo({

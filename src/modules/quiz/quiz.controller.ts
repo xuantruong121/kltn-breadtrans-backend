@@ -90,15 +90,6 @@ export class QuizController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @Delete(':id')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Xóa đề thi (Admin)' })
-  deleteQuiz(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.quizService.deleteQuiz(id, req.user);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
   @Get()
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Lấy tất cả quizzes (Admin)' })

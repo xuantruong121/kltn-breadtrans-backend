@@ -24,6 +24,7 @@ import { AuthSessionStore } from '../auth/session-store';
 import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { AccountPurgeService } from '../account/account-purge.service';
+import { assertKeepsAnAdmin } from './admin-roster';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
@@ -779,37 +780,40 @@ export class AdminService {
   }
 
   async updateUser(userId: number, dto: UpdateUserDto) {
-    if (dto.role && dto.role !== Role.ADMIN) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-      });
-      if (existingUser?.role === Role.ADMIN) {
-        const adminCount = await this.prisma.user.count({
-          where: { role: Role.ADMIN },
-        });
-        if (adminCount <= 1) {
-          throw new BadRequestException(
-            'Không thể hạ quyền Admin duy nhất trong hệ thống.',
-          );
-        }
-      }
-    }
-
     const updateUserData: any = {};
-    if (dto.role) updateUserData.role = dto.role;
     if (dto.password) {
       updateUserData.password = await bcrypt.hash(dto.password, 10);
     }
 
-    if (Object.keys(updateUserData).length > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: updateUserData,
+    // The role is read, checked and written in one transaction under the
+    // admin-roster lock (audit A9, 2026-11-18): two admins demoting each
+    // other both passed a count made before either wrote. The form always
+    // sends the role; it is written only when it changes, so a name or phone
+    // edit no longer ends the user's sessions.
+    if (dto.role || dto.password) {
+      await this.prisma.$transaction(async (tx) => {
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        if (!current) throw new NotFoundException('Người dùng không tồn tại');
+        if (dto.role && dto.role !== current.role) {
+          if (current.role === Role.ADMIN) await assertKeepsAnAdmin(tx, userId);
+          updateUserData.role = dto.role;
+        }
+        if (Object.keys(updateUserData).length > 0)
+          await tx.user.update({ where: { id: userId }, data: updateUserData });
       });
+    }
+
+    if (Object.keys(updateUserData).length > 0) {
       forgetAuthUser(userId);
       // A new password or role ends every session of the account.
-      if (this.redis) await new AuthSessionStore(this.redis).revokeAll(userId);
+      if (this.redis) {
+        const sessions = new AuthSessionStore(this.redis);
+        if (dto.password) await sessions.markPasswordChanged(userId);
+        await sessions.revokeAll(userId);
+      }
     }
 
     if (dto.fullName !== undefined || dto.phone !== undefined) {
@@ -847,7 +851,13 @@ export class AdminService {
    * An account without orders or payments is deleted; one with them becomes
    * an anonymous shell that keeps those records (soft-delete rule).
    */
-  async deleteUser(userId: number) {
+  async deleteUser(userId: number, actorId?: number) {
+    // The admin's own account is not deleted from here (audit A9): it was
+    // one click away from leaving the system with no admin.
+    if (actorId !== undefined && actorId === userId)
+      throw new BadRequestException(
+        'Không thể xoá tài khoản Admin bạn đang đăng nhập.',
+      );
     const outcome = await this.accountPurge.purgeUser(userId);
     return { id: userId, outcome };
   }
@@ -1057,30 +1067,37 @@ export class AdminService {
   }
 
   async publishVocabTopic(id: number) {
-    const topic = await this.prisma.vocabTopic.findUnique({
-      where: { id },
-      include: { words: { include: DECK_WORD_INCLUDE } },
-    });
-    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    if (!topic.words || topic.words.length === 0) {
-      throw new BadRequestException(
-        'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
+    // The words are read and counted with the topic locked (audit A8,
+    // 2026-11-18): a word added or deleted while publishing changed
+    // totalWords between the read and this write, and the count drifted.
+    // Adding or deleting a word waits for the lock.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabTopic" WHERE id = ${id} FOR UPDATE`;
+      const topic = await tx.vocabTopic.findUnique({
+        where: { id },
+        include: { words: { include: DECK_WORD_INCLUDE } },
+      });
+      if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+      if (!topic.words || topic.words.length === 0) {
+        throw new BadRequestException(
+          'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
+        );
+      }
+      const invalidWords = topic.words.filter(
+        (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
       );
-    }
-    const invalidWords = topic.words.filter(
-      (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
-    );
-    if (invalidWords.length > 0) {
-      throw new BadRequestException(
-        'Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa',
-      );
-    }
-    return this.prisma.vocabTopic.update({
-      where: { id },
-      data: {
-        publicationStatus: QuizPublicationStatus.PUBLISHED,
-        totalWords: topic.words.length,
-      },
+      if (invalidWords.length > 0) {
+        throw new BadRequestException(
+          'Tất cả từ vựng phải có đầy đủ thuật ngữ và định nghĩa',
+        );
+      }
+      return tx.vocabTopic.update({
+        where: { id },
+        data: {
+          publicationStatus: QuizPublicationStatus.PUBLISHED,
+          totalWords: topic.words.length,
+        },
+      });
     });
   }
 
@@ -1094,24 +1111,33 @@ export class AdminService {
   }
 
   async deleteVocabTopic(id: number) {
-    const topic = await this.prisma.vocabTopic.findUnique({
-      where: { id },
-      include: { words: true },
-    });
-    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    // History safety guard: if any word has learner progress, block delete
-    const wordIds = topic.words.map((w) => w.id);
-    if (wordIds.length > 0) {
-      const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
-        where: { wordId: { in: wordIds } },
+    // The check and the delete in one transaction, with the topic and its
+    // words locked (audit A5, 2026-11-18). A learner's progress row needs its
+    // word row (foreign key): it either committed before the lock and is
+    // counted here, or it waits and then fails on the deleted word. Before,
+    // progress saved between the check and the delete went with the topic.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabTopic" WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "VocabWord" WHERE "topicId" = ${id} FOR UPDATE`;
+      const topic = await tx.vocabTopic.findUnique({
+        where: { id },
+        include: { words: true },
       });
-      if (hasProgress) {
-        throw new ConflictException(
-          'Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa',
-        );
+      if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+      // History safety guard: if any word has learner progress, block delete
+      const wordIds = topic.words.map((w) => w.id);
+      if (wordIds.length > 0) {
+        const hasProgress = await tx.userVocabWordProgress.findFirst({
+          where: { wordId: { in: wordIds } },
+        });
+        if (hasProgress) {
+          throw new ConflictException(
+            'Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa',
+          );
+        }
       }
-    }
-    return this.prisma.vocabTopic.delete({ where: { id } });
+      return tx.vocabTopic.delete({ where: { id } });
+    });
   }
 
   async addVocabWord(topicId: number, dto: CreateVocabWordDto) {
@@ -1288,29 +1314,34 @@ export class AdminService {
   }
 
   async deleteVocabWord(topicId: number, wordId: number) {
-    const word = await this.prisma.vocabWord.findUnique({
-      where: { id: wordId },
+    // One transaction with the word locked, as deleteVocabTopic (audit A5);
+    // the word count drops with the delete, not in a second step.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabWord" WHERE id = ${wordId} FOR UPDATE`;
+      const word = await tx.vocabWord.findUnique({
+        where: { id: wordId },
+      });
+      if (!word || word.topicId !== topicId) {
+        throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+      }
+      // History safety guard
+      const hasProgress = await tx.userVocabWordProgress.findFirst({
+        where: { wordId },
+      });
+      if (hasProgress) {
+        throw new ConflictException(
+          'Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa',
+        );
+      }
+      const deleted = await tx.vocabWord.delete({
+        where: { id: wordId },
+      });
+      await tx.vocabTopic.update({
+        where: { id: topicId },
+        data: { totalWords: { decrement: 1 } },
+      });
+      return deleted;
     });
-    if (!word || word.topicId !== topicId) {
-      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
-    }
-    // History safety guard
-    const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
-      where: { wordId },
-    });
-    if (hasProgress) {
-      throw new ConflictException(
-        'Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa',
-      );
-    }
-    const deleted = await this.prisma.vocabWord.delete({
-      where: { id: wordId },
-    });
-    await this.prisma.vocabTopic.update({
-      where: { id: topicId },
-      data: { totalWords: { decrement: 1 } },
-    });
-    return deleted;
   }
 
   async reorderVocabWords(topicId: number, wordIds: number[]) {

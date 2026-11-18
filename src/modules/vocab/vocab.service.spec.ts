@@ -138,6 +138,48 @@ describe('VocabService', () => {
     });
   });
 
+  describe('a first progress write made twice at once (audit C9)', () => {
+    const duplicate = Object.assign(new Error('Unique constraint failed'), {
+      code: 'P2002',
+    });
+
+    it('the second create becomes an update instead of a 500', async () => {
+      const prisma = (service as any).prisma;
+      prisma.userVocabWordProgress = {
+        // First read: no row yet; after the other request created it: one.
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({ id: 3, isStarred: true }),
+        create: jest.fn().mockRejectedValue(duplicate),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+      };
+
+      await expect(service.toggleStar(1, 10)).resolves.toEqual({
+        isStarred: false,
+      });
+      expect(prisma.userVocabWordProgress.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('a word deleted while its first review is saved is "not found", not 500', async () => {
+      const prisma = (service as any).prisma;
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockRejectedValue(
+          Object.assign(new Error('Foreign key constraint failed'), {
+            code: 'P2003',
+          }),
+        ),
+      };
+
+      await expect(service.submitReview(1, 10, true)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('setMastered', () => {
     it('blocks progress writes for a vocabulary topic that is not published', async () => {
       const prisma = (service as any).prisma;

@@ -48,10 +48,24 @@ export type DeviceMeta = {
   /** Client IP, recorded with a consent. */
   ip?: string | null;
 };
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
 import { EmailService } from '../../common/email/email.service';
+
+/**
+ * Two sign-ups with one e-mail at once (a double submit, two tabs) both pass
+ * the check above; the second create hits the unique e-mail (audit A14,
+ * 2026-11-18): 409, as for an e-mail already taken.
+ */
+function emailTaken(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  )
+    throw new ConflictException('Email này đã được đăng ký.');
+  throw error;
+}
 
 @Injectable()
 export class AuthService {
@@ -82,17 +96,19 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 12);
     // The DTO requires acceptTerms === true; the acceptance is stored with the
     // account, in the same write (owner 2026-11-16).
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: { create: { fullName } },
-        consents: { create: consentRows('EMAIL_SIGNUP', meta) },
-      },
-      include: { profile: true },
-    });
+    const user = await this.prisma.user
+      .create({
+        data: {
+          email,
+          password: hashedPassword,
+          role: Role.STUDENT,
+          emailVerifiedAt: new Date(),
+          profile: { create: { fullName } },
+          consents: { create: consentRows('EMAIL_SIGNUP', meta) },
+        },
+        include: { profile: true },
+      })
+      .catch(emailTaken);
     const { password: createdPassword, ...safeUser } = user;
     void createdPassword;
     return safeUser;
@@ -170,6 +186,8 @@ export class AuthService {
     forgetAuthUser(userId);
     await this.redis.del(userTokenKey);
 
+    // After the new hash is saved: a sign-in that read the old one sees it.
+    await this.sessions.markPasswordChanged(userId);
     // Every device, and every access token it still holds.
     await this.sessions.revokeAll(userId);
 
@@ -178,6 +196,7 @@ export class AuthService {
   async login(loginDto: LoginDto, deviceId: string, meta: DeviceMeta = {}) {
     const { email, password } = loginDto;
     await this.loginGuard.assertAllowed(email);
+    const startedAt = Date.now();
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
@@ -200,10 +219,12 @@ export class AuthService {
       },
     });
 
-    return this.issueTokens(user, deviceId, {
-      userAgent: meta.userAgent,
-      remember: loginDto.rememberMe ?? false,
-    });
+    return this.issueTokensUnlessPasswordChanged(
+      user,
+      deviceId,
+      { userAgent: meta.userAgent, remember: loginDto.rememberMe ?? false },
+      startedAt,
+    );
   }
 
   /**
@@ -370,6 +391,7 @@ export class AuthService {
       data: { password, mustChangePassword: false },
     });
     forgetAuthUser(userId);
+    await this.sessions.markPasswordChanged(userId);
     // Someone holding another session must not keep it (owner 2026-11-14).
     const signedOut = await this.sessions.revokeAll(userId, currentDeviceId);
     return { message: 'Đổi mật khẩu thành công.', signedOutDevices: signedOut };
@@ -463,6 +485,7 @@ export class AuthService {
       );
     }
 
+    const startedAt = Date.now();
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true },
@@ -519,7 +542,12 @@ export class AuthService {
       data: { lastLoginAt: new Date(), loginCount: { increment: 1 } },
     });
 
-    return this.issueTokens(user, deviceId, { ...meta, remember: true });
+    return this.issueTokensUnlessPasswordChanged(
+      user,
+      deviceId,
+      { ...meta, remember: true },
+      startedAt,
+    );
   }
 
   /**
@@ -612,25 +640,27 @@ export class AuthService {
     // No password: the learner never chose one. Password login stays closed
     // (it rejects a null password) until they set one via "Quên mật khẩu",
     // and the account page hides "Đổi mật khẩu" while it is null.
-    return this.prisma.user.create({
-      data: {
-        email: profile.email,
-        password: null,
-        role: Role.STUDENT,
-        emailVerifiedAt: new Date(),
-        profile: {
-          create: { fullName: profile.fullName, avatar: profile.avatar },
-        },
-        authAccounts: {
-          create: {
-            provider: 'GOOGLE',
-            providerAccountId: profile.providerId,
+    return this.prisma.user
+      .create({
+        data: {
+          email: profile.email,
+          password: null,
+          role: Role.STUDENT,
+          emailVerifiedAt: new Date(),
+          profile: {
+            create: { fullName: profile.fullName, avatar: profile.avatar },
           },
+          authAccounts: {
+            create: {
+              provider: 'GOOGLE',
+              providerAccountId: profile.providerId,
+            },
+          },
+          consents: { create: consentRows('GOOGLE_SIGNUP', meta) },
         },
-        consents: { create: consentRows('GOOGLE_SIGNUP', meta) },
-      },
-      include: { profile: true },
-    });
+        include: { profile: true },
+      })
+      .catch(emailTaken);
   }
 
   /**
@@ -704,6 +734,28 @@ export class AuthService {
   }
 
   /** A new device session: access token, refresh token (for the cookie) and the user. */
+  /**
+   * A sign-in that checked the password it read from `startedAt` on. If the
+   * password changed since, the new session is ended and the sign-in refused
+   * (audit A2, 2026-11-18). The check runs after the session exists: either
+   * it sees the change, or the change's revokeAll sees the session.
+   */
+  private async issueTokensUnlessPasswordChanged(
+    user: { id: number; email: string; role: Role; profile?: unknown },
+    deviceId: string,
+    meta: DeviceMeta,
+    startedAt: number,
+  ) {
+    const issued = await this.issueTokens(user, deviceId, meta);
+    if (await this.sessions.passwordChangedSince(user.id, startedAt)) {
+      await this.sessions.revoke(user.id, deviceId);
+      throw new UnauthorizedException(
+        'Mật khẩu vừa được đổi. Vui lòng đăng nhập lại bằng mật khẩu mới.',
+      );
+    }
+    return issued;
+  }
+
   private async issueTokens(
     user: { id: number; email: string; role: Role; profile?: unknown },
     deviceId: string,
@@ -772,8 +824,19 @@ export class AuthService {
   /** Records consent given after sign-up (older account or new documents). */
   async acceptConsent(userId: number, meta: DeviceMeta = {}) {
     if (await this.consentRequiredFor(userId))
-      await this.prisma.userConsent.createMany({
-        data: consentRows('PROMPT', meta).map((row) => ({ ...row, userId })),
+      // Checked again under a per-user lock (audit A15, 2026-11-18): two
+      // accepts at once (double click, two tabs) both read "required" and
+      // each wrote both documents.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`consent:${userId}`}, 0))`;
+        const consents = await tx.userConsent.findMany({
+          where: { userId, version: LEGAL_VERSION },
+          select: { document: true, version: true },
+        });
+        if (!consentRequired(consents)) return;
+        await tx.userConsent.createMany({
+          data: consentRows('PROMPT', meta).map((row) => ({ ...row, userId })),
+        });
       });
     return { consentRequired: false, version: LEGAL_VERSION };
   }

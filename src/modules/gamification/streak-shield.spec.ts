@@ -51,7 +51,10 @@ describe('a shield in use tells the learner', () => {
             },
           ])
           .mockResolvedValueOnce([]),
-        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ streakCount: 5, streakFreezes: 1 }),
       },
       notification: { create: jest.fn().mockResolvedValue({}) },
       gameSettings: {
@@ -71,8 +74,8 @@ describe('a shield in use tells the learner', () => {
 
     await service.triggerDailyCron('2026-09-16');
 
-    expect(tx.userStats.update).toHaveBeenCalledWith({
-      where: { id: 10 },
+    expect(tx.userStats.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: 10, streakFreezes: { gt: 0 } }),
       data: expect.objectContaining({ streakFreezes: { decrement: 1 } }),
     });
     expect(tx.notification.create).toHaveBeenCalledTimes(1);
@@ -99,7 +102,47 @@ describe('a shield in use tells the learner', () => {
             },
           ])
           .mockResolvedValueOnce([]),
-        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      notification: { create: jest.fn() },
+      gameSettings: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+    };
+    const prisma: any = {
+      $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+    };
+    const service = new GamificationService(
+      prisma,
+      { emit: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.triggerDailyCron('2026-09-16');
+
+    expect(tx.notification.create).not.toHaveBeenCalled();
+  });
+
+  it('the rollover tells nothing when the learner studied after the batch was read (audit R4)', async () => {
+    const tx: any = {
+      userStats: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([
+            {
+              id: 12,
+              userId: 79,
+              streakCount: 5,
+              streakFreezes: 1,
+              lastStreakUpdate: new Date('2026-09-10T00:00:00Z'),
+            },
+          ])
+          .mockResolvedValueOnce([]),
+        // The row no longer misses a day: nothing matches.
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUnique: jest.fn(),
       },
       notification: { create: jest.fn() },
       gameSettings: {
@@ -125,6 +168,7 @@ describe('a shield in use tells the learner', () => {
   it('studying again after missed days uses one shield and says so', async () => {
     const tx: any = {
       $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([]),
       userStats: {
         findUnique: jest.fn().mockResolvedValue({
           userId: 15,

@@ -54,7 +54,27 @@ describe('applyDiagnosticPlacement', () => {
     });
   });
 
-  it('a new attempt replaces the level but keeps a higher unlock', async () => {
+  it('a result arriving after the learner moved up never lowers the practice level (owner 2026-11-18)', async () => {
+    const db = fakeDb();
+    // Speaking is graded later; meanwhile practice raised it to INTERMEDIATE.
+    db.levels.set('7:SPEAKING', {
+      userId: 7,
+      skill: 'SPEAKING',
+      level: 'INTERMEDIATE',
+      unlockedLevel: 'INTERMEDIATE',
+      ability: 1.4,
+      source: 'NONE',
+    });
+    await applyDiagnosticPlacement(db as any, 7, 100, { SPEAKING: done(40) });
+    expect(db.levels.get('7:SPEAKING')).toMatchObject({
+      level: 'INTERMEDIATE',
+      unlockedLevel: 'INTERMEDIATE',
+      ability: 1.4,
+      source: 'DIAGNOSTIC',
+    });
+  });
+
+  it('a new attempt below the current level keeps the higher level and unlock', async () => {
     const db = fakeDb();
     db.levels.set('7:READING', {
       userId: 7,
@@ -64,8 +84,9 @@ describe('applyDiagnosticPlacement', () => {
       source: 'SELF',
     });
     await applyDiagnosticPlacement(db as any, 7, 100, { READING: done(40) });
+    // Placement only raises the practice level (owner 2026-11-18).
     expect(db.levels.get('7:READING')).toMatchObject({
-      level: 'BASIC',
+      level: 'ADVANCED',
       unlockedLevel: 'ADVANCED',
       source: 'DIAGNOSTIC',
     });

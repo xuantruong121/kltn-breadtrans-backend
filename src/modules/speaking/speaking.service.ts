@@ -45,6 +45,21 @@ import {
   parseCefrRange,
 } from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
+import {
+  aiQuotaExhausted,
+  returnAiGrading,
+  takeAiGrading,
+} from '../../common/guards/ai-rate-limit.guard';
+import { SubscriptionService } from '../subscription/subscription.service';
+
+/**
+ * Set (not serialised) on a response that returns a submission another
+ * request made: the grading this request took is given back.
+ */
+export const SPEAKING_REPLAYED = Symbol('speaking-replayed');
+const replayed = <T extends object>(response: T): T =>
+  Object.assign(response, { [SPEAKING_REPLAYED]: true });
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -250,6 +265,9 @@ function timingOf(exercise: {
   });
 }
 
+/** An exam question's recordings are all used: the intent is invalid. */
+class ExamTakesUsedError extends Error {}
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -265,7 +283,104 @@ export class SpeakingService {
     @Optional()
     private readonly speakingContentAccess?: SpeakingContentAccessService,
     @Optional() private readonly trial?: TrialService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
+
+  /**
+   * The learner routes take one AI grading here, not in AiRateLimitGuard
+   * (audit follow-up 2026-11-18). The guard ran before the handler, so a
+   * retried finalize or a resent Idempotency-Key took a second grading for
+   * the submission it got back, and a learner with none left got 429 instead
+   * of it. A replay is answered first and takes none; a grading that made no
+   * submission (an error, or another request made it) is given back.
+   */
+  async finalizeUploadForLearner(
+    uploadIntentId: string,
+    userId: number,
+    traceIdHeader?: string,
+    role?: Role,
+  ) {
+    return this.withAiGrading(
+      userId,
+      role,
+      async () => {
+        const intent = await this.prisma.speakingUploadIntent.findUnique({
+          where: { id: uploadIntentId },
+          select: { userId: true, status: true, submissionId: true },
+        });
+        return (
+          intent?.userId === userId &&
+          intent.status === 'FINALIZED' &&
+          intent.submissionId != null
+        );
+      },
+      () => this.finalizeUpload(uploadIntentId, userId, traceIdHeader, role),
+    );
+  }
+
+  async submitAudioForLearner(
+    exerciseId: number,
+    userId: number,
+    audioFile: Express.Multer.File,
+    idempotencyKey?: string,
+    traceIdHeader?: string,
+    role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
+  ) {
+    return this.withAiGrading(
+      userId,
+      role,
+      async () => {
+        const key = idempotencyKey?.trim();
+        if (!key) return false;
+        const existing = await this.prisma.speakingSubmission.findUnique({
+          where: { userId_idempotencyKey: { userId, idempotencyKey: key } },
+          select: { id: true },
+        });
+        return existing != null;
+      },
+      () =>
+        this.submitAudio(
+          exerciseId,
+          userId,
+          audioFile,
+          idempotencyKey,
+          traceIdHeader,
+          role,
+          internalContext,
+        ),
+    );
+  }
+
+  private async withAiGrading<T extends object>(
+    userId: number,
+    role: Role | undefined,
+    isReplay: () => Promise<boolean>,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    if (role === Role.ADMIN || (await isReplay())) return work();
+    // Without Redis the gradings cannot be counted: closed, as the guard was.
+    if (!this.redis)
+      throw new ServiceUnavailableException(
+        'Chưa đếm được lượt chấm AI. Vui lòng thử lại sau.',
+      );
+    const planCode = (await this.subscriptions?.planCodeFor(userId)) ?? 'FREE';
+    const taken = await takeAiGrading(this.redis, userId, planCode);
+    if (!taken.allowed) {
+      await returnAiGrading(this.redis, taken.key);
+      throw aiQuotaExhausted(planCode, taken.limit, taken.count);
+    }
+    let result: T;
+    try {
+      result = await work();
+    } catch (error) {
+      await returnAiGrading(this.redis, taken.key);
+      throw error;
+    }
+    if ((result as Record<symbol, unknown>)[SPEAKING_REPLAYED])
+      await returnAiGrading(this.redis, taken.key);
+    return result;
+  }
 
   private getStorage() {
     return this.r2Service ?? this.uploadService;
@@ -641,6 +756,29 @@ export class SpeakingService {
     role?: Role,
     internalContext?: { attemptId: number; componentId: number },
   ): Promise<SubmitSpeakingResponse> {
+    return notFoundIfGone(
+      this.submitAudioOnce(
+        exerciseId,
+        userId,
+        audioFile,
+        idempotencyKey,
+        traceIdHeader,
+        role,
+        internalContext,
+      ),
+      `Không tìm thấy bài luyện Nói #${exerciseId}.`,
+    );
+  }
+
+  private async submitAudioOnce(
+    exerciseId: number,
+    userId: number,
+    audioFile: Express.Multer.File,
+    idempotencyKey?: string,
+    traceIdHeader?: string,
+    role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
+  ): Promise<SubmitSpeakingResponse> {
     const traceId = traceIdHeader?.trim() || crypto.randomUUID();
 
     // 1. Validate Idempotency-Key
@@ -718,7 +856,13 @@ export class SpeakingService {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     let submission;
+    // The trial grading is taken here, after the early check above and before
+    // the row is made; a refusal or a failed save gives it back and deletes
+    // the upload (audit R11, 2026-11-18).
+    let refundTrial: (() => Promise<void>) | null | undefined;
     try {
+      if (trialCounted)
+        refundTrial = await this.trial?.takeGrading(userId, 'SPEAKING');
       submission = await this.prisma.$transaction(async (tx) => {
         // pg_advisory_xact_lock returns PostgreSQL `void`; use executeRaw so
         // Prisma does not try to deserialize a result row from the lock call.
@@ -735,6 +879,15 @@ export class SpeakingService {
           startOfDay,
         );
         if (quotaError) throw new BadRequestException(quotaError);
+
+        if (internalContext) {
+          await this.lockExamTakes(tx, userId, exercise.id);
+          const startedAt = await this.examSectionStart(tx, internalContext);
+          const takeError =
+            startedAt &&
+            (await this.examTakesError(tx, userId, exercise.id, startedAt));
+          if (takeError) throw new BadRequestException(takeError);
+        }
 
         return tx.speakingSubmission.create({
           data: {
@@ -754,6 +907,7 @@ export class SpeakingService {
         });
       });
     } catch (error) {
+      await refundTrial?.();
       try {
         await this.uploadService.deleteFile(uploadResult.key);
       } catch (cleanupError) {
@@ -763,8 +917,6 @@ export class SpeakingService {
       }
       throw error;
     }
-
-    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Pipeline dispatch: BullMQ queue vs legacy DB-polling fallback
     const pipelineMode = getSpeakingPipelineMode();
@@ -879,26 +1031,58 @@ export class SpeakingService {
     userId: number,
     context: { attemptId: number; componentId: number },
   ) {
-    const section = await this.prisma.toeicAssessmentAttemptComponent.findFirst(
-      {
-        where: {
-          assessmentAttemptId: context.attemptId,
-          assessmentComponentId: context.componentId,
-        },
-        select: { startedAt: true },
+    const startedAt = await this.examSectionStart(this.prisma, context);
+    const error =
+      startedAt &&
+      (await this.examTakesError(this.prisma, userId, exerciseId, startedAt));
+    if (error) throw new BadRequestException(error);
+  }
+
+  private async examSectionStart(
+    db: Prisma.TransactionClient,
+    context: { attemptId: number; componentId: number },
+  ): Promise<Date | null> {
+    const section = await db.toeicAssessmentAttemptComponent.findFirst({
+      where: {
+        assessmentAttemptId: context.attemptId,
+        assessmentComponentId: context.componentId,
       },
-    );
-    if (!section?.startedAt) return;
-    const takes = await this.prisma.speakingSubmission.count({
+      select: { startedAt: true },
+    });
+    return section?.startedAt ?? null;
+  }
+
+  /** The recordings of one exam question left, counted with `db`. */
+  private async examTakesError(
+    db: Prisma.TransactionClient,
+    userId: number,
+    exerciseId: number,
+    sectionStartedAt: Date,
+  ): Promise<string | null> {
+    const takes = await db.speakingSubmission.count({
       where: {
         userId,
         exerciseId,
         status: { not: 'FAILED' },
-        submittedAt: { gte: section.startedAt },
+        submittedAt: { gte: sectionStartedAt },
       },
     });
-    if (takes >= MAX_EXAM_TAKES_PER_QUESTION)
-      throw new BadRequestException('Câu này đã hết lượt thu lại.');
+    return takes >= MAX_EXAM_TAKES_PER_QUESTION
+      ? 'Câu này đã hết lượt thu lại.'
+      : null;
+  }
+
+  /**
+   * Counted again where the recording is saved, under a lock per learner and
+   * question (audit C3, 2026-11-18): intents made in two tabs while one take
+   * was left were all finalized, and the presigned finalize never counted.
+   */
+  private async lockExamTakes(
+    db: Prisma.TransactionClient,
+    userId: number,
+    exerciseId: number,
+  ) {
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`speaking-take:${userId}:${exerciseId}`}))`;
   }
 
   async createUploadIntent(
@@ -1123,6 +1307,18 @@ export class SpeakingService {
     traceIdHeader?: string,
     role?: Role,
   ) {
+    return notFoundIfGone(
+      this.finalizeUploadOnce(uploadIntentId, userId, traceIdHeader, role),
+      'Bài luyện Nói này vừa bị xoá.',
+    );
+  }
+
+  private async finalizeUploadOnce(
+    uploadIntentId: string,
+    userId: number,
+    traceIdHeader?: string,
+    role?: Role,
+  ) {
     const traceId =
       traceIdHeader ||
       `trace-finalize-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
@@ -1233,13 +1429,13 @@ export class SpeakingService {
             where: { id: freshIntent.submissionId },
           }));
         if (sub) {
-          return {
+          return replayed({
             submissionId: sub.id,
             status: sub.status,
             pollUrl: `/speaking/submissions/${sub.id}`,
             acceptedAt: sub.submittedAt.toISOString(),
             traceId,
-          };
+          });
         }
       }
 
@@ -1258,13 +1454,13 @@ export class SpeakingService {
                 where: { id: polled.submissionId },
               }));
             if (sub) {
-              return {
+              return replayed({
                 submissionId: sub.id,
                 status: sub.status,
                 pollUrl: `/speaking/submissions/${sub.id}`,
                 acceptedAt: sub.submittedAt.toISOString(),
                 traceId,
-              };
+              });
             }
           }
         }
@@ -1343,7 +1539,11 @@ export class SpeakingService {
     startOfDay.setHours(0, 0, 0, 0);
 
     let submission: SpeakingSubmission | null;
+    // Taken before the row is made, given back if it is not (audit R11).
+    let refundTrial: (() => Promise<void>) | null | undefined;
     try {
+      if (trialCounted)
+        refundTrial = await this.trial?.takeGrading(userId, 'SPEAKING');
       submission = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           SELECT pg_advisory_xact_lock(
@@ -1359,6 +1559,35 @@ export class SpeakingService {
           startOfDay,
         );
         if (quotaError) throw new BadRequestException(quotaError);
+
+        // An exam question: its takes are counted here too (audit C3). The
+        // intent stores no section, so the learner's open section for this
+        // Speaking set is the one.
+        if (
+          exercise.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL
+        ) {
+          await this.lockExamTakes(tx, userId, intent.exerciseId);
+          const section = await tx.toeicAssessmentAttemptComponent.findFirst({
+            where: {
+              status: 'IN_PROGRESS',
+              assessmentAttempt: { userId },
+              assessmentComponent: {
+                speakingPracticeSetId: exercise.practiceSetId,
+              },
+            },
+            orderBy: { startedAt: 'desc' },
+            select: { startedAt: true },
+          });
+          const takeError =
+            section?.startedAt &&
+            (await this.examTakesError(
+              tx,
+              userId,
+              intent.exerciseId,
+              section.startedAt,
+            ));
+          if (takeError) throw new ExamTakesUsedError(takeError);
+        }
 
         const publicUrl = this.getStorage().getPublicUrl();
         const audioUrl =
@@ -1405,6 +1634,23 @@ export class SpeakingService {
         return newSub;
       });
     } catch (txError) {
+      await refundTrial?.();
+      if (txError instanceof ExamTakesUsedError) {
+        // Not transient: the recording can never be accepted.
+        const invalidation = await this.prisma.speakingUploadIntent.updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
+          data: { status: 'INVALID' },
+        });
+        if (invalidation.count === 1)
+          await this.getStorage()
+            .deleteFile(intent.objectKey)
+            .catch(() => {});
+        throw new BadRequestException(txError.message);
+      }
       // Recoverable transient failure: revert FINALIZING -> PENDING with token fencing if submission was not created
       const current = await this.prisma.speakingUploadIntent.findUnique({
         where: { id: uploadIntentId },
@@ -1434,11 +1680,11 @@ export class SpeakingService {
     }
 
     if (!submission) {
+      await refundTrial?.();
       throw new InternalServerErrorException(
         'Không hoàn tất được bài nộp Nói.',
       );
     }
-    if (trialCounted) await this.trial?.recordGrading(userId, 'SPEAKING');
 
     // 8. Enqueue BullMQ job only AFTER transaction commits
     const pipelineMode = getSpeakingPipelineMode();

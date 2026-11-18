@@ -128,6 +128,16 @@ export class UpdateMarketProductDto {
   @IsOptional()
   stock?: number;
 
+  @ApiPropertyOptional({
+    description:
+      'Tồn kho lúc mở form; bắt buộc khi gửi stock. Khác tồn kho hiện tại thì 409 (audit R9).',
+  })
+  @Type(() => Number)
+  @IsInt({ message: 'Tồn kho lúc mở form phải là số nguyên' })
+  @Min(0)
+  @IsOptional()
+  expectedStock?: number;
+
   @ApiPropertyOptional({ description: 'URL ảnh đại diện' })
   @IsString()
   @IsOptional()

@@ -9,6 +9,8 @@ import { ModuleRef } from '@nestjs/core';
 import {
   PayOSPaymentIntentStatus,
   PayOSPaymentIntentType,
+  PlanPaymentStatus,
+  PlanPurchaseStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -58,26 +60,62 @@ export class PayosPaymentService {
     });
     if (!payment)
       throw new NotFoundException('Không tìm thấy khoản thanh toán.');
+    // No QR for a purchase that stopped waiting for payment: paying it would
+    // only end in admin review (audit R8, 2026-11-18).
+    if (
+      payment.planPurchase.status !== PlanPurchaseStatus.PENDING_PAYMENT ||
+      (payment.status !== PlanPaymentStatus.PENDING &&
+        payment.status !== PlanPaymentStatus.REPORTED)
+    )
+      throw new ConflictException(
+        'Giao dịch này không còn chờ thanh toán. Vui lòng tạo giao dịch mới.',
+      );
     const existing = await this.prisma.payOSPaymentIntent.findUnique({
       where: { planPaymentId },
       include: { planPayment: true },
     });
     if (existing?.checkoutUrl && existing.qrCode) return this.toDto(existing);
-    const intent =
-      existing ??
-      (await this.createIntent({
-        userId,
-        type: PayOSPaymentIntentType.PLAN,
-        planPaymentId,
-        amountVnd: payment.amountVnd,
-        // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
-        // used to say Plus for every plan. PayOS caps descriptions at 25.
-        description: itemName.split(' — ')[0].slice(0, 25),
-        // The PayOS link closes with the purchase's payment window. Without
-        // it a saved QR stayed payable long after the app showed it expired.
-        expiresAt: payment.paymentIntentExpiresAt,
-      }));
-    return this.createProviderLink(intent, itemName);
+    const made = existing
+      ? { intent: existing, ready: false }
+      : await this.createIntentOnce(planPaymentId, {
+          userId,
+          type: PayOSPaymentIntentType.PLAN,
+          planPaymentId,
+          amountVnd: payment.amountVnd,
+          // The plan bought ("BreadTrans Pro — 30 ngày" → "BreadTrans Pro"); it
+          // used to say Plus for every plan. PayOS caps descriptions at 25.
+          description: itemName.split(' — ')[0].slice(0, 25),
+          // The PayOS link closes with the purchase's payment window. Without
+          // it a saved QR stayed payable long after the app showed it expired.
+          expiresAt: payment.paymentIntentExpiresAt,
+        });
+    if (made.ready) return this.toDto(made.intent);
+    return this.createProviderLink(made.intent, itemName);
+  }
+
+  /**
+   * Two requests can make the link of one payment at once (two Buy clicks).
+   * The second insert hits the unique planPaymentId: it takes the intent the
+   * first made when its link is ready, else asks to try again (audit R8).
+   */
+  private async createIntentOnce(
+    planPaymentId: number,
+    data: Parameters<PayosPaymentService['createIntent']>[0],
+  ): Promise<{ intent: IntentWithTarget; ready: boolean }> {
+    try {
+      return { intent: await this.createIntent(data), ready: false };
+    } catch (error) {
+      if ((error as { code?: string })?.code !== 'P2002') throw error;
+      const made = await this.prisma.payOSPaymentIntent.findUnique({
+        where: { planPaymentId },
+        include: { planPayment: true },
+      });
+      if (made?.checkoutUrl && made.qrCode)
+        return { intent: made, ready: true };
+      throw new ConflictException(
+        'Mã thanh toán đang được tạo. Vui lòng thử lại sau giây lát.',
+      );
+    }
   }
 
   async getOwnedIntent(
@@ -126,20 +164,45 @@ export class PayosPaymentService {
         paidAt: intent.paidAt ?? new Date(),
       });
     }
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        status,
-        providerStatus,
-        lastSyncedAt: new Date(),
-        paidAt:
-          status === PayOSPaymentIntentStatus.PAID
-            ? (intent.paidAt ?? new Date())
-            : intent.paidAt,
-      },
+    // A webhook may have written PAID since the read above (the provider
+    // call takes a while): a status other than PAID is written only while
+    // the intent is still not PAID (audit R14, 2026-11-18).
+    const updated =
+      status === PayOSPaymentIntentStatus.PAID
+        ? await this.prisma.payOSPaymentIntent.update({
+            where: { id: intent.id },
+            data: {
+              status,
+              providerStatus,
+              lastSyncedAt: new Date(),
+              paidAt: intent.paidAt ?? new Date(),
+            },
+            include: { planPayment: true },
+          })
+        : await this.writeUnlessPaid(intent.id, {
+            status,
+            providerStatus,
+            lastSyncedAt: new Date(),
+          });
+    return this.toDto(updated);
+  }
+
+  /**
+   * A status write that never overwrites PAID (audit R14): returns the row as
+   * it is stored afterwards, with whichever status won.
+   */
+  private async writeUnlessPaid(
+    id: number,
+    data: Prisma.PayOSPaymentIntentUpdateManyMutationInput,
+  ) {
+    await this.prisma.payOSPaymentIntent.updateMany({
+      where: { id, status: { not: PayOSPaymentIntentStatus.PAID } },
+      data,
+    });
+    return this.prisma.payOSPaymentIntent.findUniqueOrThrow({
+      where: { id },
       include: { planPayment: true },
     });
-    return this.toDto(updated);
   }
 
   /**
@@ -174,14 +237,15 @@ export class PayosPaymentService {
           );
           return 'OPEN';
         }
-        await this.prisma.payOSPaymentIntent.update({
-          where: { id: synced.intentId },
-          data: {
+        {
+          const after = await this.writeUnlessPaid(synced.intentId, {
             status: PayOSPaymentIntentStatus.CANCELLED,
             providerStatus: 'CANCELLED',
             lastSyncedAt: new Date(),
-          },
-        });
+          });
+          // Paid while it was being cancelled: the money wins.
+          if (after.status === PayOSPaymentIntentStatus.PAID) return 'PAID';
+        }
         return 'CLOSED';
       default:
         return 'CLOSED';
@@ -203,14 +267,12 @@ export class PayosPaymentService {
       throw new ConflictException('Không thể hủy khoản đã thanh toán.');
     }
     await this.provider.cancelPayment(Number(intent.orderCode), reason);
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        status: PayOSPaymentIntentStatus.CANCELLED,
-        providerStatus: 'CANCELLED',
-      },
-      include: { planPayment: true },
+    const updated = await this.writeUnlessPaid(intent.id, {
+      status: PayOSPaymentIntentStatus.CANCELLED,
+      providerStatus: 'CANCELLED',
     });
+    if (updated.status === PayOSPaymentIntentStatus.PAID)
+      throw new ConflictException('Không thể hủy khoản đã thanh toán.');
     return this.toDto(updated);
   }
 
@@ -334,20 +396,16 @@ export class PayosPaymentService {
           ? Math.floor(intent.expiresAt.getTime() / 1000)
           : undefined,
     });
-    const updated = await this.prisma.payOSPaymentIntent.update({
-      where: { id: intent.id },
-      data: {
-        paymentLinkId: result.paymentLinkId,
-        checkoutUrl: result.checkoutUrl,
-        qrCode: result.qrCode,
-        bankBin: result.bankBin,
-        bankAccountNumber: result.bankAccountNumber,
-        bankAccountName: result.bankAccountName,
-        providerStatus: result.status,
-        status: this.mapStatus(result.status),
-        expiresAt: result.expiresAt,
-      },
-      include: { planPayment: true },
+    const updated = await this.writeUnlessPaid(intent.id, {
+      paymentLinkId: result.paymentLinkId,
+      checkoutUrl: result.checkoutUrl,
+      qrCode: result.qrCode,
+      bankBin: result.bankBin,
+      bankAccountNumber: result.bankAccountNumber,
+      bankAccountName: result.bankAccountName,
+      providerStatus: result.status,
+      status: this.mapStatus(result.status),
+      expiresAt: result.expiresAt,
     });
     return this.toDto(updated);
   }
@@ -412,14 +470,13 @@ export class PayosPaymentService {
   private async fulfill(intent: IntentWithTarget): Promise<void> {
     if (intent.type === PayOSPaymentIntentType.PLAN && intent.planPayment) {
       const plans = this.moduleRef.get<{
-        confirmPurchaseFromWebhook: (
-          purchaseId: number,
-          bankTransactionId?: number,
-        ) => Promise<unknown>;
+        confirmPaidOrHold: (purchaseId: number) => Promise<unknown>;
       }>('PlanPurchaseService', {
         strict: false,
       });
-      await plans.confirmPurchaseFromWebhook(intent.planPayment.planPurchaseId);
+      // The same step as the webhook: confirmed, or held for an admin when
+      // the purchase expired or was replaced (audit R2, 2026-11-18).
+      await plans.confirmPaidOrHold(intent.planPayment.planPurchaseId);
       return;
     }
   }
