@@ -306,6 +306,13 @@ function imageDimensions(
   return null;
 }
 
+/** How long one Apply may hold its job; a crashed one frees it after this. */
+const APPLY_LOCK_MS = 15 * 60_000;
+/** Redis must answer the lock within this, or Apply is refused (503). */
+const APPLY_LOCK_WAIT_MS = 3_000;
+const UNLOCK_SCRIPT =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 @Injectable()
 export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ToeicAiExamService.name);
@@ -1126,7 +1133,57 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     return this.status(jobId);
   }
 
+  /**
+   * One Apply per job at a time (audit A3, 2026-11-18). A double click ran
+   * two: the groups are written in a transaction, but images, audio and the
+   * Speaking and Writing sets are made outside it, and were made twice. The
+   * lock covers the whole Apply. When Redis does not answer, Apply is refused
+   * (503) rather than run unlocked; it is an admin action and can wait.
+   */
   async apply(
+    jobId: string,
+    adminId: number,
+    selectedCandidateKeys?: string[],
+  ) {
+    const key = `toeic-ai-apply:${jobId}`;
+    const owner = randomUUID();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let locked: string | null;
+    try {
+      locked = await Promise.race([
+        this.connection.set(key, owner, 'PX', APPLY_LOCK_MS, 'NX'),
+        new Promise<never>((_, fail) => {
+          timer = setTimeout(
+            () => fail(new Error('lock timed out')),
+            APPLY_LOCK_WAIT_MS,
+          );
+        }),
+      ]);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Chưa khoá được đề để áp dụng (Redis không phản hồi). Vui lòng thử lại sau.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+    if (locked !== 'OK')
+      throw new ConflictException(
+        'Đề đang được áp dụng. Vui lòng chờ lần áp dụng trước hoàn tất.',
+      );
+    try {
+      return await this.applyLocked(jobId, adminId, selectedCandidateKeys);
+    } finally {
+      await this.connection
+        .eval(UNLOCK_SCRIPT, 1, key, owner)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `toeic_ai_apply_unlock_failed jobId=${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+    }
+  }
+
+  private async applyLocked(
     jobId: string,
     adminId: number,
     selectedCandidateKeys?: string[],

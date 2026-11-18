@@ -181,6 +181,11 @@ function harness(
     prisma,
     ai,
     answerReview,
+    // The Apply lock (audit A3): always free here.
+    connection: {
+      set: jest.fn(async () => 'OK'),
+      eval: jest.fn(async () => 1),
+    },
     logger: { warn: jest.fn(), log: jest.fn(), error: jest.fn() },
     queue: {
       getJob: jest.fn(async () => null),

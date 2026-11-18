@@ -99,6 +99,11 @@ describe('ToeicAiExamService.apply — selective candidate apply', () => {
       $transaction: jest.fn((cb) => cb(tx)),
     };
     service = Object.create(ToeicAiExamService.prototype);
+    // The Apply lock (audit A3): always free here.
+    (service as any).connection = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
     (service as any).prisma = prisma;
     (service as any).genericExam = {
       hasLearnerAttempts: jest.fn().mockResolvedValue(false),
