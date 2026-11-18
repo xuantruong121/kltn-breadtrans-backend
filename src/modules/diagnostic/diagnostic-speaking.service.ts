@@ -341,13 +341,9 @@ export class DiagnosticSpeakingService
         // learner to submit, and a recording arriving after submission must
         // not replace the one that was submitted.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`diagnostic:speaking:${attemptId}:${questionId}`}, 0))`;
-        const current = await tx.diagnosticAttempt.findUnique({
-          where: { id: attemptId },
-          select: { status: true },
-        });
-        if (current?.status !== 'IN_PROGRESS') {
-          throw new BadRequestException('Phiên kiểm tra đã hoàn tất');
-        }
+        // The attempt row too, so a submit cannot commit between this check
+        // and the write below (audit C10).
+        await this.lockOpenAttempt(tx, attemptId);
         const existing = await tx.diagnosticSpeakingResponse.findUnique({
           where: { attemptId_questionId: { attemptId, questionId } },
           select: { audioKey: true },
@@ -442,25 +438,46 @@ export class DiagnosticSpeakingService
       attemptId,
       questionId,
     );
-    const response = await this.prisma.diagnosticSpeakingResponse.upsert({
-      where: { attemptId_questionId: { attemptId, questionId } },
-      create: {
-        userId,
-        assessmentId,
-        attemptId,
-        questionId,
-        taskKey: this.taskKeyOf(question),
-        status: 'SKIPPED',
-        confirmedAt: new Date(),
-      },
-      update: {
-        status: 'SKIPPED',
-        score: null,
-        failureReason: null,
-        confirmedAt: new Date(),
-      },
+    // Written with the attempt row locked and its status checked again
+    // (audit C10, 2026-11-18): a submit committing between the check above
+    // and this write turned a task of a completed attempt into SKIPPED and
+    // nulled its score. The submit's own update of the row now waits.
+    const response = await this.prisma.$transaction(async (tx) => {
+      await this.lockOpenAttempt(tx, attemptId);
+      return tx.diagnosticSpeakingResponse.upsert({
+        where: { attemptId_questionId: { attemptId, questionId } },
+        create: {
+          userId,
+          assessmentId,
+          attemptId,
+          questionId,
+          taskKey: this.taskKeyOf(question),
+          status: 'SKIPPED',
+          confirmedAt: new Date(),
+        },
+        update: {
+          status: 'SKIPPED',
+          score: null,
+          failureReason: null,
+          confirmedAt: new Date(),
+        },
+      });
     });
     return this.publicResponse(response);
+  }
+
+  /** The attempt row locked; refused unless it is still in progress. */
+  private async lockOpenAttempt(
+    tx: Prisma.TransactionClient,
+    attemptId: number,
+  ) {
+    await tx.$queryRaw`SELECT id FROM "DiagnosticAttempt" WHERE id = ${attemptId} FOR UPDATE`;
+    const current = await tx.diagnosticAttempt.findUnique({
+      where: { id: attemptId },
+      select: { status: true },
+    });
+    if (current?.status !== 'IN_PROGRESS')
+      throw new BadRequestException('Phiên kiểm tra đã hoàn tất');
   }
 
   /**
