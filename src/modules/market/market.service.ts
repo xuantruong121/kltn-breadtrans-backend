@@ -965,6 +965,14 @@ export class MarketService {
     if (dto.stock !== undefined && dto.stock < 0) {
       throw new BadRequestException('Số lượng tồn kho không được âm');
     }
+    // A new stock is written only while the stock is still the one the form
+    // loaded (audit R9, 2026-11-18): a sale or a refund since then would be
+    // overwritten, and a physical gift sold beyond what exists.
+    if (dto.stock !== undefined && dto.expectedStock === undefined) {
+      throw new BadRequestException(
+        'Thiếu số tồn kho lúc mở form (expectedStock).',
+      );
+    }
 
     let updateSlug = existing.slug;
     if (dto.slug?.trim()) {
@@ -982,27 +990,35 @@ export class MarketService {
       }
     }
 
-    return this.prisma.marketProduct.update({
-      where: { id },
-      data: {
-        name: dto.name !== undefined ? dto.name.trim() : undefined,
-        slug: updateSlug,
-        description:
-          dto.description !== undefined
-            ? dto.description?.trim() || null
-            : undefined,
-        category: dto.category !== undefined ? dto.category.trim() : undefined,
-        rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
-        price: dto.price !== undefined ? dto.price : undefined,
-        stock: dto.stock !== undefined ? dto.stock : undefined,
-        imageUrl:
-          dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
-        order: dto.order !== undefined ? dto.order : undefined,
-        isActive: dto.isActive !== undefined ? dto.isActive : undefined,
-        fulfillmentType:
-          dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
-      },
+    const data = {
+      name: dto.name !== undefined ? dto.name.trim() : undefined,
+      slug: updateSlug,
+      description:
+        dto.description !== undefined
+          ? dto.description?.trim() || null
+          : undefined,
+      category: dto.category !== undefined ? dto.category.trim() : undefined,
+      rarity: dto.rarity !== undefined ? dto.rarity.trim() : undefined,
+      price: dto.price !== undefined ? dto.price : undefined,
+      stock: dto.stock !== undefined ? dto.stock : undefined,
+      imageUrl:
+        dto.imageUrl !== undefined ? dto.imageUrl?.trim() || null : undefined,
+      order: dto.order !== undefined ? dto.order : undefined,
+      isActive: dto.isActive !== undefined ? dto.isActive : undefined,
+      fulfillmentType:
+        dto.fulfillmentType !== undefined ? dto.fulfillmentType : undefined,
+    };
+    if (dto.stock === undefined)
+      return this.prisma.marketProduct.update({ where: { id }, data });
+    const { count } = await this.prisma.marketProduct.updateMany({
+      where: { id, stock: dto.expectedStock },
+      data,
     });
+    if (count === 0)
+      throw new ConflictException(
+        'Tồn kho vừa thay đổi (có người đổi quà hoặc được hoàn). Tải lại trang rồi nhập lại số tồn kho.',
+      );
+    return (await this.prisma.marketProduct.findUnique({ where: { id } }))!;
   }
 
   async adminToggleProductActive(id: number, isActive?: boolean) {

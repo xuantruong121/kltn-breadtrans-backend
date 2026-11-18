@@ -5,6 +5,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { GamificationService } from '../gamification/gamification.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  BadRequestException,
   ConflictException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -1086,11 +1087,71 @@ describe('MarketService', () => {
 
         const result = await service.adminUpdateProduct(1, {
           price: 600,
-          stock: 15,
         });
 
         expect(result.price).toBe(600);
+        expect(
+          mockPrismaService.marketProduct.update.mock.calls[0][0].data.stock,
+        ).toBeUndefined();
+      });
+
+      it('writes a new stock only while the stock is still the one the form loaded (audit R9)', async () => {
+        mockPrismaService.marketProduct.findUnique
+          .mockResolvedValueOnce({ id: 1, slug: 'cu-slug', stock: 5 })
+          .mockResolvedValueOnce({ id: 1, slug: 'cu-slug', stock: 15 });
+        mockPrismaService.marketProduct.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const result = await service.adminUpdateProduct(1, {
+          stock: 15,
+          expectedStock: 5,
+        });
+
+        expect(mockPrismaService.marketProduct.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 1, stock: 5 },
+            data: expect.objectContaining({ stock: 15 }),
+          }),
+        );
         expect(result.stock).toBe(15);
+      });
+
+      it('refuses a stock from a form opened before a sale: 409, nothing written (audit R9)', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+          stock: 4,
+        });
+        // A learner bought one after the admin opened the form at 5.
+        mockPrismaService.marketProduct.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.adminUpdateProduct(1, {
+            name: 'Quà mới',
+            stock: 5,
+            expectedStock: 5,
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(mockPrismaService.marketProduct.update).not.toHaveBeenCalled();
+      });
+
+      it('refuses a stock without the stock the form loaded', async () => {
+        mockPrismaService.marketProduct.findUnique.mockResolvedValue({
+          id: 1,
+          slug: 'cu-slug',
+          stock: 4,
+        });
+
+        await expect(
+          service.adminUpdateProduct(1, { stock: 5 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(
+          mockPrismaService.marketProduct.updateMany,
+        ).not.toHaveBeenCalled();
+        expect(mockPrismaService.marketProduct.update).not.toHaveBeenCalled();
       });
 
       it('rejects update with price <= 0', async () => {
