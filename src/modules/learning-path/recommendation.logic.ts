@@ -139,7 +139,9 @@ const WEAKNESS_MARGIN = 0.2;
  * other placed skill; null when skills are level (e.g. a self-chosen level)
  * or fewer than two are placed.
  */
-export function weakestSkill(learner: LearnerState): PracticeSkill | null {
+export function weakestSkill(
+  learner: Pick<LearnerState, 'skills'>,
+): PracticeSkill | null {
   const placed = PRACTICE_SKILLS.filter((s) => learner.skills[s]).sort(
     (a, b) => learner.skills[a]!.ability - learner.skills[b]!.ability,
   );

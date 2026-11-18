@@ -154,4 +154,73 @@ describe('NotificationsCronService', () => {
       expect(notificationsService.sendPushToUser).not.toHaveBeenCalled();
     });
   });
+
+  describe('runWeeklyReport', () => {
+    // Last week 09/11 - 15/11 of a learner whose weakest skill is Reading.
+    const lastWeek = (skill: string, n: number) =>
+      Array.from({ length: n }, () => ({
+        userId: 19,
+        skill,
+        scorePercent: 80,
+        createdAt: new Date('2026-11-12T10:00:00+07:00'),
+      }));
+
+    beforeEach(() => {
+      prisma.learnerProgressEvent = {
+        groupBy: jest.fn().mockResolvedValue([{ userId: 19 }]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            ...lastWeek('LISTENING', 4),
+            ...lastWeek('READING', 2),
+            ...lastWeek('SPEAKING', 10),
+          ]),
+      };
+      prisma.user = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 19,
+            learnerProfile: {
+              goal: 'TOEIC_SCORE',
+              minutesPerDay: 30,
+              targetDate: null,
+            },
+          },
+        ]),
+      };
+      prisma.learnerSkillLevel = {
+        findMany: jest.fn().mockResolvedValue(
+          [
+            ['LISTENING', 'ADVANCED', 1.55],
+            ['READING', 'STARTER', -0.25],
+            ['SPEAKING', 'INTERMEDIATE', 0.4],
+            ['WRITING', 'ADVANCED', 2.35],
+          ].map(([skill, level, ability]) => ({
+            userId: 19,
+            skill,
+            level,
+            unlockedLevel: level,
+            ability,
+          })),
+        ),
+      };
+    });
+
+    it('puts the weakest skill first, with the dashboard week target', async () => {
+      // Writing (0 of 2) is further behind, but Reading is the weakest skill:
+      // TOEIC goal + weakest gives Reading 3 of 7 weights, 9 items a week.
+      const result = await cronService.runWeeklyReport('2026-11-16');
+
+      expect(result).toEqual({ week: '2026-11-16', active: 1, sent: 1 });
+      expect(prisma.learnerSkillLevel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: { in: [19] } } }),
+      );
+      const notification =
+        notificationsService.createNotification.mock.calls[0][0];
+      expect(notification.type).toBe('weekly_report:2026-11-16');
+      expect(notification.body).toContain(
+        'Tuần này nên ưu tiên Đọc: mục tiêu 9 bài.',
+      );
+    });
+  });
 });

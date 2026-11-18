@@ -76,12 +76,20 @@ export function summarizeWeeks(input: {
 }
 
 /**
- * The skill furthest behind its weekly target last week. Ties go to the
- * skill with the larger target, then to the fixed skill order.
+ * The skill to put first this week. The learner's weakest skill (the one the
+ * dashboard and the entry diagnostic also put first) wins while it is behind
+ * its weekly target; otherwise the skill furthest behind its target last
+ * week. Ties go to the skill with the larger target, then to the fixed skill
+ * order.
  */
-export function focusSkill(skills: SkillWeek[]): SkillWeek | null {
+export function focusSkill(
+  skills: SkillWeek[],
+  weakest: PracticeSkill | null = null,
+): SkillWeek | null {
   const behind = skills.filter((s) => s.count < s.target);
   if (!behind.length) return null;
+  const weak = weakest && behind.find((s) => s.skill === weakest);
+  if (weak) return weak;
   return behind.reduce((best, s) => {
     const ratio = s.count / s.target;
     const bestRatio = best.count / best.target;
@@ -123,6 +131,8 @@ export function weeklyReportMessage(input: {
   daysToExam: number | null;
   /** What the learner got wrong most last week (mistake notebook), if known. */
   mistakeTags?: string[];
+  /** Weakest skill by ability (learning-path weakestSkill), if any. */
+  weakest?: PracticeSkill | null;
 }) {
   const total = input.skills.reduce((sum, s) => sum + s.count, 0);
   const week = lastWeekLabel(input.weekStart);
@@ -153,7 +163,7 @@ export function weeklyReportMessage(input: {
       `Lỗi hay gặp tuần qua: ${tags.join('; ')}. Mở Sổ lỗi để ôn lại.`,
     );
 
-  const focus = focusSkill(input.skills);
+  const focus = focusSkill(input.skills, input.weakest ?? null);
   if (focus)
     parts.push(
       `Tuần này nên ưu tiên ${SKILL_LABEL[focus.skill]}: mục tiêu ${focus.target} bài.`,
