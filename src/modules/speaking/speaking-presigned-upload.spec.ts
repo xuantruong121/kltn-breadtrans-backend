@@ -457,6 +457,48 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
       }
     });
 
+    it('an exam question with its 2 takes used refuses a finalize from another tab, invalidates it and deletes the audio (audit C3)', async () => {
+      // Two intents were made while 1 take was used; the first finalize
+      // already counts as the second take.
+      mockPrisma.speakingExercise.findUnique.mockResolvedValue({
+        ...mockExercise,
+        practiceSetId: 'exam-set-1',
+        practiceSet: { scope: 'EXAM_INTERNAL' },
+      });
+      mockPrisma.toeicAssessmentAttemptComponent = {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ startedAt: new Date('2026-11-02T08:00:00Z') }),
+      };
+      mockPrisma.speakingSubmission.count.mockResolvedValue(2);
+      (
+        mockPrisma.speakingUploadIntent.findUnique as jest.Mock
+      ).mockResolvedValueOnce(validPendingIntent);
+
+      await expect(
+        service.finalizeUpload('intent-uuid-123', 10, 'trace-take'),
+      ).rejects.toThrow('hết lượt thu lại');
+
+      expect(mockPrisma.speakingSubmission.create).not.toHaveBeenCalled();
+      expect(
+        mockPrisma.toeicAssessmentAttemptComponent.findFirst,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'IN_PROGRESS',
+            assessmentAttempt: { userId: 10 },
+            assessmentComponent: { speakingPracticeSetId: 'exam-set-1' },
+          }),
+        }),
+      );
+      expect(mockPrisma.speakingUploadIntent.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'INVALID' } }),
+      );
+      expect(mockUploadService.deleteFile).toHaveBeenCalledWith(
+        validPendingIntent.objectKey,
+      );
+    });
+
     it('duplicate finalize returns original submission idempotently without creating another', async () => {
       const finalizedIntent = {
         ...validPendingIntent,

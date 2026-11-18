@@ -250,6 +250,9 @@ function timingOf(exercise: {
   });
 }
 
+/** An exam question's recordings are all used: the intent is invalid. */
+class ExamTakesUsedError extends Error {}
+
 @Injectable()
 export class SpeakingService {
   private readonly logger = new Logger(SpeakingService.name);
@@ -742,6 +745,15 @@ export class SpeakingService {
         );
         if (quotaError) throw new BadRequestException(quotaError);
 
+        if (internalContext) {
+          await this.lockExamTakes(tx, userId, exercise.id);
+          const startedAt = await this.examSectionStart(tx, internalContext);
+          const takeError =
+            startedAt &&
+            (await this.examTakesError(tx, userId, exercise.id, startedAt));
+          if (takeError) throw new BadRequestException(takeError);
+        }
+
         return tx.speakingSubmission.create({
           data: {
             exerciseId: exercise.id,
@@ -884,26 +896,58 @@ export class SpeakingService {
     userId: number,
     context: { attemptId: number; componentId: number },
   ) {
-    const section = await this.prisma.toeicAssessmentAttemptComponent.findFirst(
-      {
-        where: {
-          assessmentAttemptId: context.attemptId,
-          assessmentComponentId: context.componentId,
-        },
-        select: { startedAt: true },
+    const startedAt = await this.examSectionStart(this.prisma, context);
+    const error =
+      startedAt &&
+      (await this.examTakesError(this.prisma, userId, exerciseId, startedAt));
+    if (error) throw new BadRequestException(error);
+  }
+
+  private async examSectionStart(
+    db: Prisma.TransactionClient,
+    context: { attemptId: number; componentId: number },
+  ): Promise<Date | null> {
+    const section = await db.toeicAssessmentAttemptComponent.findFirst({
+      where: {
+        assessmentAttemptId: context.attemptId,
+        assessmentComponentId: context.componentId,
       },
-    );
-    if (!section?.startedAt) return;
-    const takes = await this.prisma.speakingSubmission.count({
+      select: { startedAt: true },
+    });
+    return section?.startedAt ?? null;
+  }
+
+  /** The recordings of one exam question left, counted with `db`. */
+  private async examTakesError(
+    db: Prisma.TransactionClient,
+    userId: number,
+    exerciseId: number,
+    sectionStartedAt: Date,
+  ): Promise<string | null> {
+    const takes = await db.speakingSubmission.count({
       where: {
         userId,
         exerciseId,
         status: { not: 'FAILED' },
-        submittedAt: { gte: section.startedAt },
+        submittedAt: { gte: sectionStartedAt },
       },
     });
-    if (takes >= MAX_EXAM_TAKES_PER_QUESTION)
-      throw new BadRequestException('Câu này đã hết lượt thu lại.');
+    return takes >= MAX_EXAM_TAKES_PER_QUESTION
+      ? 'Câu này đã hết lượt thu lại.'
+      : null;
+  }
+
+  /**
+   * Counted again where the recording is saved, under a lock per learner and
+   * question (audit C3, 2026-11-18): intents made in two tabs while one take
+   * was left were all finalized, and the presigned finalize never counted.
+   */
+  private async lockExamTakes(
+    db: Prisma.TransactionClient,
+    userId: number,
+    exerciseId: number,
+  ) {
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`speaking-take:${userId}:${exerciseId}`}))`;
   }
 
   async createUploadIntent(
@@ -1369,6 +1413,35 @@ export class SpeakingService {
         );
         if (quotaError) throw new BadRequestException(quotaError);
 
+        // An exam question: its takes are counted here too (audit C3). The
+        // intent stores no section, so the learner's open section for this
+        // Speaking set is the one.
+        if (
+          exercise.practiceSet?.scope === SpeakingPracticeScope.EXAM_INTERNAL
+        ) {
+          await this.lockExamTakes(tx, userId, intent.exerciseId);
+          const section = await tx.toeicAssessmentAttemptComponent.findFirst({
+            where: {
+              status: 'IN_PROGRESS',
+              assessmentAttempt: { userId },
+              assessmentComponent: {
+                speakingPracticeSetId: exercise.practiceSetId,
+              },
+            },
+            orderBy: { startedAt: 'desc' },
+            select: { startedAt: true },
+          });
+          const takeError =
+            section?.startedAt &&
+            (await this.examTakesError(
+              tx,
+              userId,
+              intent.exerciseId,
+              section.startedAt,
+            ));
+          if (takeError) throw new ExamTakesUsedError(takeError);
+        }
+
         const publicUrl = this.getStorage().getPublicUrl();
         const audioUrl =
           publicUrl && !isPrivateSpeakingMediaKey(intent.objectKey)
@@ -1415,6 +1488,22 @@ export class SpeakingService {
       });
     } catch (txError) {
       await refundTrial?.();
+      if (txError instanceof ExamTakesUsedError) {
+        // Not transient: the recording can never be accepted.
+        const invalidation = await this.prisma.speakingUploadIntent.updateMany({
+          where: {
+            id: uploadIntentId,
+            status: 'FINALIZING',
+            finalizationToken: token,
+          },
+          data: { status: 'INVALID' },
+        });
+        if (invalidation.count === 1)
+          await this.getStorage()
+            .deleteFile(intent.objectKey)
+            .catch(() => {});
+        throw new BadRequestException(txError.message);
+      }
       // Recoverable transient failure: revert FINALIZING -> PENDING with token fencing if submission was not created
       const current = await this.prisma.speakingUploadIntent.findUnique({
         where: { id: uploadIntentId },
