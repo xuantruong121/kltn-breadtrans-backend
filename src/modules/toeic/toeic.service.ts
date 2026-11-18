@@ -46,6 +46,7 @@ import {
   masterMatchesGroups,
 } from './toeic-listening-master';
 import { ToeicListeningMasterService } from './toeic-listening-master.service';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 
 const MIN_DURATION = 60;
 const MAX_DURATION = 21600;
@@ -545,6 +546,18 @@ export class ToeicService {
   }
 
   async startAttempt(
+    userId: number,
+    examId: number,
+    mode: AttemptMode = AttemptMode.PRACTICE,
+    parts: number[] = [],
+  ) {
+    return notFoundIfGone(
+      this.startAttemptOnce(userId, examId, mode, parts),
+      'Không tìm thấy đề thi.',
+    );
+  }
+
+  private async startAttemptOnce(
     userId: number,
     examId: number,
     mode: AttemptMode = AttemptMode.PRACTICE,

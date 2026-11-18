@@ -22,6 +22,7 @@ import {
   normalizeOptionExplanations,
   questionProblems,
 } from './grammar-question.logic';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 
 @Injectable()
 export class GrammarService {
@@ -203,6 +204,17 @@ export class GrammarService {
   }
 
   async submitAttempt(
+    topicId: number,
+    userId: number,
+    answers: Record<string, number>,
+  ) {
+    return notFoundIfGone(
+      this.submitAttemptOnce(topicId, userId, answers),
+      `Không tìm thấy chủ đề #${topicId}.`,
+    );
+  }
+
+  private async submitAttemptOnce(
     topicId: number,
     userId: number,
     answers: Record<string, number>,

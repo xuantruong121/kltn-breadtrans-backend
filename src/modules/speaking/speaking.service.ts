@@ -45,6 +45,7 @@ import {
   parseCefrRange,
 } from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -644,6 +645,29 @@ export class SpeakingService {
     role?: Role,
     internalContext?: { attemptId: number; componentId: number },
   ): Promise<SubmitSpeakingResponse> {
+    return notFoundIfGone(
+      this.submitAudioOnce(
+        exerciseId,
+        userId,
+        audioFile,
+        idempotencyKey,
+        traceIdHeader,
+        role,
+        internalContext,
+      ),
+      `Không tìm thấy bài luyện Nói #${exerciseId}.`,
+    );
+  }
+
+  private async submitAudioOnce(
+    exerciseId: number,
+    userId: number,
+    audioFile: Express.Multer.File,
+    idempotencyKey?: string,
+    traceIdHeader?: string,
+    role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
+  ): Promise<SubmitSpeakingResponse> {
     const traceId = traceIdHeader?.trim() || crypto.randomUUID();
 
     // 1. Validate Idempotency-Key
@@ -1167,6 +1191,18 @@ export class SpeakingService {
    * Phase 2.3: Finalize a direct R2 upload with server-side validation and atomic BullMQ enqueueing.
    */
   async finalizeUpload(
+    uploadIntentId: string,
+    userId: number,
+    traceIdHeader?: string,
+    role?: Role,
+  ) {
+    return notFoundIfGone(
+      this.finalizeUploadOnce(uploadIntentId, userId, traceIdHeader, role),
+      'Bài luyện Nói này vừa bị xoá.',
+    );
+  }
+
+  private async finalizeUploadOnce(
     uploadIntentId: string,
     userId: number,
     traceIdHeader?: string,

@@ -44,6 +44,7 @@ import {
   ToeicWritingAnswerDto,
   UpdateToeicAssessmentDto,
 } from './toeic-assessment.dto';
+import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 
 const FAMILY_KINDS: Record<
   ToeicAssessmentProductFamily,
@@ -262,6 +263,18 @@ export class ToeicAssessmentService {
   }
 
   async startAttempt(
+    assessmentId: number,
+    userId: number,
+    idempotencyKey?: string,
+    role?: string,
+  ) {
+    return notFoundIfGone(
+      this.startAttemptOnce(assessmentId, userId, idempotencyKey, role),
+      'Không tìm thấy đề thi.',
+    );
+  }
+
+  private async startAttemptOnce(
     assessmentId: number,
     userId: number,
     idempotencyKey?: string,
@@ -509,6 +522,17 @@ export class ToeicAssessmentService {
   }
 
   async startComponent(attemptId: number, componentId: number, userId: number) {
+    return notFoundIfGone(
+      this.startComponentOnce(attemptId, componentId, userId),
+      'Không tìm thấy đề thi.',
+    );
+  }
+
+  private async startComponentOnce(
+    attemptId: number,
+    componentId: number,
+    userId: number,
+  ) {
     const attempt = await this.getOwnedAttempt(attemptId, userId);
     const state = attempt.components.find(
       (item) => item.assessmentComponentId === componentId,
