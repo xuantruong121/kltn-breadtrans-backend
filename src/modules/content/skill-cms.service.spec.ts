@@ -339,6 +339,80 @@ describe('SkillCmsService', () => {
     ).rejects.toThrow('nhân bản đề');
   });
 
+  it('the five exam Speaking writes run on the transaction they are given and open none (2026-11-18)', async () => {
+    const exercise = {
+      id: 1,
+      practiceSetId: 's1',
+      taskType: 'READ_ALOUD',
+      targetText: 'Good morning.',
+      imageUrl: null,
+      stimulusId: null,
+      stimulus: null,
+      category: 'COMMUNICATION',
+      practiceSet: { category: 'COMMUNICATION', categoryId: null },
+    };
+    const tx: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      speakingPracticeSet: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 's1',
+          category: 'COMMUNICATION',
+          level: 'BEGINNER',
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
+      speakingExercise: {
+        findFirst: jest.fn().mockResolvedValue(exercise),
+        findMany: jest.fn().mockResolvedValue([{ id: 1, order: 1 }]),
+        create: jest.fn().mockResolvedValue({ id: 2 }),
+        update: jest.fn().mockResolvedValue(exercise),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        delete: jest.fn().mockResolvedValue(exercise),
+      },
+      speakingStimulus: { create: jest.fn().mockResolvedValue({ id: 3 }) },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+      toeicAssessmentComponent: { count: jest.fn().mockResolvedValue(0) },
+    };
+    // No model on the service's own client: any read or write outside the
+    // given transaction fails the test.
+    const prisma: any = { $transaction: jest.fn() };
+    const service = new SkillCmsService(prisma);
+
+    await service.addSpeakingExercise(
+      'speaking',
+      's1',
+      { title: 'P', targetText: 'Good morning.', taskType: 'READ_ALOUD' },
+      admin,
+      tx,
+    );
+    await service.updateSpeakingExercise(
+      'speaking',
+      's1',
+      '1',
+      { title: 'Q' } as any,
+      admin,
+      tx,
+    );
+    await service.reorderSpeakingExercises(
+      'speaking',
+      's1',
+      { exerciseIds: [1] },
+      admin,
+      tx,
+    );
+    await service.deleteSpeakingExercise('speaking', 's1', '1', admin, tx);
+    await service.createSpeakingStimulus(
+      { kind: 'INFORMATION', content: 'Lịch họp' } as any,
+      admin,
+      tx,
+    );
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.speakingExercise.create).toHaveBeenCalled();
+    expect(tx.speakingExercise.delete).toHaveBeenCalled();
+    expect(tx.speakingStimulus.create).toHaveBeenCalled();
+  });
+
   describe('editing practice that has attempts', () => {
     const question = {
       id: 8,

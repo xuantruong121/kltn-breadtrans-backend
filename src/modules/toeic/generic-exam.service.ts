@@ -54,7 +54,7 @@ import {
 import { SpeakingStimulusDto } from '../content/speaking-stimulus.dto';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import { examListFacets, filterExamList } from './exam-admin-list';
-import { inDraftSet } from './draft-set-lock';
+import { inDraftExam, inDraftSet } from './draft-set-lock';
 
 type ProductRecord = any;
 
@@ -764,6 +764,19 @@ export class GenericExamService {
       throw new ConflictException(EXAM_NOT_DRAFT);
   }
 
+  /**
+   * A Speaking edit of an exam, written with the exam row locked and still a
+   * draft (2026-11-18). The check above runs first and answers 409 fast; it
+   * ran alone before, so a publish between it and the write had the change
+   * land in the live exam.
+   */
+  private inDraftSpeaking<T>(
+    id: number,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return inDraftExam(this.prisma, id, work, EXAM_NOT_DRAFT);
+  }
+
   private async assertDraftExamById(id: number) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },
@@ -906,7 +919,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     await this.speakingContext(id);
-    return this.skillCms.createSpeakingStimulus(dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.createSpeakingStimulus(dto, user, tx),
+    );
   }
 
   async createSpeakingExercise(
@@ -916,7 +931,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.addSpeakingExercise('speaking', setId, dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.addSpeakingExercise('speaking', setId, dto, user, tx),
+    );
   }
 
   async updateSpeakingExercise(
@@ -927,12 +944,15 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.updateSpeakingExercise(
-      'speaking',
-      setId,
-      String(exerciseId),
-      dto,
-      user,
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.updateSpeakingExercise(
+        'speaking',
+        setId,
+        String(exerciseId),
+        dto,
+        user,
+        tx,
+      ),
     );
   }
 
@@ -943,7 +963,9 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user);
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.reorderSpeakingExercises('speaking', setId, dto, user, tx),
+    );
   }
 
   async deleteSpeakingExercise(
@@ -953,11 +975,14 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.skillCms.deleteSpeakingExercise(
-      'speaking',
-      setId,
-      String(exerciseId),
-      user,
+    return this.inDraftSpeaking(id, (tx) =>
+      this.skillCms.deleteSpeakingExercise(
+        'speaking',
+        setId,
+        String(exerciseId),
+        user,
+        tx,
+      ),
     );
   }
 

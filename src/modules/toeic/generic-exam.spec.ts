@@ -607,3 +607,68 @@ describe('GenericExamService publish readiness guard', () => {
     expect(service.prisma.$transaction).not.toHaveBeenCalled();
   });
 });
+
+describe('Speaking edits of an exam run under the exam lock (2026-11-18)', () => {
+  const user = { id: 1, role: 'ADMIN' };
+  const build = (underLock: QuizPublicationStatus) => {
+    const service: any = Object.create(GenericExamService.prototype);
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      exam: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ publicationStatus: underLock }),
+      },
+    };
+    // The early check reads DRAFT; the read under the lock may not.
+    service.prisma = {
+      exam: {
+        findUnique: jest.fn().mockResolvedValue({
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        }),
+      },
+      $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    };
+    service.speakingContext = jest.fn().mockResolvedValue({ setId: 'sw-set' });
+    service.skillCms = {
+      createSpeakingStimulus: jest.fn().mockResolvedValue('ok'),
+      addSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+      updateSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+      reorderSpeakingExercises: jest.fn().mockResolvedValue('ok'),
+      deleteSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+    };
+    return { service, tx };
+  };
+  const calls: Array<[string, (service: any) => Promise<unknown>]> = [
+    ['createSpeakingStimulus', (s) => s.createSpeakingStimulus(5, {}, user)],
+    ['addSpeakingExercise', (s) => s.createSpeakingExercise(5, {}, user)],
+    ['updateSpeakingExercise', (s) => s.updateSpeakingExercise(5, 1, {}, user)],
+    [
+      'reorderSpeakingExercises',
+      (s) => s.reorderSpeakingExercises(5, { exerciseIds: [1] }, user),
+    ],
+    ['deleteSpeakingExercise', (s) => s.deleteSpeakingExercise(5, 1, user)],
+  ];
+
+  it.each(calls)(
+    '%s: an exam published between the check and the write is refused; SkillCms never runs',
+    async (method, run) => {
+      const { service } = build(QuizPublicationStatus.PUBLISHED);
+
+      await expect(run(service)).rejects.toThrow('bản nháp');
+      expect(service.skillCms[method]).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(calls)(
+    '%s: a draft hands the lock transaction to SkillCms',
+    async (method, run) => {
+      const { service, tx } = build(QuizPublicationStatus.DRAFT);
+
+      await run(service);
+
+      const args = service.skillCms[method].mock.calls[0];
+      expect(args[args.length - 1]).toBe(tx);
+    },
+  );
+});
