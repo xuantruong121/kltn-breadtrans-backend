@@ -1112,24 +1112,6 @@ export class QuizService {
     });
   }
 
-  async deleteQuiz(id: number, user?: { id: number; role: Role }) {
-    const existing = await this.prisma.quiz.findUnique({
-      where: { id },
-    });
-    if (!existing) throw new NotFoundException('Không tìm thấy bài tập.');
-
-    if (user && user.role !== Role.ADMIN) {
-      throw new ForbiddenException(
-        'Chỉ Quản trị viên mới có quyền xóa bài kiểm tra',
-      );
-    }
-    this.assertGenericAdminOwnership(existing.type);
-
-    return this.prisma.quiz.delete({
-      where: { id },
-    });
-  }
-
   async getAllQuizzes() {
     return this.prisma.quiz.findMany({
       include: {
