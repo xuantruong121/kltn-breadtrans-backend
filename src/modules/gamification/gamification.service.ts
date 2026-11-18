@@ -21,6 +21,11 @@ import {
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
 import { vietnamDayStart } from '../events/arena-questions.logic';
+import {
+  VOCAB_XP_REASON,
+  vocabWordXp,
+  vocabWordXpReason,
+} from '../vocab/vocab-xp.logic';
 import { arenaStats } from './arena-stats.logic';
 import { streakMilestone, xpLevel } from './ranking.logic';
 import {
@@ -417,6 +422,41 @@ export class GamificationService {
         _sum: { points: true },
       });
       const amount = xpFor(today._sum.points ?? 0);
+      if (amount > 0) await this.awardXp(userId, amount, reason, { tx });
+      return amount;
+    });
+    // awardXp leaves this to the caller when it runs in a transaction.
+    if (xp > 0)
+      this.eventEmitter.emit('gamification.xp_earned', { userId, points: xp });
+    return xp;
+  }
+
+  /**
+   * XP for a word a learner knows for the first time in the flashcards
+   * (owner 2026-11-18, vocab-xp.logic.ts): once per word, 150 a day, no
+   * Bánh mì. Checked and awarded under one lock per learner, as the Arena
+   * cap is, so two words known at once cannot pass the cap and one word
+   * known twice at once pays once. A word the cap stopped writes nothing,
+   * so it still pays when it is known again another day.
+   */
+  async awardVocabWordXp(userId: number, wordId: number): Promise<number> {
+    const reason = vocabWordXpReason(wordId);
+    const xp = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`vocab_xp:${userId}`}))`;
+      const paid = await tx.pointHistory.findFirst({
+        where: { userId, reason },
+        select: { id: true },
+      });
+      if (paid) return 0;
+      const today = await tx.pointHistory.aggregate({
+        where: {
+          userId,
+          reason: { startsWith: VOCAB_XP_REASON },
+          createdAt: { gte: vietnamDayStart(new Date()) },
+        },
+        _sum: { points: true },
+      });
+      const amount = vocabWordXp(today._sum.points ?? 0);
       if (amount > 0) await this.awardXp(userId, amount, reason, { tx });
       return amount;
     });

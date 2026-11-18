@@ -10,6 +10,7 @@ import { DictionaryLookupService } from './dictionary-lookup.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { GamificationService } from '../gamification/gamification.service';
 import { DECK_WORD_INCLUDE, flattenDeckWord } from './dictionary-entry';
 import {
   nextReviewAt as srsNextReviewAt,
@@ -32,7 +33,25 @@ export class VocabService {
     private readonly eventEmitter: EventEmitter2,
     @Optional() private readonly dictionaryLookup?: DictionaryLookupService,
     @Optional() private readonly subscriptionService?: SubscriptionService,
+    @Optional() private readonly gamification?: GamificationService,
   ) {}
+
+  /**
+   * Flashcard XP for a word known for the first time (owner 2026-11-18):
+   * the reward never fails the review, as the other rewards do not.
+   */
+  private async wordXp(userId: number, wordId: number): Promise<number> {
+    if (!this.gamification) return 0;
+    try {
+      return await this.gamification.awardVocabWordXp(userId, wordId);
+    } catch (error) {
+      this.logger.warn(
+        `Could not award flashcard XP to user ${userId}, word ${wordId}`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return 0;
+    }
+  }
 
   private async emitVocabLearned(
     userId: number,
@@ -353,13 +372,16 @@ export class VocabService {
           lastReviewedAt: new Date(),
         },
       });
+      let xpEarned = 0;
       if (updated.isMastered && !existing.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
         await this.emitVocabLearned(userId, wordId);
+        xpEarned = await this.wordXp(userId, wordId);
       }
       return {
         isMastered: updated.isMastered,
         nextReviewAt: updated.nextReviewAt,
+        xpEarned,
       };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
@@ -373,13 +395,16 @@ export class VocabService {
           lastReviewedAt: new Date(),
         },
       });
+      let xpEarned = 0;
       if (created.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
         await this.emitVocabLearned(userId, wordId);
+        xpEarned = await this.wordXp(userId, wordId);
       }
       return {
         isMastered: created.isMastered,
         nextReviewAt: created.nextReviewAt,
+        xpEarned,
       };
     }
   }
@@ -436,11 +461,13 @@ export class VocabService {
           ...srs,
         },
       });
+      let xpEarned = 0;
       if (updated.isMastered && !existing.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
         await this.emitVocabLearned(userId, wordId);
+        xpEarned = await this.wordXp(userId, wordId);
       }
-      return updated;
+      return { ...updated, xpEarned };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
         data: {
@@ -454,11 +481,13 @@ export class VocabService {
           ...srs,
         },
       });
+      let xpEarned = 0;
       if (created.isMastered) {
         await this.recordMasteryActivity(userId, wordId);
         await this.emitVocabLearned(userId, wordId);
+        xpEarned = await this.wordXp(userId, wordId);
       }
-      return created;
+      return { ...created, xpEarned };
     }
   }
 

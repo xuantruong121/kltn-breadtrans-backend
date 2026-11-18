@@ -396,8 +396,9 @@ export class GamificationListener {
     }
   }
 
-  // Owner policy (reward-eligibility.ts): vocabulary outside the Arena earns
-  // no XP, Bánh mì or quest progress. Mastery itself is stored by VocabService.
+  // Owner policy (reward-eligibility.ts): a flashcard word pays only XP,
+  // awarded by VocabService (awardVocabWordXp, owner 2026-11-18); it earns no
+  // Bánh mì or quest progress here. Mastery itself is stored by VocabService.
   @OnEvent('vocab.learned')
   // eslint-disable-next-line @typescript-eslint/require-await
   async handleVocabLearnedEvent(payload: {
@@ -408,7 +409,7 @@ export class GamificationListener {
     source?: string;
   }): Promise<void> {
     this.logger.log(
-      `vocab.learned for user ${payload.userId} (${payload.count}): not a rewarded activity, no reward`,
+      `vocab.learned for user ${payload.userId} (${payload.count}): XP only, awarded by VocabService; no Bánh mì or quest`,
     );
   }
 
