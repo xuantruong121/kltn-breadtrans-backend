@@ -75,7 +75,7 @@ export function evaluatePromo(input: {
   planCode: string;
   userId: number;
   listPriceVnd: number;
-  /** Completed purchases of this learner that used the code. */
+  /** Completed purchases of this learner that used the code, plus their open payments with it for another plan version. */
   usedByUser: number;
   /** Completed purchases that used the code, plus other learners' open payments with it. */
   usedTotal: number;

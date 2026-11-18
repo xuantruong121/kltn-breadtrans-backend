@@ -1283,7 +1283,7 @@ export class PlanPurchaseService {
     tx: Prisma.TransactionClient,
     input: {
       studentId: number;
-      version: { priceVnd: number | null; plan: { code: string } };
+      version: { id: number; priceVnd: number | null; plan: { code: string } };
       code?: string | null;
       promoCodeId?: number | null;
     },
@@ -1313,9 +1313,22 @@ export class PlanPurchaseService {
     if (promo) {
       const lockKey = `promo:${promo.id}`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
-      const [mine, redeemed, openByOthers] = await Promise.all([
+      const [mine, mineOpen, redeemed, openByOthers] = await Promise.all([
         tx.promoRedemption.count({
           where: { promoCodeId: promo.id, userId: input.studentId },
+        }),
+        // The learner's own open purchases of another plan version that hold
+        // the code count as a use (audit R7, 2026-11-18): otherwise Plus and
+        // Pro could both be opened, and paid, at the once-only discount. An
+        // open purchase of this version is about to be replaced, so it is not
+        // counted.
+        tx.planPurchase.count({
+          where: {
+            promoCodeId: promo.id,
+            status: PlanPurchaseStatus.PENDING_PAYMENT,
+            userId: input.studentId,
+            planVersionId: { not: input.version.id },
+          },
         }),
         tx.promoRedemption.count({ where: { promoCodeId: promo.id } }),
         tx.planPurchase.count({
@@ -1326,7 +1339,7 @@ export class PlanPurchaseService {
           },
         }),
       ]);
-      usedByUser = mine;
+      usedByUser = mine + mineOpen;
       usedTotal = redeemed + openByOthers;
     }
     const decision = evaluatePromo({
