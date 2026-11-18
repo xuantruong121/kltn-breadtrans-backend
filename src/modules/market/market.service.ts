@@ -255,12 +255,16 @@ export class MarketService {
         };
       }
 
-      // 2a. Trừ tồn kho Stock theo CAS nguyên tử
+      // 2a. Trừ tồn kho Stock theo CAS nguyên tử. The price and the on-sale
+      // flag are part of it (audit R12, 2026-11-18): a gift repriced or taken
+      // off sale after the catalog read above was sold at the old price.
       for (const { product, quantity } of resolvedItems) {
         const stockResult = await tx.marketProduct.updateMany({
           where: {
             id: product.id,
             stock: { gte: quantity },
+            isActive: true,
+            price: product.price,
           },
           data: {
             stock: { decrement: quantity },
@@ -270,7 +274,7 @@ export class MarketService {
 
         if (stockResult.count === 0) {
           throw new BadRequestException(
-            `Sản phẩm "${product.name}" đã hết hàng hoặc không đủ tồn kho (cần ${quantity})`,
+            `Quà "${product.name}" vừa đổi giá, ngừng bán hoặc không đủ tồn kho (cần ${quantity}). Tải lại trang rồi thử lại.`,
           );
         }
       }

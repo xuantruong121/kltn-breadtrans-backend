@@ -365,6 +365,37 @@ describe('MarketService', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('a gift repriced or taken off sale after the catalog read is refused and charges nothing (audit R12)', async () => {
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([
+        mockDigitalProduct,
+      ]);
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Digital Learner',
+      });
+      const stock = jest.fn().mockResolvedValue({ count: 0 });
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) =>
+          callback({
+            $executeRaw: jest.fn(),
+            marketOrder: { findUnique: jest.fn().mockResolvedValue(null) },
+            marketProduct: { updateMany: stock },
+          }),
+      );
+
+      await expect(
+        service.createOrder(1, {
+          items: [{ id: 'streak-freeze', quantity: 1 }],
+        }),
+      ).rejects.toThrow('đổi giá');
+      expect(stock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1, stock: { gte: 1 }, isActive: true, price: 20 },
+        }),
+      );
+      expect(mockGamificationService.deductBanh).not.toHaveBeenCalled();
+    });
+
     it('blocks physical item redemption when user has no shipping profile, with 0 balance deduction', async () => {
       mockPrismaService.marketProduct.findMany.mockResolvedValue([
         mockPhysicalProduct,
