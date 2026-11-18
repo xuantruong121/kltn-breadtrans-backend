@@ -1520,20 +1520,32 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  /** A refused or failed write leaves no new file, unless the row already showed it. */
+  /**
+   * A refused or failed write leaves no new file. The admin paths upload to
+   * a new key each time (uploadSuffix), so this never deletes a file a row
+   * shows.
+   */
   private async writeOrDropUpload<T>(
     setId: number,
     uploadedKey: string,
-    alreadyShown: boolean,
     work: (tx: Prisma.TransactionClient) => Promise<T>,
   ) {
     try {
       return await this.draftWrite(setId, work);
     } catch (error) {
-      if (!alreadyShown)
-        await this.r2.deleteFile(uploadedKey).catch(() => undefined);
+      await this.r2.deleteFile(uploadedKey).catch(() => undefined);
       throw error;
     }
+  }
+
+  /**
+   * A new key for every regenerated file (audit follow-up 2026-11-18): a
+   * fixed key was written over before the draft check, so an exam published
+   * meanwhile played or showed the new file. The old file is kept: a cloned
+   * exam may point at it too.
+   */
+  private uploadSuffix() {
+    return randomUUID().slice(0, 8);
   }
 
   private async editableDraft(examId: number) {
@@ -1720,11 +1732,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (!brief) continue;
         await attempt(`Speaking câu ${exercise.order}`, async () => {
           const image = await this.sourceExamImage(
-            `exam-${examId}/speaking/${exercise.order}`,
+            `exam-${examId}/speaking/${exercise.order}-${this.uploadSuffix()}`,
             brief,
             1,
           );
-          await this.writeOrDropUpload(setId, image.key, false, (tx) =>
+          await this.writeOrDropUpload(setId, image.key, (tx) =>
             tx.speakingExercise.update({
               where: { id: exercise.id },
               data: { imageUrl: image.url },
@@ -1748,11 +1760,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         if (!brief || !question || content.imageUrl) continue;
         await attempt(`Writing câu ${item.order}`, async () => {
           const image = await this.sourceExamImage(
-            `exam-${examId}/writing/${item.order}`,
+            `exam-${examId}/writing/${item.order}-${this.uploadSuffix()}`,
             brief,
             1,
           );
-          await this.writeOrDropUpload(setId, image.key, false, (tx) =>
+          await this.writeOrDropUpload(setId, image.key, (tx) =>
             tx.question.update({
               where: { id: question.id },
               data: {
@@ -1790,7 +1802,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         );
       try {
         const image = await this.sourceExamImage(
-          `exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated`,
+          `exam-${exam.toeicExamSet!.id}/groups/${group.id}/image-regenerated-${this.uploadSuffix()}`,
           group.imageBrief,
           1,
         );
@@ -1813,7 +1825,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         const updated = await this.writeOrDropUpload(
           group.examId,
           image.key,
-          image.url === group.imageUrl,
           (tx) =>
             tx.toeicQuestionGroup.update({
               where: { id: group.id },
@@ -1843,7 +1854,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       // Exam Listening audio goes to the private bucket; the group stores the
       // key and learners hear it only through /toeic/groups/:id/audio.
       const uploaded = await this.r2.putPrivateObjectAtKey(
-        `premium/listening/toeic/exams/${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated.mp3`,
+        `premium/listening/toeic/exams/${exam.toeicExamSet!.id}/groups/${group.id}/audio-regenerated-${this.uploadSuffix()}.mp3`,
         audio,
         'audio/mpeg',
       );
@@ -1857,18 +1868,14 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         sourceHash,
         scriptVersion: TOEIC_LISTENING_AUDIO_SCRIPT_VERSION,
       };
-      return await this.writeOrDropUpload(
-        group.examId,
-        uploaded.key,
-        uploaded.key === group.audioUrl,
-        (tx) =>
-          tx.toeicQuestionGroup.update({
-            where: { id: group.id },
-            data: {
-              audioUrl: uploaded.key,
-              mediaMetadata: metadata as Prisma.InputJsonValue,
-            },
-          }),
+      return await this.writeOrDropUpload(group.examId, uploaded.key, (tx) =>
+        tx.toeicQuestionGroup.update({
+          where: { id: group.id },
+          data: {
+            audioUrl: uploaded.key,
+            mediaMetadata: metadata as Prisma.InputJsonValue,
+          },
+        }),
       );
     } catch (error) {
       if (error instanceof ExamNotDraftException) throw error;

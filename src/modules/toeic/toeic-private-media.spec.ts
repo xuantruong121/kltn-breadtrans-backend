@@ -280,7 +280,9 @@ describe('AI exam audio regeneration', () => {
       examId: 9,
       part: 1,
       canonicalAccent: 'US',
-      audioUrl: 'premium/listening/toeic/exams/9/groups/2/audio.mp3',
+      // The live exam plays the file an earlier regeneration made.
+      audioUrl:
+        'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
       transcriptText: null,
       passageText: null,
       mediaMetadata: {},
@@ -313,9 +315,12 @@ describe('AI exam audio regeneration', () => {
       'xuất bản',
     );
     expect(service.prisma.toeicQuestionGroup.update).not.toHaveBeenCalled();
-    expect(service.r2.deleteFile).toHaveBeenCalledWith(
-      'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
-    );
+    // The new audio went to a new key: the live file was never written over,
+    // and only the new one is deleted.
+    const uploadedKey = service.r2.putPrivateObjectAtKey.mock.calls[0][0];
+    expect(uploadedKey).not.toBe(group.audioUrl);
+    expect(service.r2.deleteFile).toHaveBeenCalledWith(uploadedKey);
+    expect(service.r2.deleteFile).not.toHaveBeenCalledWith(group.audioUrl);
   });
 
   it('writes the audio to the private bucket and stores the key', async () => {
@@ -356,12 +361,16 @@ describe('AI exam audio regeneration', () => {
       putObjectAtKey: jest.fn(),
     };
     const data = await service.regenerateMedia(4, 2, 'audio');
+    await service.regenerateMedia(4, 2, 'audio');
     expect(service.r2.putObjectAtKey).not.toHaveBeenCalled();
-    expect(service.r2.putPrivateObjectAtKey.mock.calls[0][0]).toBe(
-      'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
+    const [first, second] = service.r2.putPrivateObjectAtKey.mock.calls.map(
+      (call: string[]) => call[0],
     );
-    expect(data.audioUrl).toBe(
-      'premium/listening/toeic/exams/9/groups/2/audio-regenerated.mp3',
+    // A new key each time: an earlier file stays as it was (2026-11-18).
+    expect(first).toMatch(
+      /^premium\/listening\/toeic\/exams\/9\/groups\/2\/audio-regenerated-[0-9a-f]{8}\.mp3$/,
     );
+    expect(second).not.toBe(first);
+    expect(data.audioUrl).toBe(first);
   });
 });
