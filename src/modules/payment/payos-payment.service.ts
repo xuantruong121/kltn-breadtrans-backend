@@ -412,14 +412,13 @@ export class PayosPaymentService {
   private async fulfill(intent: IntentWithTarget): Promise<void> {
     if (intent.type === PayOSPaymentIntentType.PLAN && intent.planPayment) {
       const plans = this.moduleRef.get<{
-        confirmPurchaseFromWebhook: (
-          purchaseId: number,
-          bankTransactionId?: number,
-        ) => Promise<unknown>;
+        confirmPaidOrHold: (purchaseId: number) => Promise<unknown>;
       }>('PlanPurchaseService', {
         strict: false,
       });
-      await plans.confirmPurchaseFromWebhook(intent.planPayment.planPurchaseId);
+      // The same step as the webhook: confirmed, or held for an admin when
+      // the purchase expired or was replaced (audit R2, 2026-11-18).
+      await plans.confirmPaidOrHold(intent.planPayment.planPurchaseId);
       return;
     }
   }

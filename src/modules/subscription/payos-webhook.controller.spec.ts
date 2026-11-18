@@ -1,5 +1,10 @@
 import { ConflictException } from '@nestjs/common';
 import { PayosWebhookController } from './payos-webhook.controller';
+import { PlanPurchaseService } from './plan-purchase.service';
+
+// The controller hands the money to PlanPurchaseService.confirmPaidOrHold;
+// the real method runs here over the mocked confirm and hold steps.
+const { confirmPaidOrHold } = PlanPurchaseService.prototype;
 
 describe('PayosWebhookController', () => {
   it('returns success for the PayOS endpoint verification probe', () => {
@@ -20,6 +25,7 @@ describe('PayosWebhookController', () => {
     };
     const plans = {
       confirmPurchaseFromWebhook: jest.fn().mockResolvedValue({}),
+      confirmPaidOrHold,
     };
     const controller = new PayosWebhookController(
       payos as never,
@@ -57,6 +63,7 @@ describe('PayosWebhookController', () => {
       const plans = {
         confirmPurchaseFromWebhook: jest.fn().mockRejectedValue(confirmError),
         holdPaidPurchaseForReview: jest.fn().mockResolvedValue(held),
+        confirmPaidOrHold,
       };
       return {
         payos,

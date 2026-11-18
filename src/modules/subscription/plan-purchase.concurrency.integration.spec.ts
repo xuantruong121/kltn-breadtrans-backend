@@ -173,6 +173,37 @@ describeWithIsolatedDatabase(
       ).toBe(2);
     });
 
+    it('money paid on a QR already replaced waits for an admin, who can confirm it (audit R2)', async () => {
+      const first = await service.createPurchase(
+        userId,
+        planVersionId,
+        `r2-old-qr-${Date.now()}`,
+      );
+      purchaseIds.push(first.id);
+      const replacement = await service.replacePayment(userId, first.id);
+      purchaseIds.push(replacement.id);
+
+      // The old QR's money arrives (webhook or the learner's status check).
+      await expect(service.confirmPaidOrHold(first.id)).resolves.toBe('REVIEW');
+      const held = await prisma.planPurchase.findUnique({
+        where: { id: first.id },
+        include: { payment: true },
+      });
+      expect(held?.status).toBe(PlanPurchaseStatus.EXPIRED);
+      expect(held?.payment?.status).toBe(PlanPaymentStatus.REVIEW_REQUIRED);
+      // The webhook and the status check may both report it: still held.
+      await expect(service.confirmPaidOrHold(first.id)).resolves.toBe('REVIEW');
+
+      await service.confirmPurchase(first.id, userId);
+      const confirmed = await prisma.planPurchase.findUnique({
+        where: { id: first.id },
+        include: { payment: true, subscription: true },
+      });
+      expect(confirmed?.status).toBe(PlanPurchaseStatus.COMPLETED);
+      expect(confirmed?.payment?.status).toBe(PlanPaymentStatus.CONFIRMED);
+      expect(confirmed?.subscription).not.toBeNull();
+    });
+
     async function createReportedPurchase(
       key: string,
       targetVersionId = planVersionId,

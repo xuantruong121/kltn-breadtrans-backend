@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -40,20 +39,10 @@ export class PayosWebhookController {
     // is acknowledged (so PayOS stops retrying) but grants nothing and stays
     // unfulfilled for review.
     if (intent.type !== 'PLAN' || !intent.planPayment) return { success: true };
-    const purchaseId = intent.planPayment.planPurchaseId;
-    try {
-      await this.plans.confirmPurchaseFromWebhook(purchaseId, undefined);
-    } catch (error) {
-      // The money is real but cannot be applied automatically, typically a
-      // payment that arrived after the purchase expired. It waits for an
-      // admin instead of being refused, which would leave it nowhere.
-      if (
-        !(error instanceof ConflictException) ||
-        !(await this.plans.holdPaidPurchaseForReview(purchaseId))
-      ) {
-        throw error;
-      }
-    }
+    // The money is real. When it cannot be applied automatically (it arrived
+    // after the purchase expired, or for a QR already replaced) it waits for
+    // an admin instead of being refused, which would leave it nowhere.
+    await this.plans.confirmPaidOrHold(intent.planPayment.planPurchaseId);
     await this.payos.markWebhookFulfilled(intent.id);
     return { success: true };
   }

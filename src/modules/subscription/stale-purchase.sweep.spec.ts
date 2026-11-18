@@ -260,11 +260,37 @@ describe('PlanPurchaseService.holdPaidPurchaseForReview', () => {
     });
   });
 
+  it('holds a payment made with a QR the learner had already replaced (audit R2)', async () => {
+    const { held, tx } = await run(
+      PlanPurchaseStatus.SUPERSEDED,
+      PlanPaymentStatus.SUPERSEDED,
+    );
+
+    expect(held).toBe(true);
+    expect(tx.planPayment.update).toHaveBeenCalledWith({
+      where: { id: 21 },
+      data: { status: PlanPaymentStatus.REVIEW_REQUIRED },
+    });
+    expect(tx.planPurchase.update).toHaveBeenCalledWith({
+      where: { id: 31 },
+      data: { status: PlanPurchaseStatus.EXPIRED },
+    });
+  });
+
+  it('answers true again for a payment already held, writing nothing', async () => {
+    const { held, tx } = await run(
+      PlanPurchaseStatus.EXPIRED,
+      PlanPaymentStatus.REVIEW_REQUIRED,
+    );
+
+    expect(held).toBe(true);
+    expect(tx.planPayment.update).not.toHaveBeenCalled();
+    expect(tx.planPurchase.update).not.toHaveBeenCalled();
+  });
+
   it.each([
     [PlanPurchaseStatus.COMPLETED, PlanPaymentStatus.CONFIRMED],
     [PlanPurchaseStatus.REJECTED, PlanPaymentStatus.REJECTED],
-    [PlanPurchaseStatus.SUPERSEDED, PlanPaymentStatus.SUPERSEDED],
-    [PlanPurchaseStatus.EXPIRED, PlanPaymentStatus.REVIEW_REQUIRED],
   ])('leaves a %s purchase with a %s payment as it is', async (s, p) => {
     const { held, tx } = await run(s, p);
 
