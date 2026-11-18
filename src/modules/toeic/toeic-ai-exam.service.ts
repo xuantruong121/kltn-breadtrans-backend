@@ -18,7 +18,7 @@ import {
   SpeakingStimulusKind,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
-import { DelayedError, Job, Queue, Worker } from 'bullmq';
+import { DelayedError, Job, Queue, UnrecoverableError, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
@@ -305,6 +305,24 @@ function imageDimensions(
   }
   return null;
 }
+
+/**
+ * The admin cancelled the job while the worker ran (audit A6, 2026-11-18).
+ * Unrecoverable, so BullMQ never retries it; process() stops without
+ * writing FAILED over CANCELLED.
+ */
+class GenerationCancelledError extends UnrecoverableError {
+  constructor() {
+    super('Generation cancelled by Admin');
+  }
+}
+
+/** Statuses after which a job can no longer be cancelled. */
+const UNCANCELLABLE: AiGenerationJobStatus[] = [
+  AiGenerationJobStatus.GENERATED,
+  AiGenerationJobStatus.APPROVED,
+  AiGenerationJobStatus.PUBLISHED,
+];
 
 /** How long one Apply may hold its job; a crashed one frees it after this. */
 const APPLY_LOCK_MS = 15 * 60_000;
@@ -1108,18 +1126,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     });
     if (!job || job.createdByAdminId !== adminId)
       throw new NotFoundException('Không tìm thấy job tạo đề TOEIC AI');
-    const terminalStatuses: AiGenerationJobStatus[] = [
-      AiGenerationJobStatus.GENERATED,
-      AiGenerationJobStatus.APPROVED,
-      AiGenerationJobStatus.PUBLISHED,
-    ];
-    if (terminalStatuses.includes(job.status)) {
-      throw new ConflictException(
+    const refused = () =>
+      new ConflictException(
         'Bản nháp đã sẵn sàng review nên không thể hủy job',
       );
-    }
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
+    if (UNCANCELLABLE.includes(job.status)) throw refused();
+    // Only a job still running or waiting is cancelled: a worker that wrote
+    // GENERATED meanwhile keeps its candidate (audit A6, 2026-11-18).
+    const { count } = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: UNCANCELLABLE } },
       data: {
         status: AiGenerationJobStatus.CANCELLED,
         resultSnapshot: {
@@ -1128,8 +1143,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+    if (count === 0) throw refused();
     const queued = await this.queue.getJob(jobId);
-    if (queued) await queued.remove();
+    // A job the worker is running is locked and cannot be removed: it stops
+    // at its next checkpoint instead. Removing it used to answer 500.
+    if (queued)
+      await queued
+        .remove()
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `toeic_ai_job_cancel_running jobId=${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
     return this.status(jobId);
   }
 
@@ -2020,7 +2045,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       select: { resultSnapshot: true, status: true },
     });
     if (job.status === AiGenerationJobStatus.CANCELLED)
-      throw new Error('Generation cancelled by Admin');
+      throw new GenerationCancelledError();
     const current = (job.resultSnapshot as any) ?? {};
     await this.prisma.aiGenerationJob.update({
       where: { id: jobId },
@@ -3551,14 +3576,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       | { kind: 'speaking-writing' }
       | undefined;
     try {
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      // Not over a cancel that landed after the read above (audit A6).
+      const started = await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: { not: AiGenerationJobStatus.CANCELLED } },
         data: {
           status: AiGenerationJobStatus.PROCESSING,
           startedAt: new Date(),
           errorSummary: null,
         },
       });
+      if (started.count === 0) return;
       const existingAttempts = exam.toeicExamSet
         ? await this.prisma.toeicAttempt.count({
             where: { examId: exam.toeicExamSet.id },
@@ -3778,8 +3805,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         where: { id: jobId },
         select: { resultSnapshot: true },
       });
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      // Only from PROCESSING: a cancel after the last checkpoint wins.
+      await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: AiGenerationJobStatus.PROCESSING },
         data: {
           status: AiGenerationJobStatus.GENERATED,
           completedAt: new Date(),
@@ -3806,6 +3834,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       });
     } catch (error) {
+      // Cancelled by the admin: stop here, CANCELLED stays (audit A6).
+      if (error instanceof GenerationCancelledError) {
+        this.logger.log(`toeic_ai_job_cancelled jobId=${jobId}`);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       // Every provider out (quota spent or down): wait for the reset and
       // resume from the checkpoint rather than failing (ai-job-quota-wait).
@@ -3829,8 +3862,11 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           })
         : null;
       if (resumeAt && token) {
-        await this.prisma.aiGenerationJob.update({
-          where: { id: jobId },
+        const waiting = await this.prisma.aiGenerationJob.updateMany({
+          where: {
+            id: jobId,
+            status: { not: AiGenerationJobStatus.CANCELLED },
+          },
           data: {
             status: AiGenerationJobStatus.QUEUED,
             errorSummary: message.slice(0, 1000),
@@ -3851,14 +3887,15 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
             ] as Prisma.InputJsonValue,
           },
         });
+        if (waiting.count === 0) return;
         this.logger.warn(
           `toeic_ai_job_waiting_quota jobId=${jobId} resumeAt=${resumeAt.toISOString()} wait=${waitsSoFar + 1}`,
         );
         await queueJob.moveToDelayed(resumeAt.getTime(), token);
         throw new DelayedError();
       }
-      await this.prisma.aiGenerationJob.update({
-        where: { id: jobId },
+      const failed = await this.prisma.aiGenerationJob.updateMany({
+        where: { id: jobId, status: { not: AiGenerationJobStatus.CANCELLED } },
         data: {
           status: AiGenerationJobStatus.FAILED,
           completedAt: new Date(),
@@ -3874,6 +3911,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           ] as Prisma.InputJsonValue,
         },
       });
+      // Cancelled while failing: nothing to retry.
+      if (failed.count === 0) return;
       throw error;
     }
   }

@@ -143,6 +143,24 @@ function harness(
           runtimeJob.approvedSnapshot = data.approvedSnapshot;
         return runtimeJob;
       }),
+      // Job writes are CAS on the status (audit A6/A7).
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const cond = where.status;
+        const ok =
+          cond === undefined ||
+          (typeof cond === 'string'
+            ? runtimeJob.status === cond
+            : cond.not !== undefined
+              ? runtimeJob.status !== cond.not
+              : cond.in
+                ? cond.in.includes(runtimeJob.status)
+                : cond.notIn
+                  ? !cond.notIn.includes(runtimeJob.status)
+                  : true);
+        if (!ok) return { count: 0 };
+        await prisma.aiGenerationJob.update({ data });
+        return { count: 1 };
+      }),
     },
     exam: {
       findUnique: jest.fn(async () => ({
