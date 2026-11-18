@@ -380,14 +380,12 @@ export class MarketService {
             },
           });
           if (badge) {
-            const existing = await tx.userBadge.findUnique({
-              where: { userId_badgeId: { userId, badgeId: badge.id } },
+            // ON CONFLICT DO NOTHING (audit C5): two checkouts at once no
+            // longer roll the whole order back on the unique badge.
+            await tx.userBadge.createMany({
+              data: [{ userId, badgeId: badge.id }],
+              skipDuplicates: true,
             });
-            if (!existing) {
-              await tx.userBadge.create({
-                data: { userId, badgeId: badge.id },
-              });
-            }
           }
         }
       }

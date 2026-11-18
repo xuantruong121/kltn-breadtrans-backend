@@ -1122,14 +1122,14 @@ export class GamificationService {
     });
     if (!badge) return false;
 
-    const exists = await client.userBadge.findUnique({
-      where: { userId_badgeId: { userId, badgeId: badge.id } },
+    // INSERT ... ON CONFLICT DO NOTHING (audit C5, 2026-11-18): the same
+    // badge earned by two paths at once failed the second create on the
+    // unique key, and the quiz job then skipped the rest of its rewards.
+    const { count } = await client.userBadge.createMany({
+      data: [{ userId, badgeId: badge.id }],
+      skipDuplicates: true,
     });
-    if (exists) return false;
-
-    await client.userBadge.create({
-      data: { userId, badgeId: badge.id },
-    });
+    if (count === 0) return false;
 
     this.logger.log(`Awarded badge "${badgeName}" to user ${userId}`);
 
@@ -1692,19 +1692,24 @@ export class GamificationService {
         },
       };
 
-      pet = await this.prisma.userPet.create({
-        data: {
-          userId,
-          name: 'Bánh Mì Dũng Cảm',
-          health: 100,
-          happiness: 100,
-          level: 1,
-          exp: 0,
-          roster: initialRoster as any,
-        } as any,
+      // INSERT ... ON CONFLICT DO NOTHING, then read (audit C5): two first
+      // visits at once (two tabs) failed the second create on the unique
+      // userId with a 500. The row that won is the one returned.
+      await this.prisma.userPet.createMany({
+        data: [
+          {
+            userId,
+            name: 'Bánh Mì Dũng Cảm',
+            health: 100,
+            happiness: 100,
+            level: 1,
+            exp: 0,
+            roster: initialRoster as any,
+          } as any,
+        ],
+        skipDuplicates: true,
       });
-
-      return this.withPetFeedStatus(pet, initialRoster.bready);
+      pet = (await this.prisma.userPet.findUnique({ where: { userId } }))!;
     }
 
     let settled = this.settlePet(pet, now, today);

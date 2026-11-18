@@ -88,21 +88,13 @@ export class GamificationListener {
           where: { name: 'Thợ săn điểm số' },
         });
         if (firstBadge && leaderboard && leaderboard.totalPoints >= 100) {
-          const userBadgeExists = await this.prisma.userBadge.findUnique({
-            where: {
-              userId_badgeId: {
-                userId: payload.userId,
-                badgeId: firstBadge.id,
-              },
-            },
+          // ON CONFLICT DO NOTHING (audit C5): a badge given by another
+          // path at the same moment no longer fails this whole handler.
+          const { count } = await this.prisma.userBadge.createMany({
+            data: [{ userId: payload.userId, badgeId: firstBadge.id }],
+            skipDuplicates: true,
           });
-          if (!userBadgeExists) {
-            await this.prisma.userBadge.create({
-              data: {
-                userId: payload.userId,
-                badgeId: firstBadge.id,
-              },
-            });
+          if (count === 1) {
             this.logger.log(
               `Awarded badge ${firstBadge.name} to user ${payload.userId}`,
             );
