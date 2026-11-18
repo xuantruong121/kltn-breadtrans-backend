@@ -362,9 +362,12 @@ describe('GamificationService weekly cron hardening', () => {
     it('appends one compensating BanhTransaction row, leaving UserStats untouched', async () => {
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
+        // The gap measured again under the UserStats lock (audit R13).
+        $queryRaw: jest.fn().mockResolvedValue([{ totalBanhRan: 101 }]),
         banhTransaction: {
           findUnique: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({ id: 1 }),
+          aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 66 } }),
         },
         userStats: {
           findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 101 }),
@@ -399,6 +402,29 @@ describe('GamificationService weekly cron hardening', () => {
       // The whole point of this primitive: totalBanhRan is never written.
       expect(tx.userStats.update).not.toHaveBeenCalled();
       expect(tx.userStats.upsert).not.toHaveBeenCalled();
+    });
+
+    it('a gap that changed since the report was read is not written (audit R13)', async () => {
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest.fn().mockResolvedValue([{ totalBanhRan: 101 }]),
+        banhTransaction: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn(),
+          // A reward landed after the report: the gap is now 21, not 35.
+          aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 80 } }),
+        },
+        userStats: { findUnique: jest.fn() },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(prisma, {} as any, {} as any);
+
+      const res = await service.appendLegacyReconciliationEntry(2, 35, 'r');
+
+      expect(res).toMatchObject({ applied: false, gapChanged: true });
+      expect(tx.banhTransaction.create).not.toHaveBeenCalled();
     });
 
     it('is idempotent — a second call for the same user is a no-op, not a duplicate entry', async () => {

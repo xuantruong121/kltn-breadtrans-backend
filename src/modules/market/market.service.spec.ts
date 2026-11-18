@@ -797,6 +797,13 @@ describe('MarketService', () => {
   });
 
   describe('getReconciliationReport — read-only drift detection', () => {
+    // One REPEATABLE READ snapshot for the four reads (audit R13).
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
+
     it('classifies CONSISTENT / DRIFT_POSITIVE / DRIFT_NEGATIVE without mutating anything', async () => {
       mockPrismaService.userStats.findMany.mockResolvedValue([
         { userId: 1, totalBanhRan: 100 }, // consistent
@@ -817,6 +824,10 @@ describe('MarketService', () => {
       );
 
       const report = await service.getReconciliationReport();
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: 'RepeatableRead' },
+      );
 
       expect(report.totalUsers).toBe(3);
       expect(report.driftCount).toBe(2);
@@ -847,6 +858,12 @@ describe('MarketService', () => {
   });
 
   describe('runLegacyReconciliation — explicitly-scoped, idempotent one-time correction', () => {
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
+
     beforeEach(() => {
       mockPrismaService.userStats.findMany.mockResolvedValue([
         { userId: 2, totalBanhRan: 101 },
@@ -969,6 +986,11 @@ describe('MarketService', () => {
   });
 
   describe('getUserLedgerHistory — per-learner ledger, never CurrencyTransaction', () => {
+    beforeEach(() =>
+      mockPrismaService.$transaction.mockImplementation((run: any) =>
+        run(mockPrismaService),
+      ),
+    );
     it('returns current balance, reconciliation status and BanhTransaction history', async () => {
       mockPrismaService.userStats.findUnique.mockResolvedValue({
         totalBanhRan: 101,

@@ -466,6 +466,8 @@ export class GamificationService {
     applied: boolean;
     alreadyApplied: boolean;
     balanceAfter: number;
+    /** The gap is no longer `delta`: nothing written, run the report again. */
+    gapChanged?: boolean;
   }> {
     if (delta === 0) {
       const stats = await this.prisma.userStats.findUnique({
@@ -496,6 +498,26 @@ export class GamificationService {
           balanceAfter: stats?.totalBanhRan ?? 0,
         };
       }
+
+      // The gap is measured again with the balance row locked (audit R13,
+      // 2026-11-18): the report's four reads were not one snapshot, and a
+      // reward between them gave a false gap that this one-shot correction
+      // would make permanent. Every balance writer locks UserStats before its
+      // ledger row, so the sum read after the lock matches the balance.
+      const [locked] = await tx.$queryRaw<{ totalBanhRan: number }[]>`
+        SELECT "totalBanhRan" FROM "UserStats" WHERE "userId" = ${userId} FOR UPDATE`;
+      const ledger = await tx.banhTransaction.aggregate({
+        where: { userId },
+        _sum: { amount: true },
+      });
+      const balance = locked?.totalBanhRan ?? 0;
+      if (balance - (ledger._sum.amount ?? 0) !== delta)
+        return {
+          applied: false,
+          alreadyApplied: false,
+          balanceAfter: balance,
+          gapChanged: true,
+        };
 
       await tx.banhTransaction.create({
         data: {

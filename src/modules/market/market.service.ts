@@ -14,6 +14,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { isStreakShieldProduct } from '../gamification/streak-shield.logic';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
 import { CreateMarketOrderDto } from './dto/create-order.dto';
@@ -1089,22 +1090,29 @@ export class MarketService {
    * remediation, not a repair action.
    */
   async getReconciliationReport() {
-    const [allStats, ledgerSums, lastTx, users] = await Promise.all([
-      this.prisma.userStats.findMany({
-        select: { userId: true, totalBanhRan: true },
-      }),
-      this.prisma.banhTransaction.groupBy({
-        by: ['userId'],
-        _sum: { amount: true },
-      }),
-      this.prisma.banhTransaction.groupBy({
-        by: ['userId'],
-        _max: { createdAt: true },
-      }),
-      this.prisma.user.findMany({
-        select: { id: true, profile: { select: { fullName: true } } },
-      }),
-    ]);
+    // One snapshot for the four reads (audit R13, 2026-11-18): read apart, a
+    // reward between the balances and the ledger sums showed a false drift.
+    const [allStats, ledgerSums, lastTx, users] =
+      await this.prisma.$transaction(
+        (tx) =>
+          Promise.all([
+            tx.userStats.findMany({
+              select: { userId: true, totalBanhRan: true },
+            }),
+            tx.banhTransaction.groupBy({
+              by: ['userId'],
+              _sum: { amount: true },
+            }),
+            tx.banhTransaction.groupBy({
+              by: ['userId'],
+              _max: { createdAt: true },
+            }),
+            tx.user.findMany({
+              select: { id: true, profile: { select: { fullName: true } } },
+            }),
+          ]),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
 
     const ledgerByUser = new Map(
       ledgerSums.map((row) => [row.userId, row._sum.amount ?? 0]),
@@ -1192,6 +1200,12 @@ export class MarketService {
         delta: row.delta,
         applied: outcome.applied,
         alreadyApplied: outcome.alreadyApplied,
+        ...(outcome.gapChanged
+          ? {
+              skippedReason:
+                'Chênh lệch vừa thay đổi trong lúc chạy; hãy xem lại báo cáo rồi chạy lại.',
+            }
+          : {}),
       });
     }
 
