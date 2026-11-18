@@ -647,6 +647,7 @@ describe('GamificationService weekly cron hardening', () => {
           .mockResolvedValueOnce([
             { id: 10, currentValue: 8, isCompleted: false },
           ]) // UserQuestProgress lock
+          .mockResolvedValueOnce([]) // UserStats row lock (streak, audit R4)
           .mockResolvedValueOnce([]) // INSERT DailyBanhEarning
           .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]), // SELECT DailyBanhEarning lock
         userQuestProgress: {
@@ -1273,9 +1274,10 @@ describe('GamificationService weekly cron hardening', () => {
               },
             ])
             .mockResolvedValueOnce([]),
-          update: jest.fn().mockImplementation((args) => {
+          // The rollover writes only while the row still misses a day (R4).
+          updateMany: jest.fn().mockImplementation((args) => {
             updates.push(args);
-            return Promise.resolve(args);
+            return Promise.resolve({ count: 1 });
           }),
         },
         gameSettings: {
@@ -1296,7 +1298,12 @@ describe('GamificationService weekly cron hardening', () => {
       const res = await service.triggerDailyCron('2026-09-16');
       expect(res.success).toBe(true);
       expect(updates[0]).toEqual({
-        where: { id: 10 },
+        where: {
+          id: 10,
+          streakCount: { gt: 0 },
+          lastStreakUpdate: { lt: expect.any(Date) },
+          streakFreezes: { lte: 0 },
+        },
         data: { streakCount: 0 },
       });
       // lastStreakUpdate should NOT be updated in the data payload
@@ -1306,6 +1313,7 @@ describe('GamificationService weekly cron hardening', () => {
     it('restores streak to 1 when user studies on same day if streakCount is 0', async () => {
       const tx: any = {
         $executeRaw: jest.fn().mockResolvedValue(1),
+        $queryRaw: jest.fn().mockResolvedValue([]),
         userStats: {
           findUnique: jest.fn().mockResolvedValue({
             userId: 15,

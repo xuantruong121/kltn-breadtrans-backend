@@ -1131,6 +1131,10 @@ export class GamificationService {
     const run = async (client: Prisma.TransactionClient) => {
       try {
         await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`streak:${userId}`}))`;
+        // The row too: a nightly batch writing it now is waited for, and the
+        // read below sees what it committed (audit R4, 2026-11-18). The job
+        // never takes the advisory lock above, so this order cannot deadlock.
+        await client.$queryRaw`SELECT "id" FROM "UserStats" WHERE "userId" = ${userId} FOR UPDATE`;
         const now = new Date();
         // Use Vietnam timezone consistently for streak day boundaries
         const nowDateStr = getTodayDateKey('Asia/Ho_Chi_Minh');
@@ -2259,14 +2263,28 @@ export class GamificationService {
           take: batchSize,
         });
 
+        // Each write checks the row again (audit R4, 2026-11-18): a learner
+        // who studied after the read above (00:01) has a new
+        // lastStreakUpdate, so the shield is not taken twice and a restarted
+        // streak is not put back to 0. A write that waited on the learner's
+        // row lock re-checks against the committed row.
+        const stillMissed = {
+          streakCount: { gt: 0 },
+          lastStreakUpdate: { lt: previousDayStart },
+        };
         for (const stat of stats) {
           if (stat.streakFreezes > 0) {
-            await tx.userStats.update({
-              where: { id: stat.id },
+            const used = await tx.userStats.updateMany({
+              where: { id: stat.id, ...stillMissed, streakFreezes: { gt: 0 } },
               data: {
                 streakFreezes: { decrement: 1 },
                 lastStreakUpdate: processedAt,
               },
+            });
+            if (used.count === 0) continue;
+            const after = await tx.userStats.findUnique({
+              where: { id: stat.id },
+              select: { streakCount: true, streakFreezes: true },
             });
             // Same transaction as the shield it reports, so a retried batch
             // cannot tell the learner twice.
@@ -2274,14 +2292,14 @@ export class GamificationService {
               data: {
                 userId: stat.userId,
                 ...streakShieldUsedNotice({
-                  streak: stat.streakCount,
-                  remaining: stat.streakFreezes - 1,
+                  streak: after?.streakCount ?? stat.streakCount,
+                  remaining: after?.streakFreezes ?? stat.streakFreezes - 1,
                 }),
               },
             });
           } else {
-            await tx.userStats.update({
-              where: { id: stat.id },
+            await tx.userStats.updateMany({
+              where: { id: stat.id, ...stillMissed, streakFreezes: { lte: 0 } },
               data: { streakCount: 0 },
             });
           }
