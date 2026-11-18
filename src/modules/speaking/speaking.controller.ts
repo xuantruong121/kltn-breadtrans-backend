@@ -127,7 +127,9 @@ export class SpeakingController {
     );
   }
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  // The AI grading is taken in the service, after a replay is answered
+  // (audit follow-up 2026-11-18): the guard took one for a retried finalize.
+  @UseGuards(JwtAuthGuard)
   @Post('upload-intents/:uploadIntentId/finalize')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -146,7 +148,7 @@ export class SpeakingController {
     @Request() req: any,
     @Headers('x-trace-id') traceIdHeader?: string,
   ) {
-    return this.speakingService.finalizeUpload(
+    return this.speakingService.finalizeUploadForLearner(
       uploadIntentId,
       req.user.id,
       traceIdHeader,
@@ -154,7 +156,8 @@ export class SpeakingController {
     );
   }
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  // The AI grading is taken in the service (see finalize).
+  @UseGuards(JwtAuthGuard)
   @Post('exercises/:id/submit')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -211,7 +214,7 @@ export class SpeakingController {
     @Query('parentAttemptId') parentAttemptId?: string,
     @Query('parentComponentId') parentComponentId?: string,
   ) {
-    return this.speakingService.submitAudio(
+    return this.speakingService.submitAudioForLearner(
       exerciseId,
       req.user.id,
       audio,

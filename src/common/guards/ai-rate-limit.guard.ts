@@ -45,6 +45,27 @@ export async function takeAiGrading(
   return { key, limit, count, allowed: count <= limit };
 }
 
+/** The 429 a learner out of AI gradings gets, from the guard or a service. */
+export function aiQuotaExhausted(
+  planCode: PlanCode,
+  limit: number,
+  count: number,
+) {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.TOO_MANY_REQUESTS,
+      // The page tells this apart from other 429s and shows the
+      // out-of-gradings notice (owner 2026-11-13).
+      error: 'AI_QUOTA_EXHAUSTED',
+      message: aiGradingLimitMessage(planCode),
+      limit,
+      currentUsage: count,
+      planCode,
+    },
+    HttpStatus.TOO_MANY_REQUESTS,
+  );
+}
+
 /** Gives back a grading taken with takeAiGrading that was not used. */
 export async function returnAiGrading(redis: Redis, key: string) {
   await redis.decr(key);
@@ -92,21 +113,7 @@ export class AiRateLimitGuard implements CanActivate {
       res.setHeader('X-AI-Quota-Remaining', Math.max(0, limit - count));
     }
 
-    if (count > limit) {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          // The page tells this apart from other 429s and shows the
-          // out-of-gradings notice (owner 2026-11-13).
-          error: 'AI_QUOTA_EXHAUSTED',
-          message: aiGradingLimitMessage(planCode),
-          limit,
-          currentUsage: count,
-          planCode,
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    if (count > limit) throw aiQuotaExhausted(planCode, limit, count);
 
     return true;
   }

@@ -50,17 +50,18 @@ describe('SpeakingController - Security & AI Quota', () => {
     expect(guards).toContain(AiRateLimitGuard);
   });
 
-  it('a presigned answer takes one AI grading, at finalize, not two (2026-11-18)', () => {
-    const intent = Reflect.getMetadata(
-      GUARDS_METADATA,
+  it('a Speaking answer takes its AI grading in the service, where a replay is known (2026-11-18)', () => {
+    for (const handler of [
       controller.createUploadIntent,
-    );
-    const finalize = Reflect.getMetadata(
-      GUARDS_METADATA,
       controller.finalizeUpload,
-    );
-    expect(intent).not.toContain(AiRateLimitGuard);
-    expect(finalize).toContain(AiRateLimitGuard);
+      controller.submitAudio,
+    ])
+      expect(Reflect.getMetadata(GUARDS_METADATA, handler)).not.toContain(
+        AiRateLimitGuard,
+      );
+    expect(
+      Reflect.getMetadata(GUARDS_METADATA, controller.generateTts),
+    ).toContain(AiRateLimitGuard);
   });
 
   it('submitPart3To5 delegates to speakingService.evaluateSpeakingPart3To5', async () => {

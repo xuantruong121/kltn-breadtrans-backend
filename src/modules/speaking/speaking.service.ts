@@ -46,6 +46,20 @@ import {
 } from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
 import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
+import {
+  aiQuotaExhausted,
+  returnAiGrading,
+  takeAiGrading,
+} from '../../common/guards/ai-rate-limit.guard';
+import { SubscriptionService } from '../subscription/subscription.service';
+
+/**
+ * Set (not serialised) on a response that returns a submission another
+ * request made: the grading this request took is given back.
+ */
+export const SPEAKING_REPLAYED = Symbol('speaking-replayed');
+const replayed = <T extends object>(response: T): T =>
+  Object.assign(response, { [SPEAKING_REPLAYED]: true });
 
 export interface SubmitSpeakingResponse {
   submissionId: number;
@@ -269,7 +283,104 @@ export class SpeakingService {
     @Optional()
     private readonly speakingContentAccess?: SpeakingContentAccessService,
     @Optional() private readonly trial?: TrialService,
+    @Optional() private readonly subscriptions?: SubscriptionService,
   ) {}
+
+  /**
+   * The learner routes take one AI grading here, not in AiRateLimitGuard
+   * (audit follow-up 2026-11-18). The guard ran before the handler, so a
+   * retried finalize or a resent Idempotency-Key took a second grading for
+   * the submission it got back, and a learner with none left got 429 instead
+   * of it. A replay is answered first and takes none; a grading that made no
+   * submission (an error, or another request made it) is given back.
+   */
+  async finalizeUploadForLearner(
+    uploadIntentId: string,
+    userId: number,
+    traceIdHeader?: string,
+    role?: Role,
+  ) {
+    return this.withAiGrading(
+      userId,
+      role,
+      async () => {
+        const intent = await this.prisma.speakingUploadIntent.findUnique({
+          where: { id: uploadIntentId },
+          select: { userId: true, status: true, submissionId: true },
+        });
+        return (
+          intent?.userId === userId &&
+          intent.status === 'FINALIZED' &&
+          intent.submissionId != null
+        );
+      },
+      () => this.finalizeUpload(uploadIntentId, userId, traceIdHeader, role),
+    );
+  }
+
+  async submitAudioForLearner(
+    exerciseId: number,
+    userId: number,
+    audioFile: Express.Multer.File,
+    idempotencyKey?: string,
+    traceIdHeader?: string,
+    role?: Role,
+    internalContext?: { attemptId: number; componentId: number },
+  ) {
+    return this.withAiGrading(
+      userId,
+      role,
+      async () => {
+        const key = idempotencyKey?.trim();
+        if (!key) return false;
+        const existing = await this.prisma.speakingSubmission.findUnique({
+          where: { userId_idempotencyKey: { userId, idempotencyKey: key } },
+          select: { id: true },
+        });
+        return existing != null;
+      },
+      () =>
+        this.submitAudio(
+          exerciseId,
+          userId,
+          audioFile,
+          idempotencyKey,
+          traceIdHeader,
+          role,
+          internalContext,
+        ),
+    );
+  }
+
+  private async withAiGrading<T extends object>(
+    userId: number,
+    role: Role | undefined,
+    isReplay: () => Promise<boolean>,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    if (role === Role.ADMIN || (await isReplay())) return work();
+    // Without Redis the gradings cannot be counted: closed, as the guard was.
+    if (!this.redis)
+      throw new ServiceUnavailableException(
+        'Chưa đếm được lượt chấm AI. Vui lòng thử lại sau.',
+      );
+    const planCode = (await this.subscriptions?.planCodeFor(userId)) ?? 'FREE';
+    const taken = await takeAiGrading(this.redis, userId, planCode);
+    if (!taken.allowed) {
+      await returnAiGrading(this.redis, taken.key);
+      throw aiQuotaExhausted(planCode, taken.limit, taken.count);
+    }
+    let result: T;
+    try {
+      result = await work();
+    } catch (error) {
+      await returnAiGrading(this.redis, taken.key);
+      throw error;
+    }
+    if ((result as Record<symbol, unknown>)[SPEAKING_REPLAYED])
+      await returnAiGrading(this.redis, taken.key);
+    return result;
+  }
 
   private getStorage() {
     return this.r2Service ?? this.uploadService;
@@ -1318,13 +1429,13 @@ export class SpeakingService {
             where: { id: freshIntent.submissionId },
           }));
         if (sub) {
-          return {
+          return replayed({
             submissionId: sub.id,
             status: sub.status,
             pollUrl: `/speaking/submissions/${sub.id}`,
             acceptedAt: sub.submittedAt.toISOString(),
             traceId,
-          };
+          });
         }
       }
 
@@ -1343,13 +1454,13 @@ export class SpeakingService {
                 where: { id: polled.submissionId },
               }));
             if (sub) {
-              return {
+              return replayed({
                 submissionId: sub.id,
                 status: sub.status,
                 pollUrl: `/speaking/submissions/${sub.id}`,
                 acceptedAt: sub.submittedAt.toISOString(),
                 traceId,
-              };
+              });
             }
           }
         }
