@@ -50,6 +50,19 @@ describe('SpeakingController - Security & AI Quota', () => {
     expect(guards).toContain(AiRateLimitGuard);
   });
 
+  it('a presigned answer takes one AI grading, at finalize, not two (2026-11-18)', () => {
+    const intent = Reflect.getMetadata(
+      GUARDS_METADATA,
+      controller.createUploadIntent,
+    );
+    const finalize = Reflect.getMetadata(
+      GUARDS_METADATA,
+      controller.finalizeUpload,
+    );
+    expect(intent).not.toContain(AiRateLimitGuard);
+    expect(finalize).toContain(AiRateLimitGuard);
+  });
+
   it('submitPart3To5 delegates to speakingService.evaluateSpeakingPart3To5', async () => {
     const result = await controller.submitPart3To5(
       'Sample prompt',

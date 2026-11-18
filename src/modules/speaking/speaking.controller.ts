@@ -89,7 +89,10 @@ export class SpeakingController {
     return this.speakingService.getCapabilities();
   }
 
-  @UseGuards(JwtAuthGuard, AiRateLimitGuard)
+  // No AI grading taken here (2026-11-18): the presigned answer is graded,
+  // and its AI grading taken, at finalize. Both took one before, so a Free
+  // learner got 5 answers out of 10 gradings.
+  @UseGuards(JwtAuthGuard)
   @Post('exercises/:id/upload-intents')
   @ApiOperation({
     summary:
