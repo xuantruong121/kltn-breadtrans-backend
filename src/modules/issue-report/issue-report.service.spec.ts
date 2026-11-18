@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { IssueReportStatus } from '@prisma/client';
 import { IssueReportService } from './issue-report.service';
 
@@ -16,6 +16,7 @@ describe('IssueReportService', () => {
     sourceId: null,
   };
   const build = (current: Record<string, unknown> = report) => {
+    let written: Record<string, unknown> = {};
     const prisma = {
       issueReport: {
         findUnique: jest.fn().mockResolvedValue(current),
@@ -23,6 +24,15 @@ describe('IssueReportService', () => {
           .fn()
           .mockImplementation(({ data }) =>
             Promise.resolve({ ...current, ...data }),
+          ),
+        updateMany: jest.fn().mockImplementation(({ data }) => {
+          written = data;
+          return Promise.resolve({ count: 1 });
+        }),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve({ ...current, ...written }),
           ),
       },
       quiz: { findUnique: jest.fn() },
@@ -79,6 +89,25 @@ describe('IssueReportService', () => {
 
       await service.update(5, 1, { status: IssueReportStatus.IN_REVIEW });
 
+      expect(notifications.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('two admins closing at once: the second gets 409 and sends no notice (audit A15)', async () => {
+      const { service, prisma, notifications } = build();
+      // The other admin closed it after both read NEW.
+      prisma.issueReport.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.update(5, 1, {
+          status: IssueReportStatus.RESOLVED,
+          resolutionNote: 'Đã sửa',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.issueReport.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 5, status: IssueReportStatus.NEW },
+        }),
+      );
       expect(notifications.createNotification).not.toHaveBeenCalled();
     });
 
