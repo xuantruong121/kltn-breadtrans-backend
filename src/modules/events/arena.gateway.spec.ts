@@ -293,7 +293,18 @@ describe('ArenaGateway security validation', () => {
     withXp.prisma.$transaction = jest.fn((cb: (c: any) => unknown) => cb(tx));
     withXp.prisma.pointHistory = { aggregate };
     withXp.server = { to: jest.fn().mockReturnValue({ emit }) };
-    withXp.gamification = { awardXp };
+    // As GamificationService.awardArenaXp: today's Arena XP, then the award.
+    const awardArenaXp = async (
+      userId: number,
+      reason: string,
+      xpFor: (earned: number) => number,
+    ) => {
+      const today = await aggregate({ where: { userId } });
+      const xp = xpFor(today._sum.points ?? 0);
+      if (xp > 0) await awardXp(userId, xp, reason);
+      return xp;
+    };
+    withXp.gamification = { awardXp, awardArenaXp };
 
     const answers = (correct: number) =>
       Object.fromEntries(

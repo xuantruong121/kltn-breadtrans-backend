@@ -23,6 +23,12 @@ class FakeRedis {
     this.store.delete(key);
     return Promise.resolve(1);
   }
+  /** The lock release script only: delete KEYS[1] while it holds ARGV[1]. */
+  eval(_script: string, _n: number, key: string, owner: string) {
+    if (this.store.get(key) !== owner) return Promise.resolve(0);
+    this.store.delete(key);
+    return Promise.resolve(1);
+  }
   exists(key: string) {
     return Promise.resolve(this.store.has(key) ? 1 : 0);
   }
@@ -68,6 +74,7 @@ describe('DungeonService', () => {
     deductBanh: jest.Mock;
     awardBanh: jest.Mock;
     awardXp: jest.Mock;
+    awardArenaXp: jest.Mock;
   };
   let service: DungeonService;
   let now: number;
@@ -88,6 +95,13 @@ describe('DungeonService', () => {
           Promise.resolve({ granted: amount }),
         ),
       awardXp: jest.fn().mockResolvedValue({}),
+      // The real one reads today's Arena XP and awards under one lock.
+      awardArenaXp: jest
+        .fn()
+        .mockImplementation(
+          (_u: number, _r: string, xpFor: (earned: number) => number) =>
+            Promise.resolve(xpFor(0)),
+        ),
     };
     findMany = jest.fn().mockResolvedValue(entries);
     const prisma = {
@@ -183,6 +197,15 @@ describe('DungeonService', () => {
     await expect(service.start(1, 'daily')).rejects.toThrow('Không đủ');
     await service.start(1, 'daily');
     expect(gamification.deductBanh).toHaveBeenCalledTimes(2);
+  });
+
+  it('two starts of the free dungeon at once pay one ticket and open one run (audit R5)', async () => {
+    const [a, b] = await Promise.all([
+      service.start(1, 'free'),
+      service.start(1, 'free'),
+    ]);
+    expect(a.sessionId).toBe(b.sessionId);
+    expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
   });
 
   it('the day dungeon is the same for everyone, whatever order the words come in', async () => {

@@ -31,7 +31,6 @@ import {
   ROUND_SECONDS,
   arenaXp,
   buildArenaQuestions,
-  vietnamDayStart,
   roundPoints,
   type QuestionKind,
 } from './arena-questions.logic';
@@ -1683,24 +1682,18 @@ export class ArenaGateway
       p2: { xp: 0, xpCapped: false },
     };
     if (!this.gamification) return out;
-    const since = vietnamDayStart(new Date());
     for (const role of ['p1', 'p2'] as const) {
       const player = match[role];
       try {
         const correct = Object.values(player.answers ?? {}).filter(
           (a) => a.isCorrect,
         ).length;
-        const today = await this.prisma.pointHistory.aggregate({
-          where: {
-            userId: player.userId,
-            reason: ARENA_XP_REASON,
-            createdAt: { gte: since },
-          },
-          _sum: { points: true },
-        });
-        const xp = arenaXp(correct, today._sum.points ?? 0);
-        if (xp > 0)
-          await this.gamification.awardXp(player.userId, xp, ARENA_XP_REASON);
+        // Read and awarded under one lock with Pháo and Hầm (audit R6).
+        const xp = await this.gamification.awardArenaXp(
+          player.userId,
+          ARENA_XP_REASON,
+          (earnedToday) => arenaXp(correct, earnedToday),
+        );
         out[role] = { xp, xpCapped: xp < correct * ARENA_XP_PER_CORRECT };
       } catch (err) {
         this.logger.error(

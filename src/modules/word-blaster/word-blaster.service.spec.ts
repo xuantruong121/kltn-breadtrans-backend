@@ -19,6 +19,12 @@ class FakeRedis {
     this.store.delete(key);
     return Promise.resolve(1);
   }
+  /** The lock release script only: delete KEYS[1] while it holds ARGV[1]. */
+  eval(_script: string, _n: number, key: string, owner: string) {
+    if (this.store.get(key) !== owner) return Promise.resolve(0);
+    this.store.delete(key);
+    return Promise.resolve(1);
+  }
   zadd(_key: string, score: number, member: string) {
     this.zset.set(member, score);
     return Promise.resolve(1);
@@ -57,6 +63,7 @@ describe('WordBlasterService', () => {
     deductBanh: jest.Mock;
     awardBanh: jest.Mock;
     awardXp: jest.Mock;
+    awardArenaXp: jest.Mock;
   };
   let service: WordBlasterService;
   let now: number;
@@ -75,6 +82,13 @@ describe('WordBlasterService', () => {
           Promise.resolve({ granted: amount }),
         ),
       awardXp: jest.fn().mockResolvedValue({}),
+      // The real one reads today's Arena XP and awards under one lock.
+      awardArenaXp: jest
+        .fn()
+        .mockImplementation(
+          (_u: number, _r: string, xpFor: (earned: number) => number) =>
+            Promise.resolve(xpFor(0)),
+        ),
     };
     const prisma = {
       dictionaryEntry: { findMany: jest.fn().mockResolvedValue(entries) },
@@ -133,6 +147,33 @@ describe('WordBlasterService', () => {
     await expect(service.shot(2, view.sessionId, 'x')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('two starts at once (two tabs) take the stake once and open one game (audit R5)', async () => {
+    const [a, b] = await Promise.all([
+      service.start(1, 20, 'copy'),
+      service.start(1, 20, 'copy'),
+    ]);
+    expect(a.sessionId).toBe(b.sessionId);
+    expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a page reload and a finish settling an ended game at once pay its XP once (audit R6)', async () => {
+    const view = await service.start(1, 20, 'copy');
+    // One block broken (so there is XP to pay), then every other one lands.
+    const first = stored(view.sessionId).blocks[0];
+    now = 1_000_000 + first.spawnAtMs + 100;
+    await service.shot(1, view.sessionId, first.answers[0]);
+    now = 1_000_000 + 10 * 60_000;
+    await Promise.all([
+      service.current(1),
+      service.finish(1, view.sessionId, false),
+    ]);
+    // One XP payment, whichever way it is made.
+    expect(
+      gamification.awardArenaXp.mock.calls.length +
+        gamification.awardXp.mock.calls.length,
+    ).toBe(1);
   });
 
   it('breaking every block wins: stake back, the stake again as a capped bonus, XP, paid once', async () => {

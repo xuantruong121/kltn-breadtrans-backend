@@ -20,6 +20,7 @@ import {
   getBusinessWeekStart,
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
+import { vietnamDayStart } from '../events/arena-questions.logic';
 import { arenaStats } from './arena-stats.logic';
 import { streakMilestone, xpLevel } from './ranking.logic';
 import {
@@ -391,6 +392,38 @@ export class GamificationService {
     }
 
     return updatedLeaderboard;
+  }
+
+  /**
+   * XP from an Arena game (Song Đấu, Pháo, Hầm) under their shared daily cap
+   * (audit R6, 2026-11-18). `xpFor` turns the Arena XP earned today into
+   * this game's XP. Reading today's total and awarding run under one lock
+   * per learner: two games ending together each read the total before the
+   * other's award and went past the cap.
+   */
+  async awardArenaXp(
+    userId: number,
+    reason: string,
+    xpFor: (earnedToday: number) => number,
+  ): Promise<number> {
+    const xp = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`arena_xp:${userId}`}))`;
+      const today = await tx.pointHistory.aggregate({
+        where: {
+          userId,
+          reason,
+          createdAt: { gte: vietnamDayStart(new Date()) },
+        },
+        _sum: { points: true },
+      });
+      const amount = xpFor(today._sum.points ?? 0);
+      if (amount > 0) await this.awardXp(userId, amount, reason, { tx });
+      return amount;
+    });
+    // awardXp leaves this to the caller when it runs in a transaction.
+    if (xp > 0)
+      this.eventEmitter.emit('gamification.xp_earned', { userId, points: xp });
+    return xp;
   }
 
   /**
