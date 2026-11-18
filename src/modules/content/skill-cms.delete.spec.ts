@@ -29,7 +29,9 @@ describe('SkillCmsService.deleteContent', () => {
       speakingExercise: {
         deleteMany: jest.fn().mockReturnValue('delete-exercises'),
       },
-      $transaction: jest.fn().mockResolvedValue([]),
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
     };
     return prisma;
   };
@@ -41,22 +43,28 @@ describe('SkillCmsService.deleteContent', () => {
       examItems?: number;
       found?: boolean;
     } = {},
-  ) => ({
-    quiz: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue(
-          over.found === false
-            ? null
-            : { id: 31, publicationStatus: over.status ?? 'DRAFT' },
-        ),
-      delete: jest.fn().mockResolvedValue({ id: 31 }),
-    },
-    submission: { count: jest.fn().mockResolvedValue(over.submissions ?? 0) },
-    toeicWritingSetItem: {
-      count: jest.fn().mockResolvedValue(over.examItems ?? 0),
-    },
-  });
+  ) => {
+    const prisma: any = {
+      quiz: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            over.found === false
+              ? null
+              : { id: 31, publicationStatus: over.status ?? 'DRAFT' },
+          ),
+        delete: jest.fn().mockResolvedValue({ id: 31 }),
+      },
+      submission: { count: jest.fn().mockResolvedValue(over.submissions ?? 0) },
+      toeicWritingSetItem: {
+        count: jest.fn().mockResolvedValue(over.examItems ?? 0),
+      },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+    };
+    return prisma;
+  };
 
   it('deletes a speaking set with no recordings: exercises first, then the set', async () => {
     const prisma = speakingPrisma();
@@ -73,10 +81,19 @@ describe('SkillCmsService.deleteContent', () => {
     expect(prisma.speakingExercise.deleteMany).toHaveBeenCalledWith({
       where: { practiceSetId: 'speaking-1' },
     });
-    expect(prisma.$transaction).toHaveBeenCalledWith([
-      'delete-exercises',
-      'delete-set',
-    ]);
+    expect(prisma.speakingPracticeSet.delete).toHaveBeenCalledWith({
+      where: { id: 'speaking-1' },
+    });
+    // Exercises first: practiceSet on SpeakingExercise is SetNull.
+    expect(
+      prisma.speakingExercise.deleteMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      prisma.speakingPracticeSet.delete.mock.invocationCallOrder[0],
+    );
+    // Set and exercises locked before the recordings are counted (audit A5).
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.speakingSubmission.count.mock.invocationCallOrder[0],
+    );
   });
 
   it('refuses a speaking set that learners recorded on, and an exam set', async () => {
@@ -91,7 +108,8 @@ describe('SkillCmsService.deleteContent', () => {
           admin,
         ),
       ).rejects.toBeInstanceOf(ConflictException);
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.speakingExercise.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.speakingPracticeSet.delete).not.toHaveBeenCalled();
     }
   });
 
@@ -104,7 +122,7 @@ describe('SkillCmsService.deleteContent', () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
-      new SkillCmsService(quizPrisma({ found: false }) as any).deleteContent(
+      new SkillCmsService(quizPrisma({ found: false })).deleteContent(
         'reading',
         '31',
         admin,
@@ -114,11 +132,7 @@ describe('SkillCmsService.deleteContent', () => {
 
   it('deletes a draft quiz with no submission', async () => {
     const prisma = quizPrisma();
-    await new SkillCmsService(prisma as any).deleteContent(
-      'listening',
-      '31',
-      admin,
-    );
+    await new SkillCmsService(prisma).deleteContent('listening', '31', admin);
     expect(prisma.quiz.delete).toHaveBeenCalledWith({ where: { id: 31 } });
   });
 
@@ -129,11 +143,7 @@ describe('SkillCmsService.deleteContent', () => {
       quizPrisma({ examItems: 1 }),
     ]) {
       await expect(
-        new SkillCmsService(prisma as any).deleteContent(
-          'writing',
-          '31',
-          admin,
-        ),
+        new SkillCmsService(prisma).deleteContent('writing', '31', admin),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.quiz.delete).not.toHaveBeenCalled();
     }
@@ -141,7 +151,7 @@ describe('SkillCmsService.deleteContent', () => {
 
   it('requires an admin', async () => {
     await expect(
-      new SkillCmsService(quizPrisma() as any).deleteContent('reading', '31', {
+      new SkillCmsService(quizPrisma()).deleteContent('reading', '31', {
         id: 1,
         role: Role.STUDENT,
       }),

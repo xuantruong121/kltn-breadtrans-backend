@@ -196,20 +196,27 @@ export class AdminExamService {
   }
 
   async deleteExam(id: number) {
-    const exam = await this.prisma.toeicExamSet.findUnique({ where: { id } });
-    if (!exam) throw new NotFoundException(`Đề thi với ID ${id} không tồn tại`);
+    // One transaction with the exam set locked, as GenericExamService.delete
+    // (audit A5, 2026-11-18): an attempt started meanwhile is counted, or
+    // waits and then fails on the deleted set.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${id} FOR UPDATE`;
+      const exam = await tx.toeicExamSet.findUnique({ where: { id } });
+      if (!exam)
+        throw new NotFoundException(`Đề thi với ID ${id} không tồn tại`);
 
-    // History safety guard: cannot delete exam if attempts exist
-    const hasAttempts = await this.prisma.toeicAttempt.findFirst({
-      where: { examId: id },
+      // History safety guard: cannot delete exam if attempts exist
+      const hasAttempts = await tx.toeicAttempt.findFirst({
+        where: { examId: id },
+      });
+      if (hasAttempts) {
+        throw new ConflictException(
+          'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa',
+        );
+      }
+
+      return tx.toeicExamSet.delete({ where: { id } });
     });
-    if (hasAttempts) {
-      throw new ConflictException(
-        'Bộ đề thi đã có lượt làm bài của học viên, không thể xóa',
-      );
-    }
-
-    return this.prisma.toeicExamSet.delete({ where: { id } });
   }
 
   /** Exam content changes only while the exam is a draft. */

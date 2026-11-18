@@ -265,16 +265,22 @@ export class GenericExamService {
    * An Exam with attempts must keep its historical content/structure and
    * publication semantics; mutation goes through Duplicate instead.
    */
-  async hasLearnerAttempts(exam: ProductRecord): Promise<boolean> {
+  async hasLearnerAttempts(
+    exam: ProductRecord,
+    client: Pick<
+      Prisma.TransactionClient,
+      'toeicAttempt' | 'toeicAssessmentAttempt'
+    > = this.prisma,
+  ): Promise<boolean> {
     const [lrAttempt, assessmentAttempt] = await Promise.all([
       exam.toeicExamSet
-        ? this.prisma.toeicAttempt.findFirst({
+        ? client.toeicAttempt.findFirst({
             where: { examId: exam.toeicExamSet.id },
             select: { id: true },
           })
         : Promise.resolve(null),
       exam.toeicAssessment
-        ? this.prisma.toeicAssessmentAttempt.findFirst({
+        ? client.toeicAssessmentAttempt.findFirst({
             where: { assessmentId: exam.toeicAssessment.id },
             select: { id: true },
           })
@@ -1431,12 +1437,25 @@ export class GenericExamService {
 
   async delete(id: number) {
     const exam = await this.findExam(id);
+    // The attempt check runs again in the transaction, with the rows an
+    // attempt points to locked (audit A5, 2026-11-18): a learner starting
+    // the exam either committed before the lock and is counted, or waits and
+    // then fails on the deleted exam set. The first check answers 409 fast.
     if (await this.hasLearnerAttempts(exam)) {
       throw new ConflictException(
         'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
       );
     }
     await this.prisma.$transaction(async (tx) => {
+      if (exam.toeicExamSet)
+        await tx.$queryRaw`SELECT id FROM "ToeicExamSet" WHERE id = ${exam.toeicExamSet.id} FOR UPDATE`;
+      if (exam.toeicAssessment)
+        await tx.$queryRaw`SELECT id FROM "ToeicAssessment" WHERE id = ${exam.toeicAssessment.id} FOR UPDATE`;
+      if (await this.hasLearnerAttempts(exam, tx)) {
+        throw new ConflictException(
+          'Exam đã có lịch sử làm bài, không thể xóa sản phẩm',
+        );
+      }
       if (exam.toeicAssessment) {
         await tx.toeicAssessment.delete({
           where: { id: exam.toeicAssessment.id },

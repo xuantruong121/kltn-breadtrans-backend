@@ -1098,24 +1098,33 @@ export class AdminService {
   }
 
   async deleteVocabTopic(id: number) {
-    const topic = await this.prisma.vocabTopic.findUnique({
-      where: { id },
-      include: { words: true },
-    });
-    if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-    // History safety guard: if any word has learner progress, block delete
-    const wordIds = topic.words.map((w) => w.id);
-    if (wordIds.length > 0) {
-      const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
-        where: { wordId: { in: wordIds } },
+    // The check and the delete in one transaction, with the topic and its
+    // words locked (audit A5, 2026-11-18). A learner's progress row needs its
+    // word row (foreign key): it either committed before the lock and is
+    // counted here, or it waits and then fails on the deleted word. Before,
+    // progress saved between the check and the delete went with the topic.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabTopic" WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "VocabWord" WHERE "topicId" = ${id} FOR UPDATE`;
+      const topic = await tx.vocabTopic.findUnique({
+        where: { id },
+        include: { words: true },
       });
-      if (hasProgress) {
-        throw new ConflictException(
-          'Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa',
-        );
+      if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
+      // History safety guard: if any word has learner progress, block delete
+      const wordIds = topic.words.map((w) => w.id);
+      if (wordIds.length > 0) {
+        const hasProgress = await tx.userVocabWordProgress.findFirst({
+          where: { wordId: { in: wordIds } },
+        });
+        if (hasProgress) {
+          throw new ConflictException(
+            'Chủ đề từ vựng đã có dữ liệu học tập của học viên, không thể xóa',
+          );
+        }
       }
-    }
-    return this.prisma.vocabTopic.delete({ where: { id } });
+      return tx.vocabTopic.delete({ where: { id } });
+    });
   }
 
   async addVocabWord(topicId: number, dto: CreateVocabWordDto) {
@@ -1292,29 +1301,34 @@ export class AdminService {
   }
 
   async deleteVocabWord(topicId: number, wordId: number) {
-    const word = await this.prisma.vocabWord.findUnique({
-      where: { id: wordId },
+    // One transaction with the word locked, as deleteVocabTopic (audit A5);
+    // the word count drops with the delete, not in a second step.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "VocabWord" WHERE id = ${wordId} FOR UPDATE`;
+      const word = await tx.vocabWord.findUnique({
+        where: { id: wordId },
+      });
+      if (!word || word.topicId !== topicId) {
+        throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
+      }
+      // History safety guard
+      const hasProgress = await tx.userVocabWordProgress.findFirst({
+        where: { wordId },
+      });
+      if (hasProgress) {
+        throw new ConflictException(
+          'Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa',
+        );
+      }
+      const deleted = await tx.vocabWord.delete({
+        where: { id: wordId },
+      });
+      await tx.vocabTopic.update({
+        where: { id: topicId },
+        data: { totalWords: { decrement: 1 } },
+      });
+      return deleted;
     });
-    if (!word || word.topicId !== topicId) {
-      throw new NotFoundException('Từ vựng không tồn tại trong chủ đề này');
-    }
-    // History safety guard
-    const hasProgress = await this.prisma.userVocabWordProgress.findFirst({
-      where: { wordId },
-    });
-    if (hasProgress) {
-      throw new ConflictException(
-        'Từ vựng này đã có dữ liệu học tập của học viên, không thể xóa',
-      );
-    }
-    const deleted = await this.prisma.vocabWord.delete({
-      where: { id: wordId },
-    });
-    await this.prisma.vocabTopic.update({
-      where: { id: topicId },
-      data: { totalWords: { decrement: 1 } },
-    });
-    return deleted;
   }
 
   async reorderVocabWords(topicId: number, wordIds: number[]) {

@@ -18,6 +18,8 @@ describe('GenericExamService — attempt-aware unpublish/delete guard (P1-01)', 
       toeicAssessment: { update: jest.fn(), delete: jest.fn() },
       toeicAttempt: { findFirst: jest.fn() },
       toeicAssessmentAttempt: { findFirst: jest.fn() },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((ops: any) =>
         Array.isArray(ops) ? Promise.all(ops) : ops(prisma),
       ),

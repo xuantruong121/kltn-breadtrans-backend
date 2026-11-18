@@ -31,6 +31,8 @@ describe('AdminGrammarCMS (Phase 4)', () => {
         create: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 

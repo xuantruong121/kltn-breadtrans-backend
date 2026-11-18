@@ -33,6 +33,8 @@ describe('AdminVocabCMS (Phase 4)', () => {
       userVocabWordProgress: {
         findFirst: jest.fn(),
       },
+      // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((arg) =>
         typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
       ),
