@@ -106,8 +106,8 @@ export class AdminController {
 
   @Delete('users/:id')
   @ApiOperation({ summary: 'Admin xoa tai khoan nguoi dung' })
-  deleteUser(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deleteUser(id);
+  deleteUser(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.adminService.deleteUser(id, req.user?.id);
   }
 
   // ============== DICTIONARY STORE (F13) ==============

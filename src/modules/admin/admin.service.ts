@@ -24,6 +24,7 @@ import { AuthSessionStore } from '../auth/session-store';
 import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { AccountPurgeService } from '../account/account-purge.service';
+import { assertKeepsAnAdmin } from './admin-roster';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
@@ -779,34 +780,33 @@ export class AdminService {
   }
 
   async updateUser(userId: number, dto: UpdateUserDto) {
-    if (dto.role && dto.role !== Role.ADMIN) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-      });
-      if (existingUser?.role === Role.ADMIN) {
-        const adminCount = await this.prisma.user.count({
-          where: { role: Role.ADMIN },
-        });
-        if (adminCount <= 1) {
-          throw new BadRequestException(
-            'Không thể hạ quyền Admin duy nhất trong hệ thống.',
-          );
-        }
-      }
-    }
-
     const updateUserData: any = {};
-    if (dto.role) updateUserData.role = dto.role;
     if (dto.password) {
       updateUserData.password = await bcrypt.hash(dto.password, 10);
     }
 
-    if (Object.keys(updateUserData).length > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: updateUserData,
+    // The role is read, checked and written in one transaction under the
+    // admin-roster lock (audit A9, 2026-11-18): two admins demoting each
+    // other both passed a count made before either wrote. The form always
+    // sends the role; it is written only when it changes, so a name or phone
+    // edit no longer ends the user's sessions.
+    if (dto.role || dto.password) {
+      await this.prisma.$transaction(async (tx) => {
+        const current = await tx.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        if (!current) throw new NotFoundException('Người dùng không tồn tại');
+        if (dto.role && dto.role !== current.role) {
+          if (current.role === Role.ADMIN) await assertKeepsAnAdmin(tx, userId);
+          updateUserData.role = dto.role;
+        }
+        if (Object.keys(updateUserData).length > 0)
+          await tx.user.update({ where: { id: userId }, data: updateUserData });
       });
+    }
+
+    if (Object.keys(updateUserData).length > 0) {
       forgetAuthUser(userId);
       // A new password or role ends every session of the account.
       if (this.redis) {
@@ -851,7 +851,13 @@ export class AdminService {
    * An account without orders or payments is deleted; one with them becomes
    * an anonymous shell that keeps those records (soft-delete rule).
    */
-  async deleteUser(userId: number) {
+  async deleteUser(userId: number, actorId?: number) {
+    // The admin's own account is not deleted from here (audit A9): it was
+    // one click away from leaving the system with no admin.
+    if (actorId !== undefined && actorId === userId)
+      throw new BadRequestException(
+        'Không thể xoá tài khoản Admin bạn đang đăng nhập.',
+      );
     const outcome = await this.accountPurge.purgeUser(userId);
     return { id: userId, outcome };
   }

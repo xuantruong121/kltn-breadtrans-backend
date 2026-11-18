@@ -6,12 +6,13 @@ import {
 } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../upload/r2.service';
 import { forgetAuthUser } from '../auth/auth-user-cache';
 import { AuthSessionStore } from '../auth/session-store';
+import { assertKeepsAnAdmin } from '../admin/admin-roster';
 import {
   KEPT_TABLES,
   type KeptTable,
@@ -103,11 +104,12 @@ export class AccountPurgeService {
       const locked = await tx.$queryRaw<
         Array<{
           id: number;
+          role: Role;
           anonymizedAt: Date | null;
           deletionScheduledAt: Date | null;
         }>
       >`
-        SELECT id, "anonymizedAt", "deletionScheduledAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+        SELECT id, role, "anonymizedAt", "deletionScheduledAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
       if (!locked.length)
         throw new NotFoundException('Người dùng không tồn tại');
       // A shell already holds only kept records: nothing personal left.
@@ -119,6 +121,8 @@ export class AccountPurgeService {
         (!scheduled || scheduled.getTime() > now.getTime())
       )
         return 'SKIPPED' as const;
+      // The last admin is never purged (audit A9, 2026-11-18).
+      if (locked[0].role === Role.ADMIN) await assertKeepsAnAdmin(tx, userId);
 
       // Exam links to the learner's submissions have a Restrict key: first.
       await tx.toeicAssessmentSpeakingSubmission.deleteMany({
