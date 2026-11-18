@@ -324,6 +324,12 @@ const UNCANCELLABLE: AiGenerationJobStatus[] = [
   AiGenerationJobStatus.PUBLISHED,
 ];
 
+/** Statuses in which the worker owns the candidate (audit A7). */
+const CANDIDATE_BUSY: AiGenerationJobStatus[] = [
+  AiGenerationJobStatus.QUEUED,
+  AiGenerationJobStatus.PROCESSING,
+];
+
 /** How long one Apply may hold its job; a crashed one frees it after this. */
 const APPLY_LOCK_MS = 15 * 60_000;
 /** Redis must answer the lock within this, or Apply is refused (503). */
@@ -755,7 +761,26 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * job's draftSnapshot JSON; never touches real Exam/ToeicQuestionGroup
    * tables (EXAM_AI_CANDIDATE_EDIT_MUTATES_DRAFT=false).
    */
+  /**
+   * Candidate writes (edit, regenerate, confirm, retry) and Apply run one at a
+   * time per job, under the job lock (audit A7, 2026-11-18): each read the
+   * whole candidate, changed it and wrote it back, so a "Tạo lại nhóm" still
+   * running erased an edit saved meanwhile. A job the worker is still
+   * generating is not edited.
+   */
   async updateCandidate(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    patch: Record<string, unknown>,
+  ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.updateCandidateLocked(jobId, adminId, candidateKey, patch);
+    });
+  }
+
+  private async updateCandidateLocked(
     jobId: string,
     adminId: number,
     candidateKey: string,
@@ -851,10 +876,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('candidateKey không hợp lệ');
     }
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -866,6 +888,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * territory, not a silent candidate swap under an applied item).
    */
   async regenerateCandidateGroup(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+  ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.regenerateCandidateGroupLocked(jobId, adminId, candidateKey);
+    });
+  }
+
+  private async regenerateCandidateGroupLocked(
     jobId: string,
     adminId: number,
     candidateKey: string,
@@ -931,10 +964,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     this.assertNoDuplicateBatches(lrBatches);
     this.resolveReviewFailures(candidate);
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -944,6 +974,17 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
    * Bounded to this Part's groups only — never re-runs the whole Exam.
    */
   async regenerateCandidatePart(jobId: string, adminId: number, part: number) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.regenerateCandidatePartLocked(jobId, adminId, part);
+    });
+  }
+
+  private async regenerateCandidatePartLocked(
+    jobId: string,
+    adminId: number,
+    part: number,
+  ) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -990,10 +1031,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     }
     this.resolveReviewFailures(candidate);
 
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 
@@ -1044,6 +1082,10 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
   }
 
   async retry(jobId: string, adminId: number) {
+    return this.withJobLock(jobId, () => this.retryLocked(jobId, adminId));
+  }
+
+  private async retryLocked(jobId: string, adminId: number) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -1094,8 +1136,9 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       legacyFailedScope?.kind === 'speaking-writing';
     if (!failedUnits.length && !speakingWritingFailed)
       throw new ConflictException('Chỉ job lỗi mới có thể thử lại');
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
+    // Not over a run that another tab started meanwhile (audit A7).
+    const queuedNow = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: CANDIDATE_BUSY } },
       data: {
         status: AiGenerationJobStatus.QUEUED,
         errorSummary: null,
@@ -1114,6 +1157,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+    if (queuedNow.count === 0)
+      throw new ConflictException('Job đang chạy lại rồi.');
     const existing = await this.queue.getJob(jobId);
     if (existing) await existing.remove();
     await this.queue.add('generate', { version: 1, jobId }, { jobId });
@@ -1170,6 +1215,16 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     adminId: number,
     selectedCandidateKeys?: string[],
   ) {
+    return this.withJobLock(jobId, () =>
+      this.applyLocked(jobId, adminId, selectedCandidateKeys),
+    );
+  }
+
+  /**
+   * The job lock (audit A3/A7): SET NX PX, released with a compare-and-delete
+   * on this run's token. Held: 409. Redis silent for 3 s: 503, nothing run.
+   */
+  private async withJobLock<T>(jobId: string, work: () => Promise<T>) {
     const key = `toeic-ai-apply:${jobId}`;
     const owner = randomUUID();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1196,7 +1251,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         'Đề đang được áp dụng. Vui lòng chờ lần áp dụng trước hoàn tất.',
       );
     try {
-      return await this.applyLocked(jobId, adminId, selectedCandidateKeys);
+      return await work();
     } finally {
       await this.connection
         .eval(UNLOCK_SCRIPT, 1, key, owner)
@@ -1206,6 +1261,34 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
           ),
         );
     }
+  }
+
+  /** A job the worker is generating has no candidate to edit yet. */
+  private async assertCandidateIdle(jobId: string) {
+    const job = await this.prisma.aiGenerationJob.findUnique({
+      where: { id: jobId },
+      select: { status: true },
+    });
+    if (job && CANDIDATE_BUSY.includes(job.status))
+      throw new ConflictException(
+        'Job đang tạo đề. Đợi tạo xong rồi mới sửa candidate.',
+      );
+  }
+
+  /**
+   * Saves a changed candidate only while the worker is not generating (a
+   * retry from another tab could have queued it): it would overwrite the
+   * save with its own copy (audit A7).
+   */
+  private async writeCandidate(jobId: string, candidate: unknown) {
+    const { count } = await this.prisma.aiGenerationJob.updateMany({
+      where: { id: jobId, status: { notIn: CANDIDATE_BUSY } },
+      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
+    });
+    if (count === 0)
+      throw new ConflictException(
+        'Job vừa được chạy lại nên candidate chưa được lưu. Đợi xong rồi thử lại.',
+      );
   }
 
   private async applyLocked(
@@ -2500,6 +2583,18 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
     candidateKey: string,
     method: ConfirmationMethod,
   ) {
+    return this.withJobLock(jobId, async () => {
+      await this.assertCandidateIdle(jobId);
+      return this.confirmCandidateLocked(jobId, adminId, candidateKey, method);
+    });
+  }
+
+  private async confirmCandidateLocked(
+    jobId: string,
+    adminId: number,
+    candidateKey: string,
+    method: ConfirmationMethod,
+  ) {
     const job = await this.prisma.aiGenerationJob.findUnique({
       where: { id: jobId },
     });
@@ -2533,10 +2628,7 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       at: new Date().toISOString(),
       method,
     });
-    await this.prisma.aiGenerationJob.update({
-      where: { id: jobId },
-      data: { draftSnapshot: candidate as Prisma.InputJsonValue },
-    });
+    await this.writeCandidate(jobId, candidate);
     return this.getCandidate(jobId, adminId);
   }
 

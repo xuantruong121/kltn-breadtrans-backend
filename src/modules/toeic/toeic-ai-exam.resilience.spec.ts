@@ -90,6 +90,7 @@ describe('retrying a job', () => {
       aiGenerationJob: {
         findUnique: jest.fn().mockResolvedValue(job),
         update: jest.fn().mockResolvedValue(job),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     service.queue = {
@@ -97,6 +98,10 @@ describe('retrying a job', () => {
       add: jest.fn().mockResolvedValue({}),
     };
     service.status = jest.fn().mockResolvedValue({ id: 'job' });
+    service.connection = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
 
     await expect(service.retry('job', 1)).resolves.toEqual({ id: 'job' });
     expect(service.queue.add).toHaveBeenCalled();

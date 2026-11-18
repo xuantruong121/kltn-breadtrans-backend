@@ -193,6 +193,11 @@ function fixture(
   const service: any = Object.create(ToeicAiExamService.prototype);
   service.prisma = prisma;
   service.logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  // The job lock (audit A3/A7): always free here.
+  service.connection = {
+    set: jest.fn().mockResolvedValue('OK'),
+    eval: jest.fn().mockResolvedValue(1),
+  };
   service.ai = ai;
   service.queue = {
     getJob: jest.fn().mockResolvedValue(null),
