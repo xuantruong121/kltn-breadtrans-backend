@@ -640,24 +640,43 @@ export class MarketService {
         return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
       });
     } else {
-      updatedOrder = await this.prisma.marketOrder.update({
-        where: { id: orderId },
-        data: {
-          status,
-          reviewedBy: reviewerName,
-          reviewedAt: new Date(),
-          bankSnapshot: reason?.trim()
-            ? { reason: reason.trim(), action: status, reviewerName }
-            : undefined,
-        },
-      });
-
-      if (status === 'approved' || status === 'completed') {
-        await this.prisma.marketPhysicalRedemption.updateMany({
-          where: { orderId, status: 'PENDING' },
-          data: { status: status === 'completed' ? 'DELIVERED' : 'PROCESSING' },
+      // Same guard as the reject branch: only a still-pending order changes.
+      // Without it a reject that committed first (refund, stock back) was
+      // overwritten with "approved" (audit R1, 2026-11-18).
+      updatedOrder = await this.prisma.$transaction(async (tx) => {
+        const casResult = await tx.marketOrder.updateMany({
+          where: { id: orderId, status: 'pending' },
+          data: {
+            status,
+            reviewedBy: reviewerName,
+            reviewedAt: new Date(),
+            ...(reason?.trim()
+              ? {
+                  bankSnapshot: {
+                    reason: reason.trim(),
+                    action: status,
+                    reviewerName,
+                  },
+                }
+              : {}),
+          },
         });
-      }
+        if (casResult.count === 0) {
+          throw new ConflictException(
+            'Đơn đổi quà đã được xử lý, vui lòng tải lại trang.',
+          );
+        }
+
+        if (status === 'approved' || status === 'completed') {
+          await tx.marketPhysicalRedemption.updateMany({
+            where: { orderId, status: 'PENDING' },
+            data: {
+              status: status === 'completed' ? 'DELIVERED' : 'PROCESSING',
+            },
+          });
+        }
+        return (await tx.marketOrder.findUnique({ where: { id: orderId } }))!;
+      });
     }
 
     // Bắn sự kiện Real-time thông báo kết quả duyệt đơn cho học sinh

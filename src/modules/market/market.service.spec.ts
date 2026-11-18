@@ -506,6 +506,64 @@ describe('MarketService', () => {
     });
   });
 
+  describe('reviewOrder — approve races a reject (audit R1, 2026-11-18)', () => {
+    const pendingOrder = {
+      id: 51,
+      userId: 7,
+      status: 'pending',
+      totalBanh: 100,
+      items: [{ productId: 1, quantity: 1 }],
+      studentName: 'Học viên',
+    };
+
+    it('approves only a still-pending order: a reject that committed first wins and nothing is written', async () => {
+      // Both admins read "pending"; the reject commits first.
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(pendingOrder);
+      const tx: any = {
+        marketOrder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          update: jest.fn(),
+          findUnique: jest.fn(),
+        },
+        marketPhysicalRedemption: { updateMany: jest.fn() },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      await expect(
+        service.reviewOrder(51, 'approved', 'admin@x.com'),
+      ).rejects.toThrow('đã được xử lý');
+      expect(tx.marketOrder.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 51, status: 'pending' } }),
+      );
+      expect(tx.marketPhysicalRedemption.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.marketOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('a pending order is approved and its physical redemption moves on, in one transaction', async () => {
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(pendingOrder);
+      const tx: any = {
+        marketOrder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ ...pendingOrder, status: 'approved' }),
+        },
+        marketPhysicalRedemption: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+      const result = await service.reviewOrder(51, 'approved', 'admin@x.com');
+
+      expect(result).toMatchObject({ status: 'approved' });
+      expect(tx.marketPhysicalRedemption.updateMany).toHaveBeenCalledWith({
+        where: { orderId: 51, status: 'PENDING' },
+        data: { status: 'PROCESSING' },
+      });
+    });
+  });
+
   describe('markFulfillmentFailed — approved-order refund, double-apply blocked', () => {
     const approvedOrder = {
       id: 42,
@@ -1091,6 +1149,22 @@ describe('MarketService', () => {
     });
 
     describe('reviewOrder — only a pending order', () => {
+      // The approve branch writes in a transaction with a pending-status guard.
+      const approveInTransaction = (order: Record<string, unknown>) => {
+        const tx: any = {
+          marketOrder: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ ...order, status: 'approved' }),
+          },
+          marketPhysicalRedemption: {
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+        };
+        mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+        return tx;
+      };
       it.each(['approved', 'completed', 'rejected', 'refunded'])(
         'refuses to reject an order that is already %s',
         async (status) => {
@@ -1111,10 +1185,7 @@ describe('MarketService', () => {
       it('tells the learner an order was approved', async () => {
         const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
         mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
-        mockPrismaService.marketOrder.update.mockResolvedValue({
-          ...order,
-          status: 'approved',
-        });
+        approveInTransaction(order);
 
         await service.reviewOrder(10, 'approved', 'Admin');
 
@@ -1132,10 +1203,7 @@ describe('MarketService', () => {
       it('keeps the review when the notification fails', async () => {
         const order = { id: 10, userId: 1, totalBanh: 500, status: 'pending' };
         mockPrismaService.marketOrder.findUnique.mockResolvedValue(order);
-        mockPrismaService.marketOrder.update.mockResolvedValue({
-          ...order,
-          status: 'approved',
-        });
+        approveInTransaction(order);
         mockNotificationsService.createNotification.mockRejectedValueOnce(
           new Error('down'),
         );
