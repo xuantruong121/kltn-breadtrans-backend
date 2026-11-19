@@ -11,6 +11,7 @@ import Redis from 'ioredis';
 import * as crypto from 'crypto';
 
 import { getJwtVerificationKey } from '../auth.constants';
+import { endedByLogout } from '../session-store';
 import {
   AUTH_USER_TTL_MS,
   cachedAuthUser,
@@ -86,11 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const loggedOutAt = await this.redis.get(
       `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
     );
-    if (
-      loggedOutAt &&
-      payload.iat &&
-      payload.iat * 1000 < Number(loggedOutAt)
-    ) {
+    if (endedByLogout(payload.iat, loggedOutAt)) {
       throw new UnauthorizedException('Phiên thiết bị đã kết thúc.');
     }
 

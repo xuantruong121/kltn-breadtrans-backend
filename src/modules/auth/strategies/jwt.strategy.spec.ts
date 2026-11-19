@@ -91,6 +91,38 @@ describe('JwtStrategy security checks', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
+  describe('device logout mark (one browser stays one device, 2026-11-19)', () => {
+    const req = { headers: { authorization: 'Bearer access-token' } };
+    // Logged out at 100.5 s: the mark is in ms, iat in whole seconds.
+    beforeEach(() =>
+      redis.get.mockImplementation((key: string) =>
+        key === 'user:1:device:device-1:logged_out_at' ? '100500' : null,
+      ),
+    );
+
+    it('refuses a token issued in an earlier second than the logout', async () => {
+      await expect(
+        strategy.validate(req, {
+          sub: 1,
+          type: 'access',
+          deviceId: 'device-1',
+          iat: 99,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('accepts the token of a sign-in right after the logout on the same device', async () => {
+      // Signed in again 0.2 s after logging out: iat is 100, the same second.
+      const result = await strategy.validate(req, {
+        sub: 1,
+        type: 'access',
+        deviceId: 'device-1',
+        iat: 100,
+      });
+      expect(result.deviceId).toBe('device-1');
+    });
+  });
+
   it('returns the current database role, not the stale JWT role', async () => {
     const result = await strategy.validate(
       { headers: { authorization: 'Bearer access-token' } },
