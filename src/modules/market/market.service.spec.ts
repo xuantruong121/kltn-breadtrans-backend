@@ -172,6 +172,107 @@ describe('MarketService', () => {
     });
   });
 
+  describe('createOrder - Pet Bun is bought once', () => {
+    const petBun = {
+      id: 4,
+      slug: 'pet-bun',
+      name: 'Pet Bun đồng hành',
+      price: 500,
+      stock: 100,
+      isActive: true,
+      fulfillmentType: 'DIGITAL',
+      category: 'BOOST',
+    };
+    const txWithOrders = (owning: Array<{ items: unknown }>) => ({
+      $executeRaw: jest.fn(),
+      $queryRaw: jest.fn(),
+      marketOrder: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue(owning),
+        create: jest
+          .fn()
+          .mockResolvedValue({ id: 61, status: 'approved', totalBanh: 500 }),
+      },
+      marketProduct: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      userStats: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 1000 }),
+        update: jest.fn(),
+      },
+      banhTransaction: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+      marketPhysicalRedemption: { create: jest.fn() },
+      notification: { create: jest.fn() },
+    });
+
+    beforeEach(() => {
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([petBun]);
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Bun Learner',
+      });
+    });
+
+    it('refuses a second Pet Bun before any stock or Bánh Mì moves', async () => {
+      const tx = txWithOrders([{ items: [{ slug: 'pet-bun', quantity: 1 }] }]);
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+      mockGamificationService.deductBanh.mockClear();
+
+      await expect(
+        service.createOrder(
+          3,
+          { items: [{ id: 'pet-bun', quantity: 1 }] },
+          'bun-2',
+        ),
+      ).rejects.toThrow(/đã sở hữu thú ảo Bun/);
+      expect(tx.marketProduct.updateMany).not.toHaveBeenCalled();
+      expect(mockGamificationService.deductBanh).not.toHaveBeenCalled();
+      expect(tx.marketOrder.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses two Pet Bun in one order', async () => {
+      const tx = txWithOrders([]);
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+      mockGamificationService.deductBanh.mockClear();
+
+      await expect(
+        service.createOrder(
+          3,
+          { items: [{ id: 'pet-bun', quantity: 2 }] },
+          'bun-x2',
+        ),
+      ).rejects.toThrow(/chỉ cần đổi một lần/);
+      expect(mockGamificationService.deductBanh).not.toHaveBeenCalled();
+    });
+
+    it('the first Pet Bun goes through, under a per-learner lock', async () => {
+      const tx = txWithOrders([
+        { items: [{ slug: 'streak-freeze', quantity: 1 }] },
+      ]);
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+      mockGamificationService.deductBanh.mockClear();
+
+      const result = await service.createOrder(
+        3,
+        { items: [{ id: 'pet-bun', quantity: 1 }] },
+        'bun-1',
+      );
+      expect(result.success).toBe(true);
+      expect(mockGamificationService.deductBanh).toHaveBeenCalled();
+      const locks = tx.$executeRaw.mock.calls.map((call: unknown[]) =>
+        call.slice(1).join(','),
+      );
+      expect(locks.some((args: string) => args.includes('pet_bun:3'))).toBe(
+        true,
+      );
+    });
+  });
+
   describe('createOrder - 7-day Plus card', () => {
     const plusCard = {
       id: 10,

@@ -1165,6 +1165,81 @@ describe('GamificationService weekly cron hardening', () => {
       expect(switched.happiness).toBe(80);
       expect(switched.satiety).toBe(70);
     });
+
+    const breadyPet = () => ({
+      id: 1,
+      userId: 5,
+      name: 'Bánh Mì Dũng Cảm',
+      level: 2,
+      exp: 300,
+      health: 90,
+      happiness: 90,
+      satiety: 80,
+      lastFedAt: null,
+      stateUpdatedAt: new Date().toISOString(),
+      roster: {},
+    });
+    const prismaWithOrders = (orders: Array<{ items: unknown }>) => {
+      const prisma: any = {
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue(breadyPet()),
+          update: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ id: 1, userId: 5, ...data }),
+            ),
+        },
+        marketOrder: { findMany: jest.fn().mockResolvedValue(orders) },
+        $executeRaw: jest.fn(),
+        $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+      };
+      return prisma;
+    };
+
+    it('keeps Bun locked without a Pet Bun order', async () => {
+      const prisma = prismaWithOrders([
+        { items: [{ slug: 'streak-freeze', quantity: 1 }] },
+      ]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      await expect(service.changePetType(5, 'petbun')).rejects.toThrow(
+        /chưa sở hữu thú ảo Bun/,
+      );
+      // getMyPet may save due decay first; nothing may make the pet Bun.
+      const names = prisma.userPet.update.mock.calls.map(
+        ([arg]: [{ data: { name?: string } }]) => arg.data.name,
+      );
+      expect(names).not.toContain('petbun');
+    });
+
+    it('switches to Bun once a Pet Bun order exists', async () => {
+      const prisma = prismaWithOrders([
+        { items: [{ slug: 'pet-bun', quantity: 1 }] },
+      ]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      const switched = await service.changePetType(5, 'petbun');
+      expect(switched.name).toBe('petbun');
+      expect(switched.level).toBe(1);
+    });
+
+    it('a pet named "Bun" by the seed is still Bready, not the bought Bun', async () => {
+      const prisma = prismaWithOrders([]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      const switched = await service.changePetType(5, 'Bun');
+      expect(prisma.marketOrder.findMany).not.toHaveBeenCalled();
+      expect(switched.name).toBe('Bun');
+    });
   });
 
   describe('awardVocabMasteryReward', () => {

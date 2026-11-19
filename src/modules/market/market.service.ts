@@ -4,6 +4,9 @@ import {
   PLUS_CARD_DAYS,
   PLUS_CARD_SLUG,
   extendDoubleBanhUntil,
+  OWNING_ORDER_STATUSES,
+  ordersHoldSlug,
+  PET_BUN_SLUG,
 } from './market-effects';
 import {
   Injectable,
@@ -254,6 +257,30 @@ export class MarketService {
           order: duplicate,
           remainingBanh: duplicate.balanceAtCheckout ?? 0,
         };
+      }
+
+      // Pet Bun is bought once: it unlocks a pet, a second one adds nothing.
+      // Checked before stock and Bánh Mì move, under a per-learner lock so two
+      // checkouts in parallel cannot both pass.
+      const petBun = resolvedItems.find(
+        ({ product }) => product.slug === PET_BUN_SLUG,
+      );
+      if (petBun) {
+        if (petBun.quantity > 1) {
+          throw new BadRequestException(
+            'Thú ảo Bun chỉ cần đổi một lần cho mỗi tài khoản.',
+          );
+        }
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_bun:${userId}`}))`;
+        const owning = await tx.marketOrder.findMany({
+          where: { userId, status: { in: OWNING_ORDER_STATUSES } },
+          select: { items: true },
+        });
+        if (ordersHoldSlug(owning, PET_BUN_SLUG)) {
+          throw new BadRequestException(
+            'Bạn đã sở hữu thú ảo Bun. Vào trang Thú ảo để đổi sang Bun.',
+          );
+        }
       }
 
       // 2a. Trừ tồn kho Stock theo CAS nguyên tử. The price and the on-sale

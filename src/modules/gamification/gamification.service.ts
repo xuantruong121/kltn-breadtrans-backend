@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   BadRequestException,
   NotFoundException,
@@ -6,6 +7,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { streakShieldUsedNotice } from './streak-shield.logic';
+import {
+  OWNING_ORDER_STATUSES,
+  ordersHoldSlug,
+  PET_BUN_SLUG,
+  PET_BUN_SPECIES,
+} from '../market/market-effects';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -1625,6 +1632,8 @@ export class GamificationService {
     ) {
       return 'foxy';
     }
+    // Bought in the shop. An exact key: seeded pets named "Bun" stay Bready.
+    if (n === PET_BUN_SPECIES || n.includes('pet bun')) return PET_BUN_SPECIES;
     return 'bready';
   }
 
@@ -2043,6 +2052,19 @@ export class GamificationService {
     );
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
     const targetSpecies = this.normalizeSpeciesKey(targetPetName);
+
+    // Bun is owned through its shop order; without one it stays locked.
+    if (targetSpecies === PET_BUN_SPECIES) {
+      const orders = await tx.marketOrder.findMany({
+        where: { userId, status: { in: OWNING_ORDER_STATUSES } },
+        select: { items: true },
+      });
+      if (!ordersHoldSlug(orders, PET_BUN_SLUG)) {
+        throw new ForbiddenException(
+          'Bạn chưa sở hữu thú ảo Bun. Đổi Bun trong Cửa hàng để mở.',
+        );
+      }
+    }
 
     const roster = ((pet as any).roster as Record<string, any>) || {};
 

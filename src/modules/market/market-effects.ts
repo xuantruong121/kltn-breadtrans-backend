@@ -28,3 +28,27 @@ export function extendDoubleBanhUntil(
     start.getTime() + quantity * DOUBLE_BANH_HOURS_PER_CARD * 60 * 60 * 1000,
   );
 }
+
+/**
+ * "Pet Bun đồng hành" unlocks the Bun pet (owner 2026-11-19). Ownership is the
+ * order itself: a learner owns Bun while an approved or completed order holds
+ * the product, so a refund takes it back and buyers from before this rule own
+ * it already. The species key is not "bun": seeded pets are named "Bun".
+ */
+export const PET_BUN_SLUG = 'pet-bun';
+export const PET_BUN_SPECIES = 'petbun';
+export const OWNING_ORDER_STATUSES = ['approved', 'completed'];
+
+/** Whether any of these orders (one learner's) holds the product. */
+export function ordersHoldSlug(
+  orders: Array<{ items: unknown }>,
+  slug: string,
+): boolean {
+  return orders.some(
+    (order) =>
+      Array.isArray(order.items) &&
+      (order.items as Array<{ slug?: unknown } | null>).some(
+        (item) => item?.slug === slug,
+      ),
+  );
+}
