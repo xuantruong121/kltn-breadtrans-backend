@@ -38,6 +38,15 @@ export class NotificationsController {
   @Post('subscribe')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Lưu đăng ký thông báo trình duyệt (Web Push) của trình duyệt này cho học viên đang đăng nhập',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã lưu; cùng endpoint thì cập nhật và gán cho học viên này',
+  })
   async subscribe(@Req() req: any, @Body() dto: SubscribeDto) {
     const userId = req.user.id;
     return await this.notificationsService.subscribe(userId, dto);
@@ -46,6 +55,14 @@ export class NotificationsController {
   @Post('unsubscribe')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Huỷ đăng ký thông báo trình duyệt của một endpoint',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã xoá đăng ký của học viên này (nếu có)',
+  })
   async unsubscribe(@Req() req: any, @Body() dto: UnsubscribeDto) {
     const userId = req.user.id;
     return await this.notificationsService.unsubscribe(dto.endpoint, userId);
@@ -54,13 +71,22 @@ export class NotificationsController {
   @Post('test')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Gửi một thông báo trình duyệt thử tới mọi trình duyệt đã đăng ký của học viên',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'result.sent: số trình duyệt nhận được; result.failed',
+  })
   async sendTestPush(@Req() req: any) {
     const userId = req.user.id;
     const result = await this.notificationsService.sendPushToUser(userId, {
-      title: 'BreadTrans - Kiểm tra thông báo',
-      body: 'Chúc mừng bạn đã kích hoạt thành công tính năng Web Push Notification trên thiết bị!',
+      title: 'BreadTrans - Thông báo thử',
+      body: 'Thông báo trình duyệt đã bật trên thiết bị này.',
       icon: '/icons/icon-192.png',
-      url: '/dashboard',
+      url: '/hub?tab=account-device',
     });
     return {
       success: true,
