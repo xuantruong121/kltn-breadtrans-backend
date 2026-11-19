@@ -7,6 +7,7 @@ import {
   OWNING_ORDER_STATUSES,
   ordersHoldSlug,
   PET_BUN_SLUG,
+  SHOP_BADGE_NAMES,
 } from './market-effects';
 import {
   Injectable,
@@ -393,27 +394,30 @@ export class MarketService {
           });
         }
 
-        // Tự động trao Huy hiệu nếu mua vật phẩm Huy hiệu
-        if (
-          product.name.includes('Huy Hiệu') ||
-          product.name.includes('Bậc Thầy Từ Vựng')
-        ) {
-          const badge = await tx.badge.findFirst({
-            where: {
-              OR: [
-                { name: 'Bậc Thầy Từ Vựng' },
-                { name: { contains: 'Bậc Thầy' } },
-              ],
-            },
+        // A shop badge grants its own Badge (owner 2026-11-19). The old check
+        // matched names ("Huy Hiệu" with a capital H never matched, and the
+        // Bậc Thầy badge did not exist), so neither purchase granted anything.
+        const badgeName = SHOP_BADGE_NAMES[product.slug];
+        if (badgeName) {
+          // The Badge row is created on first sale; the lock keeps two
+          // checkouts from creating it twice (Badge.name is not unique).
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shop_badge:${badgeName}`}))`;
+          const exists = await tx.badge.findFirst({
+            where: { name: badgeName },
+            select: { id: true },
           });
-          if (badge) {
-            // ON CONFLICT DO NOTHING (audit C5): two checkouts at once no
-            // longer roll the whole order back on the unique badge.
-            await tx.userBadge.createMany({
-              data: [{ userId, badgeId: badge.id }],
-              skipDuplicates: true,
+          if (!exists) {
+            await tx.badge.create({
+              data: {
+                name: badgeName,
+                description: 'Đổi trong Cửa hàng Bánh Mì.',
+                criteria: { source: 'shop', slug: product.slug },
+              },
             });
           }
+          await this.gamificationService.awardBadgeIfEarned(userId, badgeName, {
+            tx,
+          });
         }
       }
 

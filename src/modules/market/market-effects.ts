@@ -52,3 +52,16 @@ export function ordersHoldSlug(
       ),
   );
 }
+
+/**
+ * Shop cosmetics a learner can wear (seed slugs). A worn frame or badge is
+ * saved on the profile and shown to everyone, so only these values pass.
+ */
+export const FRAME_SLUGS = ['frame-orange', 'frame-crown', 'frame-cyber'];
+export const SHOP_BADGE_SLUGS = ['badge-star', 'badge-master'];
+
+/** The Badge a shop badge grants, by product slug (owner 2026-11-19). */
+export const SHOP_BADGE_NAMES: Readonly<Record<string, string>> = {
+  'badge-star': 'Ngôi Sao',
+  'badge-master': 'Bậc Thầy Từ Vựng',
+};

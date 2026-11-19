@@ -69,6 +69,9 @@ interface MatchPlayer {
   socketId: string;
   userName: string;
   avatar?: string;
+  /** Shop frame and badge the player wears (Profile), shown to the opponent. */
+  avatarFrame?: string | null;
+  badgeKey?: string | null;
   score: number;
   isDisconnected: boolean;
   disconnectedAt?: number;
@@ -607,6 +610,8 @@ export class ArenaGateway
     }
 
     const avatar = userStats.user?.profile?.avatar || '';
+    const avatarFrame = userStats.user?.profile?.avatarFrame ?? null;
+    const badgeKey = userStats.user?.profile?.badgeKey ?? null;
     const userName =
       userStats.user?.profile?.fullName ||
       userStats.user?.email ||
@@ -642,6 +647,8 @@ export class ArenaGateway
       userId,
       userName,
       avatar,
+      avatarFrame,
+      badgeKey,
       stake,
       gameId,
       queuedAt: Date.now(),
@@ -902,6 +909,8 @@ export class ArenaGateway
           socketId: p1.socketId,
           userName: p1.userName,
           avatar: p1.avatar,
+          avatarFrame: p1.avatarFrame ?? null,
+          badgeKey: p1.badgeKey ?? null,
           score: 0,
           isDisconnected: false,
           answers: {},
@@ -911,6 +920,8 @@ export class ArenaGateway
           socketId: p2.socketId,
           userName: p2.userName,
           avatar: p2.avatar,
+          avatarFrame: p2.avatarFrame ?? null,
+          badgeKey: p2.badgeKey ?? null,
           score: 0,
           isDisconnected: false,
           answers: {},
@@ -950,11 +961,15 @@ export class ArenaGateway
           userId: p1.userId,
           userName: p1.userName,
           avatar: p1.avatar,
+          avatarFrame: p1.avatarFrame ?? null,
+          badgeKey: p1.badgeKey ?? null,
         },
         player2: {
           userId: p2.userId,
           userName: p2.userName,
           avatar: p2.avatar,
+          avatarFrame: p2.avatarFrame ?? null,
+          badgeKey: p2.badgeKey ?? null,
         },
         questions: [],
         totalRounds: questions.length,
@@ -1317,11 +1332,15 @@ export class ArenaGateway
         userId: match.p1.userId,
         userName: match.p1.userName,
         avatar: match.p1.avatar,
+        avatarFrame: match.p1.avatarFrame ?? null,
+        badgeKey: match.p1.badgeKey ?? null,
       },
       player2: {
         userId: match.p2.userId,
         userName: match.p2.userName,
         avatar: match.p2.avatar,
+        avatarFrame: match.p2.avatarFrame ?? null,
+        badgeKey: match.p2.badgeKey ?? null,
       },
       questions: clientQuestions,
       p1: {

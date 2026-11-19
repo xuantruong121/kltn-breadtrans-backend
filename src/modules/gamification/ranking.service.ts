@@ -22,6 +22,9 @@ export type RankingEntry = {
   userId: number;
   displayName: string;
   avatarUrl: string | null;
+  /** The shop frame and badge the learner wears (Profile), shown to all. */
+  avatarFrame: string | null;
+  badgeKey: string | null;
   level: number;
   tier: string;
   value: number;
@@ -31,6 +34,8 @@ export type HallOfFameEntry = {
   userId: number;
   displayName: string;
   avatarUrl: string | null;
+  avatarFrame: string | null;
+  badgeKey: string | null;
   value: number;
 } | null;
 
@@ -161,6 +166,8 @@ export class RankingService {
             userId: row.userId,
             displayName: p.displayName,
             avatarUrl: p.avatarUrl,
+            avatarFrame: p.avatarFrame,
+            badgeKey: p.badgeKey,
             value: row.value,
           }
         : null;
@@ -437,7 +444,14 @@ export class RankingService {
       where: { id: { in: userIds }, role: Role.STUDENT },
       select: {
         id: true,
-        profile: { select: { fullName: true, avatar: true } },
+        profile: {
+          select: {
+            fullName: true,
+            avatar: true,
+            avatarFrame: true,
+            badgeKey: true,
+          },
+        },
         leaderboard: { select: { tier: true, totalPoints: true } },
       },
     });
@@ -448,6 +462,8 @@ export class RankingService {
           userId: u.id,
           displayName: u.profile?.fullName || `Học viên #${u.id}`,
           avatarUrl: u.profile?.avatar ?? null,
+          avatarFrame: u.profile?.avatarFrame ?? null,
+          badgeKey: u.profile?.badgeKey ?? null,
           level: xpLevel(u.leaderboard?.totalPoints ?? 0),
           tier: u.leaderboard?.tier ?? 'Đồng',
         },

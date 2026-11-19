@@ -10,7 +10,13 @@ import {
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateShippingProfileDto } from './dto/update-shipping-profile.dto';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { UpdateCosmeticsDto } from './dto/update-cosmetics.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
 
@@ -98,6 +104,26 @@ export class UserController {
     @Body() updateData: UpdateProfileDto,
   ) {
     return this.userService.updateUserProfile(req.user.id, updateData);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch('cosmetics')
+  @ApiOperation({
+    summary:
+      'Đổi khung avatar và huy hiệu đang dùng (món đã đổi trong Cửa hàng)',
+  })
+  @ApiResponse({ status: 200, description: 'Trả về profile đã cập nhật.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Không phải món bán trong Cửa hàng.',
+  })
+  @ApiResponse({ status: 403, description: 'Chưa sở hữu món này.' })
+  async updateCosmetics(
+    @Request() req: any,
+    @Body() change: UpdateCosmeticsDto,
+  ) {
+    return this.userService.updateCosmetics(req.user.id, change);
   }
 
   @UseGuards(JwtAuthGuard)

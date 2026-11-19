@@ -1370,6 +1370,8 @@ export class GamificationService {
               select: {
                 fullName: true,
                 avatar: true,
+                avatarFrame: true,
+                badgeKey: true,
               },
             },
           },
@@ -1382,6 +1384,8 @@ export class GamificationService {
       userId: entry.userId,
       displayName: entry.user?.profile?.fullName || `Học viên #${entry.userId}`,
       avatarUrl: entry.user?.profile?.avatar || null,
+      avatarFrame: entry.user?.profile?.avatarFrame ?? null,
+      badgeKey: entry.user?.profile?.badgeKey ?? null,
       tier: entry.tier,
       totalPoints: entry.totalPoints,
       weeklyExp: entry.weeklyExp,
@@ -1393,6 +1397,8 @@ export class GamificationService {
       userId: number;
       displayName: string;
       avatarUrl: string | null;
+      avatarFrame: string | null;
+      badgeKey: string | null;
       tier: string;
       totalPoints: number;
       weeklyExp: number;
@@ -1414,6 +1420,8 @@ export class GamificationService {
                   select: {
                     fullName: true,
                     avatar: true,
+                    avatarFrame: true,
+                    badgeKey: true,
                   },
                 },
               },
@@ -1446,6 +1454,8 @@ export class GamificationService {
             displayName:
               myBoard.user?.profile?.fullName || `Học viên #${myBoard.userId}`,
             avatarUrl: myBoard.user?.profile?.avatar || null,
+            avatarFrame: myBoard.user?.profile?.avatarFrame ?? null,
+            badgeKey: myBoard.user?.profile?.badgeKey ?? null,
             tier: myBoard.tier,
             totalPoints: myBoard.totalPoints,
             weeklyExp: myBoard.weeklyExp,

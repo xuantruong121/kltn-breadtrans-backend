@@ -172,6 +172,89 @@ describe('MarketService', () => {
     });
   });
 
+  describe('createOrder - shop badges grant a real badge', () => {
+    const star = {
+      id: 1,
+      slug: 'badge-star',
+      name: 'Huy hiệu Ngôi Sao',
+      price: 300,
+      stock: 100,
+      isActive: true,
+      fulfillmentType: 'DIGITAL',
+      category: 'BADGE',
+    };
+    const txWith = (existingBadge: { id: number } | null) => ({
+      $executeRaw: jest.fn(),
+      $queryRaw: jest.fn(),
+      marketOrder: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest
+          .fn()
+          .mockResolvedValue({ id: 71, status: 'approved', totalBanh: 300 }),
+      },
+      marketProduct: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      userStats: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 1000 }),
+        update: jest.fn(),
+      },
+      banhTransaction: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+      marketPhysicalRedemption: { create: jest.fn() },
+      notification: { create: jest.fn() },
+      badge: {
+        findFirst: jest.fn().mockResolvedValue(existingBadge),
+        create: jest.fn().mockResolvedValue({ id: 99 }),
+      },
+      userBadge: { createMany: jest.fn() },
+    });
+
+    beforeEach(() => {
+      mockPrismaService.marketProduct.findMany.mockResolvedValue([star]);
+      mockPrismaService.marketOrder.findUnique.mockResolvedValue(null);
+      mockPrismaService.profile.findUnique.mockResolvedValue({
+        fullName: 'Badge Learner',
+      });
+      (mockGamificationService as any).awardBadgeIfEarned = jest
+        .fn()
+        .mockResolvedValue(true);
+    });
+
+    it('creates the Ngôi Sao badge on first sale and grants it in the order transaction', async () => {
+      const tx = txWith(null);
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+      await service.createOrder(
+        3,
+        { items: [{ id: 'badge-star', quantity: 1 }] },
+        'star-1',
+      );
+      expect(tx.badge.create.mock.calls[0][0].data).toMatchObject({
+        name: 'Ngôi Sao',
+      });
+      expect(
+        (mockGamificationService as any).awardBadgeIfEarned,
+      ).toHaveBeenCalledWith(3, 'Ngôi Sao', { tx });
+    });
+
+    it('reuses an existing badge row', async () => {
+      const tx = txWith({ id: 12 });
+      mockPrismaService.$transaction.mockImplementation(
+        (callback: (client: unknown) => Promise<unknown>) => callback(tx),
+      );
+      await service.createOrder(
+        3,
+        { items: [{ id: 'badge-star', quantity: 1 }] },
+        'star-2',
+      );
+      expect(tx.badge.create).not.toHaveBeenCalled();
+      expect(
+        (mockGamificationService as any).awardBadgeIfEarned,
+      ).toHaveBeenCalled();
+    });
+  });
+
   describe('createOrder - Pet Bun is bought once', () => {
     const petBun = {
       id: 4,

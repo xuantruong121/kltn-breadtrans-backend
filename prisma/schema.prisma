@@ -289,6 +289,11 @@ model Profile {
   birthYear     Int?
   nextExamDate  String? // YYYY-MM-DD
   isSelfClaimed Boolean @default(false)
+
+  // Shop cosmetics in use (owner 2026-11-19): a frame slug and a badge slug the
+  // learner owns through an order; shown to everyone (ranking, arena).
+  avatarFrame String?
+  badgeKey    String?
 }
 
 model UserStats {
