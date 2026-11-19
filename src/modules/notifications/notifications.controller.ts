@@ -14,6 +14,12 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 import { SubscribeDto, UnsubscribeDto } from './dto/push-subscription.dto';
@@ -65,17 +71,50 @@ export class NotificationsController {
 
   @Get('inbox')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Thông báo của học viên, mới nhất trước: theo trang (page) hoặc theo cursor',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: '1–50, mặc định 20',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description:
+      'Trang (từ 1). Có page thì trả thêm total, totalPages; trang quá cuối trả trang cuối',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'Id thông báo cuối của lần trước (khi không dùng page)',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    enum: ['all', 'unread', 'read'],
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'items, nextCursor; với page thêm page, pageSize, total, totalPages',
+  })
   async getInbox(
     @Req() req: any,
     @Query('limit') limit?: number,
     @Query('cursor') cursor?: number,
     @Query('filter') filter?: 'all' | 'unread' | 'read',
+    @Query('page') page?: number,
   ) {
     return await this.notificationsService.getInbox(
       req.user.id,
       limit,
       cursor,
       filter,
+      page,
     );
   }
 

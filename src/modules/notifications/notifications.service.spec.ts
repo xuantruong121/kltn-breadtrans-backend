@@ -73,17 +73,83 @@ describe('NotificationsService', () => {
   });
 
   describe('getInbox', () => {
-    it('returns items and calculates nextCursor', async () => {
-      const mockItems = [
-        { id: 3, title: 'Item 3' },
-        { id: 2, title: 'Item 2' },
-        { id: 1, title: 'Item 1' },
-      ];
-      prisma.notification.findMany.mockResolvedValue([...mockItems]);
+    // Newest first, as the inbox orders them. The fake applies take, cursor and
+    // skip the way Prisma does: the cursor row is the start, skip 1 steps past it.
+    const inbox = [5, 4, 3, 2, 1].map((id) => ({ id, title: `Item ${id}` }));
+    const fakeFindMany = (args: {
+      take: number;
+      skip?: number;
+      cursor?: { id: number };
+    }) => {
+      const start = args.cursor
+        ? inbox.findIndex((n) => n.id === args.cursor!.id)
+        : 0;
+      const from = start + (args.skip ?? 0);
+      return Promise.resolve(inbox.slice(from, from + args.take));
+    };
 
+    it('returns a page and the cursor of its last item', async () => {
+      prisma.notification.findMany.mockImplementation(fakeFindMany);
       const res = await service.getInbox(10, 2);
-      expect(res.items.length).toBe(2);
-      expect(res.nextCursor).toBe(1);
+      expect(res.items.map((n) => n.id)).toEqual([5, 4]);
+      expect(res.nextCursor).toBe(4);
+    });
+
+    it('loses no notification when following the cursor', async () => {
+      prisma.notification.findMany.mockImplementation(fakeFindMany);
+      const seen: number[] = [];
+      let cursor: number | undefined;
+      for (let i = 0; i < 5; i++) {
+        const res = await service.getInbox(10, 2, cursor);
+        seen.push(...res.items.map((n) => n.id));
+        if (!res.nextCursor) break;
+        cursor = res.nextCursor;
+      }
+      expect(seen).toEqual([5, 4, 3, 2, 1]);
+    });
+
+    it('serves numbered pages with the total', async () => {
+      prisma.notification.count.mockResolvedValue(5);
+      prisma.notification.findMany.mockResolvedValue([{ id: 3 }, { id: 2 }]);
+      const res = await service.getInbox(10, 2, undefined, 'all', 2);
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 10 },
+          skip: 2,
+          take: 2,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        }),
+      );
+      expect(res).toMatchObject({
+        page: 2,
+        pageSize: 2,
+        total: 5,
+        totalPages: 3,
+        nextCursor: null,
+      });
+    });
+
+    it('moves a page past the end back to the last page', async () => {
+      // The last notification of the last page was just deleted.
+      prisma.notification.count.mockResolvedValue(4);
+      prisma.notification.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+      const res = await service.getInbox(10, 2, undefined, 'all', 3);
+      expect(res.page).toBe(2);
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 2 }),
+      );
+    });
+
+    it('has one empty first page when there is nothing', async () => {
+      prisma.notification.count.mockResolvedValue(0);
+      prisma.notification.findMany.mockResolvedValue([]);
+      const res = await service.getInbox(10, 20, undefined, 'unread', 1);
+      expect(res).toMatchObject({
+        page: 1,
+        total: 0,
+        totalPages: 1,
+        items: [],
+      });
     });
   });
 
