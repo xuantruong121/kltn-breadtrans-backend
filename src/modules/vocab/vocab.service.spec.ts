@@ -259,6 +259,90 @@ describe('VocabService', () => {
     });
   });
 
+  describe('flashcard XP (owner 2026-11-18)', () => {
+    const withGamification = (xp = 2) => {
+      const gamification = {
+        awardVocabWordXp: jest.fn().mockResolvedValue(xp),
+      };
+      (service as any).gamification = gamification;
+      const prisma = (service as any).prisma;
+      prisma.learningActivity = { create: jest.fn().mockResolvedValue({}) };
+      return { gamification, prisma };
+    };
+
+    it('a word marked known for the first time pays its XP and says how much', async () => {
+      const { gamification, prisma } = withGamification();
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...data, isMastered: true }),
+          ),
+      };
+
+      const res = await service.setMastered(1, 10, true);
+
+      expect(gamification.awardVocabWordXp).toHaveBeenCalledWith(1, 10);
+      expect(res).toMatchObject({ isMastered: true, xpEarned: 2 });
+    });
+
+    it('a review that makes the word known pays; one of a word already known does not', async () => {
+      const { gamification, prisma } = withGamification();
+      prisma.userVocabWordProgress = {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 1, reviewCount: 0, isMastered: false })
+          .mockResolvedValueOnce({ id: 1, reviewCount: 1, isMastered: true }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+      };
+
+      const first = await service.submitReview(1, 10, true, 'GOOD');
+      const second = await service.submitReview(1, 10, true, 'GOOD');
+
+      expect(gamification.awardVocabWordXp).toHaveBeenCalledTimes(1);
+      expect(first).toMatchObject({ xpEarned: 2 });
+      expect(second).toMatchObject({ xpEarned: 0 });
+    });
+
+    it('"Học lại" pays nothing', async () => {
+      const { gamification, prisma } = withGamification();
+      prisma.userVocabWordProgress = {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 1, reviewCount: 0, isMastered: false }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+      };
+
+      const res = await service.submitReview(1, 10, false, 'AGAIN');
+
+      expect(gamification.awardVocabWordXp).not.toHaveBeenCalled();
+      expect(res).toMatchObject({ xpEarned: 0 });
+    });
+
+    it('a failed XP award keeps the review', async () => {
+      const { gamification, prisma } = withGamification();
+      gamification.awardVocabWordXp.mockRejectedValue(new Error('db busy'));
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...data, isMastered: true }),
+          ),
+      };
+
+      await expect(service.setMastered(1, 10, true)).resolves.toMatchObject({
+        isMastered: true,
+        xpEarned: 0,
+      });
+    });
+  });
+
   describe('submitReview', () => {
     it('schedules review for incorrect answer at 10 minutes', async () => {
       const prisma = (service as any).prisma;

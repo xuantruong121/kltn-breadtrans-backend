@@ -5,8 +5,10 @@
  *   - standalone Writing practice     (catalog Quiz WRITING_* with a practice topic)
  *   - standalone Speaking practice    (SpeakingExercise outside exam sets)
  *   - Vocabulary Arena                (rewarded in the arena gateway itself)
+ *   - Flashcards: XP only, 2 the first time a word is known, 150 a day
+ *     (owner 2026-11-18, vocab-xp.logic.ts); no Bánh mì, no daily quest.
  * Everything else (Entry Diagnostic, every TOEIC product, grammar,
- * flashcards and vocabulary, other quizzes) keeps its scores and progress but earns nothing, directly or through
+ * other quizzes) keeps its scores and progress but earns nothing, directly or through
  * daily quests and badges.
  *
  * The decision is made from server data about what the content belongs to,

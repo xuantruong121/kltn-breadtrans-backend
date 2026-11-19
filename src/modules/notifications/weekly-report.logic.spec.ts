@@ -91,6 +91,40 @@ describe('focusSkill', () => {
       focusSkill([week({ skill: 'READING', count: 2, target: 2 })]),
     ).toBeNull();
   });
+
+  // The week student2 had: Reading is the weakest skill (as on the dashboard)
+  // but Writing, with no item at all, has the lowest done/target ratio.
+  const lastWeek = [
+    week({ skill: 'LISTENING', count: 4, target: 6 }),
+    week({ skill: 'READING', count: 2, target: 9 }),
+    week({ skill: 'SPEAKING', count: 10, target: 3 }),
+    week({ skill: 'WRITING', count: 0, target: 2 }),
+  ];
+
+  it('puts the weakest skill first while it is behind its target', () => {
+    const focus = focusSkill(lastWeek, 'READING');
+    expect(focus?.skill).toBe('READING');
+    expect(focus?.target).toBe(9);
+  });
+
+  it('falls back to the furthest-behind skill once the weakest one is on target', () => {
+    expect(focusSkill(lastWeek, 'SPEAKING')?.skill).toBe('WRITING');
+  });
+
+  it('keeps the furthest-behind rule without a weakest skill', () => {
+    expect(focusSkill(lastWeek)?.skill).toBe('WRITING');
+    expect(focusSkill(lastWeek, null)?.skill).toBe('WRITING');
+  });
+
+  it('tells the learner to put the weakest skill first', () => {
+    const { body } = weeklyReportMessage({
+      weekStart,
+      skills: lastWeek,
+      daysToExam: null,
+      weakest: 'READING',
+    });
+    expect(body).toContain('Tuần này nên ưu tiên Đọc: mục tiêu 9 bài.');
+  });
 });
 
 describe('daysUntil and lastWeekLabel', () => {
@@ -145,7 +179,8 @@ describe('weeklyReportMessage', () => {
     );
     expect(message.body).toContain('Còn 45 ngày tới ngày thi bạn đặt.');
     expect(message.body).toContain(PRACTICE_SCORE_NOTE);
-    expect(message.url).toBe('/dashboard');
+    // Opens the dashboard at the "Tuần này của bạn" card (WeekPlanCard).
+    expect(message.url).toBe('/dashboard#week-plan');
   });
 
   it('nudges a learner who did nothing, without a score note', () => {

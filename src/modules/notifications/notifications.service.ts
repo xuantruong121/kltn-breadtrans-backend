@@ -191,11 +191,18 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
+  /**
+   * The inbox, newest first. With `page` (1-based) it serves numbered pages
+   * and the total, for the notifications page; a page past the end falls back
+   * to the last one (the last item of the last page was just deleted).
+   * Without `page` it pages by cursor, for the header bell.
+   */
   async getInbox(
     userId: number,
     limit = 20,
     cursor?: number,
     filter: 'all' | 'unread' | 'read' = 'all',
+    page?: number,
   ) {
     const take = Math.min(Math.max(Number(limit) || 20, 1), 50);
     const cursorNum = cursor ? Number(cursor) : undefined;
@@ -206,19 +213,45 @@ export class NotificationsService implements OnModuleInit {
       ...(normalizedFilter === 'unread' ? { isRead: false } : {}),
       ...(normalizedFilter === 'read' ? { isRead: true } : {}),
     };
+    // The id breaks ties between notifications created in the same instant.
+    const orderBy = [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
+
+    const pageNum = Math.floor(Number(page));
+    if (page !== undefined && Number.isFinite(pageNum)) {
+      const total = await this.prisma.notification.count({ where });
+      const totalPages = Math.max(1, Math.ceil(total / take));
+      const current = Math.min(Math.max(1, pageNum), totalPages);
+      const items = await this.prisma.notification.findMany({
+        where,
+        skip: (current - 1) * take,
+        take,
+        orderBy,
+      });
+      return {
+        items,
+        nextCursor: null,
+        page: current,
+        pageSize: take,
+        total,
+        totalPages,
+      };
+    }
 
     const items = await this.prisma.notification.findMany({
       where,
       take: take + 1,
       cursor: cursorNum ? { id: cursorNum } : undefined,
       skip: cursorNum ? 1 : 0,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
     });
 
+    // One extra row tells whether there is more. The next page starts after
+    // the last row kept here (the cursor row itself is skipped), so the cursor
+    // is that row's id, not the extra row's.
     let nextCursor: number | null = null;
     if (items.length > take) {
-      const nextItem = items.pop();
-      nextCursor = nextItem?.id || null;
+      items.pop();
+      nextCursor = items[items.length - 1]?.id ?? null;
     }
 
     return {

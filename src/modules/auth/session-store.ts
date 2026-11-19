@@ -42,6 +42,21 @@ const setKey = (userId: number) => `auth:sessions:${userId}`;
 /** Read by JwtStrategy and the socket gateways: kept in its old shape. */
 export const loggedOutKey = (userId: number, deviceId: string) =>
   `user:${userId}:device:${deviceId}:logged_out_at`;
+
+/**
+ * Whether a device's logout (mark in ms) ends an access token (iat in whole
+ * seconds). Compared in seconds: a browser keeps its device id across
+ * sign-ins (bt_dev), and a sign-in in the same second as the logout must not
+ * be refused. A token from earlier in that second is accepted too; the token
+ * the logout used is deny-listed on its own.
+ */
+export function endedByLogout(
+  iatSeconds: number | undefined,
+  loggedOutAt: string | null,
+): boolean {
+  if (!loggedOutAt || !iatSeconds) return false;
+  return iatSeconds < Math.floor(Number(loggedOutAt) / 1000);
+}
 const passwordChangedKey = (userId: number) =>
   `auth:password-changed-at:${userId}`;
 

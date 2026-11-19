@@ -47,6 +47,8 @@ export type DeviceMeta = {
   remember?: boolean;
   /** Client IP, recorded with a consent. */
   ip?: string | null;
+  /** This browser's device id (bt_dev cookie), reused across sign-ins. */
+  deviceId?: string;
 };
 import { Prisma, Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
@@ -433,7 +435,8 @@ export class AuthService {
     const email = payload.email.toLowerCase();
     const fullName = payload.name || 'Học viên BreadTrans';
     const avatar = payload.picture || null;
-    const deviceId = dto.deviceId || crypto.randomUUID();
+    // The browser's own device id first, so signing in again replaces its session.
+    const deviceId = meta.deviceId ?? dto.deviceId ?? crypto.randomUUID();
 
     const profile = { providerId: googleSub, email, fullName, avatar };
     const user =
@@ -502,7 +505,8 @@ export class AuthService {
       throw new UnauthorizedException('Mật khẩu không chính xác.');
     }
 
-    const deviceId = dto.deviceId || crypto.randomUUID();
+    // The browser's own device id first, so signing in again replaces its session.
+    const deviceId = meta.deviceId ?? dto.deviceId ?? crypto.randomUUID();
     await this.assertNotPendingDeletion(user);
 
     const linkedAccount = await this.prisma.authAccount.findUnique({
@@ -600,7 +604,7 @@ export class AuthService {
         });
       }
       const created = await this.createGoogleUser(payload.pending, true, meta);
-      return this.issueTokens(created, payload.deviceId, {
+      return this.issueTokens(created, meta.deviceId ?? payload.deviceId, {
         ...meta,
         remember: true,
       });
@@ -613,7 +617,9 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản không còn hợp lệ.');
     }
     await this.assertNotPendingDeletion(user);
-    return this.issueTokens(user, payload.deviceId, {
+    // The callback was a redirect from Google, which carries no Strict cookie;
+    // this exchange does, so the browser's device id wins over the one made then.
+    return this.issueTokens(user, meta.deviceId ?? payload.deviceId, {
       ...meta,
       remember: true,
     });

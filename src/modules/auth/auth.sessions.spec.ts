@@ -21,6 +21,11 @@ function memoryRedis() {
     store,
     sets,
     get: jest.fn(async (k: string) => store.get(k) ?? null),
+    getdel: jest.fn(async (k: string) => {
+      const v = store.get(k) ?? null;
+      store.delete(k);
+      return v;
+    }),
     set: jest.fn(async (k: string, v: string) => {
       store.set(k, v);
       return 'OK';
@@ -145,8 +150,11 @@ describe('refresh tokens, cookies and revocation', () => {
         ...headers,
       },
     }) as any;
-  const cookieValue = (r: ReturnType<typeof res>) =>
-    r.cookie.mock.calls.at(-1)?.[1] as string;
+  /** The last value set for a cookie (sign-ins also set the device cookie). */
+  const cookieCall = (r: ReturnType<typeof res>, name = 'bt_rt') =>
+    r.cookie.mock.calls.filter((c) => c[0] === name).at(-1);
+  const cookieValue = (r: ReturnType<typeof res>, name = 'bt_rt') =>
+    cookieCall(r, name)?.[1] as string;
 
   beforeEach(async () => {
     user.password = await bcrypt.hash('mot cum tu de nho', 4);
@@ -188,7 +196,7 @@ describe('refresh tokens, cookies and revocation', () => {
     );
     // Not remembered: a session cookie without maxAge.
     const short = await login(false);
-    expect(short.r.cookie.mock.calls[0][2]).not.toHaveProperty('maxAge');
+    expect(cookieCall(short.r)?.[2]).not.toHaveProperty('maxAge');
     // Signed with the refresh secret: the access secret cannot verify it.
     expect(() => jwt.verify(token)).toThrow();
   });
@@ -297,6 +305,84 @@ describe('refresh tokens, cookies and revocation', () => {
     expect(list[0].userAgent).toContain('Chrome');
     expect(await service.revokeOtherSessions(user.id, a.deviceId)).toEqual({
       revoked: 1,
+    });
+  });
+
+  describe('one browser stays one device', () => {
+    const signIn = async (cookie?: string) => {
+      const r = res();
+      await controller.login(
+        { email: user.email, password: 'mot cum tu de nho', rememberMe: true },
+        req(cookie),
+        r as any,
+      );
+      return r;
+    };
+
+    it('a sign-in sets the device cookie, and the next sign-in with it replaces the session', async () => {
+      const first = await signIn();
+      const device = cookieValue(first, 'bt_dev');
+      expect(device).toMatch(/^[0-9a-f-]{36}$/);
+      expect(cookieCall(first, 'bt_dev')?.[2]).toEqual(
+        expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
+      );
+      await signIn(`bt_dev=${device}`);
+      const sessions = await service.sessions.list(user.id);
+      expect(sessions.map((s) => s.deviceId)).toEqual([device]);
+    });
+
+    it('without the cookie (another browser) a sign-in is a new device', async () => {
+      await signIn();
+      await signIn();
+      expect(await service.sessions.list(user.id)).toHaveLength(2);
+    });
+
+    it('a malformed device cookie is ignored', async () => {
+      const r = await signIn('bt_dev=evil');
+      const [session] = await service.sessions.list(user.id);
+      expect(session.deviceId).not.toBe('evil');
+      expect(cookieValue(r, 'bt_dev')).toBe(session.deviceId);
+    });
+
+    it('logout keeps the device cookie, so the browser signs in again as the same device', async () => {
+      const first = await signIn();
+      const device = cookieValue(first, 'bt_dev');
+      const out = res();
+      await controller.logout(
+        {
+          user: { id: user.id, deviceId: device },
+          headers: {
+            authorization: 'Bearer x',
+            'x-requested-with': 'breadtrans',
+          },
+        } as any,
+        out as any,
+      );
+      expect(out.clearCookie.mock.calls.map((c) => c[0])).not.toContain(
+        'bt_dev',
+      );
+      await signIn(`bt_dev=${device}`);
+      expect(
+        (await service.sessions.list(user.id)).map((s) => s.deviceId),
+      ).toEqual([device]);
+    });
+
+    it('the Google code exchange uses the device cookie, not the id made at the callback', async () => {
+      const device = '0b7c6a7e-4f2d-4f7b-9d65-2a1f3c9e8b10';
+      redis.store.set(
+        'auth:google:code:abc',
+        JSON.stringify({ userId: user.id, deviceId: 'made-at-callback' }),
+      );
+      const r = res();
+      await controller.exchangeGoogleCode(
+        { code: 'abc' },
+        req(`bt_dev=${device}`),
+        r as any,
+      );
+      expect(
+        (await service.sessions.list(user.id)).map((s) => s.deviceId),
+      ).toEqual([device]);
+      expect(cookieValue(r, 'bt_dev')).toBe(device);
     });
   });
 });

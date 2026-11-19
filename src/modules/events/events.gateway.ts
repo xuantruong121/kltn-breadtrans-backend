@@ -18,6 +18,7 @@ import { SupportService } from '../support/support.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
+import { endedByLogout } from '../auth/session-store';
 
 const getSocketCorsConfig = () => {
   if (process.env.NODE_ENV !== 'production') {
@@ -100,11 +101,7 @@ export class EventsGateway
       const loggedOutAt = await this.redis.get(
         `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
       );
-      if (
-        loggedOutAt &&
-        payload.iat &&
-        payload.iat * 1000 < Number(loggedOutAt)
-      ) {
+      if (endedByLogout(payload.iat, loggedOutAt)) {
         throw new Error('Device session revoked');
       }
       const user = await this.prisma.user.findUnique({

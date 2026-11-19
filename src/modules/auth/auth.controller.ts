@@ -58,18 +58,33 @@ import {
   csrfProblem,
   readCookie,
   setRefreshCookie,
+  deviceIdFrom,
+  setDeviceCookie,
 } from './auth-cookie';
 
-/** The refresh token goes into the cookie only, never into the JSON body. */
+/**
+ * The refresh token goes into the cookie only, never into the JSON body. The
+ * device cookie is (re)set with it, so this browser keeps one device id.
+ */
 function withCookie<
-  T extends { refresh_token: string | null; remember: boolean },
+  T extends {
+    refresh_token: string | null;
+    remember: boolean;
+    deviceId?: string;
+  },
 >(res: Response, result: T) {
   if (result.refresh_token)
     setRefreshCookie(res, result.refresh_token, result.remember);
+  if (result.refresh_token && result.deviceId)
+    setDeviceCookie(res, result.deviceId);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { refresh_token, ...rest } = result;
   return rest;
 }
+
+/** This browser's device id from its bt_dev cookie, or a new one for a browser without it. */
+const deviceIdOf = (req: ExpressRequest) =>
+  deviceIdFrom(req.headers.cookie) ?? crypto.randomUUID();
 
 const userAgentOf = (req: ExpressRequest) =>
   typeof req.headers['user-agent'] === 'string'
@@ -161,10 +176,11 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Each sign-in is a new device session; the id lives in the tokens.
+    // The same browser signs in again as the same device (bt_dev cookie);
+    // its previous session is replaced. The id lives in the tokens.
     return withCookie(
       res,
-      await this.authService.login(loginDto, crypto.randomUUID(), {
+      await this.authService.login(loginDto, deviceIdOf(req), {
         userAgent: userAgentOf(req),
       }),
     );
@@ -191,7 +207,10 @@ export class AuthController {
   ) {
     return withCookie(
       res,
-      await this.authService.loginWithGoogle(dto, consentMetaOf(req)),
+      await this.authService.loginWithGoogle(dto, {
+        ...consentMetaOf(req),
+        deviceId: deviceIdOf(req),
+      }),
     );
   }
 
@@ -214,6 +233,7 @@ export class AuthController {
       res,
       await this.authService.linkGoogleWithPassword(dto, {
         userAgent: userAgentOf(req),
+        deviceId: deviceIdOf(req),
       }),
     );
   }
@@ -252,7 +272,7 @@ export class AuthController {
       res,
       await this.authService.exchangeGoogleLoginCode(
         body.code,
-        consentMetaOf(req),
+        { ...consentMetaOf(req), deviceId: deviceIdOf(req) },
         body.acceptTerms === true,
       ),
     );

@@ -22,6 +22,7 @@ import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getJwtSecret } from '../auth/auth.constants';
 import * as crypto from 'crypto';
+import { endedByLogout } from '../auth/session-store';
 import { GamificationService } from '../gamification/gamification.service';
 import { loadAllReviewedWords, loadDeckWords } from './arena-word-pool';
 import {
@@ -403,11 +404,7 @@ export class ArenaGateway
       const loggedOutAt = await this.redis.get(
         `user:${payload.sub}:device:${payload.deviceId}:logged_out_at`,
       );
-      if (
-        loggedOutAt &&
-        payload.iat &&
-        payload.iat * 1000 < Number(loggedOutAt)
-      ) {
+      if (endedByLogout(payload.iat, loggedOutAt)) {
         throw new Error('Device session revoked');
       }
       const user = await this.prisma.user.findUnique({

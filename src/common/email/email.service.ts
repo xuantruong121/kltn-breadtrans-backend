@@ -1,10 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+import {
+  isSkippedRecipient,
+  parseSkipDomains,
+  recipientDomain,
+} from './email-recipient.logic';
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly transporter: nodemailer.Transporter | null;
+  /** EMAIL_SKIP_DOMAINS: test domains nobody owns; mail there only bounces. */
+  private readonly skipDomains = parseSkipDomains(
+    process.env.EMAIL_SKIP_DOMAINS,
+  );
 
   constructor() {
     const host = process.env.SMTP_HOST;
@@ -23,6 +33,13 @@ export class EmailService {
   }
 
   private async send(to: string, subject: string, html: string): Promise<void> {
+    if (isSkippedRecipient(to, this.skipDomains)) {
+      // The in-app notification is still created by the caller; only the mail is dropped.
+      this.logger.log(
+        `email_skipped_test_domain domain=${recipientDomain(to)} subject="${subject}"`,
+      );
+      return;
+    }
     const from = process.env.SMTP_FROM || process.env.SMTP_USER;
     if (!this.transporter || !from) {
       if (process.env.NODE_ENV === 'production') {

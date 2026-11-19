@@ -12,6 +12,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { applyHttpSecurity } from './common/http/security';
+import { answerFavicon } from './common/http/favicon';
 
 function startPhase812RuntimeMetrics() {
   if (process.env.PHASE812_RUNTIME_METRICS !== 'true') return;
@@ -66,6 +67,7 @@ async function bootstrap() {
   });
 
   applyHttpSecurity(app);
+  answerFavicon(app);
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());

@@ -5,9 +5,10 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { DictionaryLookupService } from './dictionary-lookup.service';
 import { AiModule } from '../ai/ai.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
-  imports: [PrismaModule, AiModule, SubscriptionModule],
+  imports: [PrismaModule, AiModule, SubscriptionModule, GamificationModule],
   controllers: [VocabController],
   providers: [VocabService, DictionaryLookupService],
   exports: [VocabService],

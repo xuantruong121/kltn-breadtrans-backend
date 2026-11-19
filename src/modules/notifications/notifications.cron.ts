@@ -29,7 +29,11 @@ import {
   weekStart,
   weeklyTargets,
 } from '../learning-path/week.logic';
-import { GOAL_SKILLS } from '../learning-path/recommendation.logic';
+import {
+  GOAL_SKILLS,
+  weakestSkill,
+  type LearnerState,
+} from '../learning-path/recommendation.logic';
 import { isWinbackDay, winbackMessage, winbackType } from './winback-message';
 import {
   ACTIVE_WITHIN_DAYS,
@@ -319,6 +323,19 @@ export class NotificationsCronService {
         },
       },
     });
+    // Skill levels, for the weakest skill the dashboard week plan also uses.
+    const levels = learners.length
+      ? await this.prisma.learnerSkillLevel.findMany({
+          where: { userId: { in: learners.map((l) => l.id) } },
+          select: {
+            userId: true,
+            skill: true,
+            level: true,
+            unlockedLevel: true,
+            ability: true,
+          },
+        })
+      : [];
     const events = learners.length
       ? await this.prisma.learnerProgressEvent.findMany({
           where: {
@@ -341,11 +358,21 @@ export class NotificationsCronService {
     let sent = 0;
     for (const learner of learners) {
       const profile = learner.learnerProfile;
+      const skills: LearnerState['skills'] = {};
+      for (const l of levels.filter((l) => l.userId === learner.id))
+        skills[l.skill] = {
+          level: l.level,
+          unlockedLevel: l.unlockedLevel,
+          ability: l.ability,
+        };
+      const weakest = weakestSkill({ skills });
+      // Same targets as the dashboard "Tuần này" (learning-path week()).
       const targets = weeklyTargets(
         profile?.minutesPerDay ?? 15,
-        skillWeights(GOAL_SKILLS[profile?.goal ?? 'GENERAL'], null),
+        skillWeights(GOAL_SKILLS[profile?.goal ?? 'GENERAL'], weakest),
       );
       const message = weeklyReportMessage({
+        weakest,
         mistakeTags: await this.lastWeekMistakeTags(learner.id, thisWeek),
         weekStart: thisWeek,
         skills: summarizeWeeks({
