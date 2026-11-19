@@ -32,6 +32,36 @@ export function setRefreshCookie(
   });
 }
 
+/**
+ * The browser's device id (owner 2026-11-19): the same browser signing in
+ * again is the same device, so its session is replaced instead of adding a
+ * row to Tài khoản → Thiết bị. Not a secret, but HttpOnly and Strict like the
+ * refresh cookie, on the same path. Logout keeps it.
+ */
+export const DEVICE_COOKIE = 'bt_dev';
+const DEVICE_COOKIE_DAYS = 365;
+const DEVICE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function setDeviceCookie(
+  res: Pick<Response, 'cookie'>,
+  deviceId: string,
+) {
+  res.cookie(DEVICE_COOKIE, deviceId, {
+    httpOnly: true,
+    secure: secureCookie(),
+    sameSite: 'strict',
+    path: refreshCookiePath(),
+    maxAge: DEVICE_COOKIE_DAYS * 24 * 3600 * 1000,
+  });
+}
+
+/** The device id from the Cookie header, only when it is a UUID (it becomes part of Redis keys). */
+export function deviceIdFrom(header: string | undefined): string | null {
+  const value = readCookie(header, DEVICE_COOKIE);
+  return value && DEVICE_ID.test(value) ? value : null;
+}
+
 export function clearRefreshCookie(res: Pick<Response, 'clearCookie'>) {
   res.clearCookie(REFRESH_COOKIE, {
     httpOnly: true,
