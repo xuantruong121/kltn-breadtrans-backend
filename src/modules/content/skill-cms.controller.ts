@@ -86,6 +86,13 @@ export class SkillCmsController {
     required: false,
     description: 'Lĩnh vực, hoặc UNTAGGED cho nội dung chưa gắn lĩnh vực',
   })
+  @ApiQuery({
+    name: 'kind',
+    required: false,
+    enum: ['TRANSLATION', 'PICTURE', 'SENTENCE', 'EMAIL'],
+    description:
+      'Viết: Dịch câu, Viết theo tranh, Viết câu hoặc Viết email (tách Dịch câu khỏi bài tranh)',
+  })
   @ApiResponse({
     status: 200,
     description:
@@ -97,14 +104,6 @@ export class SkillCmsController {
     @Query() query: Record<string, string | undefined>,
   ) {
     return this.service.list(domain, req.user, query);
-  }
-
-  @Get('writing/pictures')
-  @ApiOperation({
-    summary: 'Mỗi tranh Viết theo tranh một thẻ, như học viên thấy',
-  })
-  listWritingPictures(@Request() req: any) {
-    return this.service.listWritingPictures(req.user);
   }
 
   @Get('speaking/stimuli') listSpeakingStimuli(@Request() req: any) {

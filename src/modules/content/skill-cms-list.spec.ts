@@ -6,6 +6,8 @@ import {
   quizListFacets,
   speakingSetFacets,
   firstImageByQuiz,
+  taskTypesByQuiz,
+  writingKindOf,
 } from './skill-cms-list';
 
 const quiz = (id: number, extra: Record<string, unknown> = {}) => ({
@@ -196,5 +198,101 @@ describe('search by Vietnamese title', () => {
     ];
     const found = filterQuizList(rows as any, { q: 'viết câu', titleIds: '1' });
     expect(found.map((row) => row.id)).toEqual([1]);
+  });
+});
+
+/**
+ * Writing kinds (owner 2026-11-19): "Dịch câu" sits on WRITING_PICTURE, so the
+ * old type filter listed it under "Viết theo tranh".
+ */
+describe('writing kind filter', () => {
+  const rows = [
+    // "Dịch câu": WRITING_PICTURE under its own topic.
+    {
+      id: 1,
+      type: 'WRITING_PICTURE',
+      writingKind: writingKindOf({
+        type: 'WRITING_PICTURE',
+        isTranslation: true,
+        taskTypes: ['SENTENCE_TRANSLATION'],
+      }),
+    },
+    // Picture exercise with images and picture tasks.
+    {
+      id: 2,
+      type: 'WRITING_PICTURE',
+      writingKind: writingKindOf({
+        type: 'WRITING_PICTURE',
+        taskTypes: ['PICTURE_SENTENCE'],
+        hasImage: true,
+      }),
+    },
+    // Plain sentences on the picture type.
+    {
+      id: 3,
+      type: 'WRITING_PICTURE',
+      writingKind: writingKindOf({
+        type: 'WRITING_PICTURE',
+        taskTypes: ['SENTENCE'],
+      }),
+    },
+    {
+      id: 4,
+      type: 'WRITING_EMAIL',
+      writingKind: writingKindOf({
+        type: 'WRITING_EMAIL',
+        taskTypes: ['EMAIL'],
+      }),
+    },
+  ];
+  const ids = (kind: string) =>
+    filterQuizList(rows, { kind }).map((row) => row.id);
+
+  it('tells the four kinds apart', () => {
+    expect(rows.map((row) => row.writingKind)).toEqual([
+      'TRANSLATION',
+      'PICTURE',
+      'SENTENCE',
+      'EMAIL',
+    ]);
+  });
+
+  it('lists picture exercises without the translation ones', () => {
+    expect(ids('PICTURE')).toEqual([2]);
+    expect(ids('TRANSLATION')).toEqual([1]);
+    expect(ids('SENTENCE')).toEqual([3]);
+    expect(ids('EMAIL')).toEqual([4]);
+    expect(ids('ALL').sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it('still answers the old type filter', () => {
+    expect(
+      filterQuizList(rows, { type: 'WRITING_PICTURE' })
+        .map((row) => row.id)
+        .sort(),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it('knows a translation task even without its topic, and a picture by its image', () => {
+    expect(
+      writingKindOf({
+        type: 'WRITING_PICTURE',
+        taskTypes: ['sentence_translation'],
+      }),
+    ).toBe('TRANSLATION');
+    expect(writingKindOf({ type: 'WRITING_PICTURE', hasImage: true })).toBe(
+      'PICTURE',
+    );
+  });
+
+  it('collects task types per quiz and skips rows without one', () => {
+    const types = taskTypesByQuiz([
+      { quizId: 7, content: { taskType: 'PICTURE_SENTENCE' } },
+      { quizId: 7, content: { taskType: ' SENTENCE ' } },
+      { quizId: 8, content: {} },
+      { quizId: null, content: { taskType: 'EMAIL' } },
+    ]);
+    expect(types.get(7)).toEqual(['PICTURE_SENTENCE', 'SENTENCE']);
+    expect(types.has(8)).toBe(false);
   });
 });

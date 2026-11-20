@@ -28,6 +28,51 @@ const AUDIO_TONE: Record<string, AudioTone> = {
 
 const PER_QUESTION_MODES: ListeningMode[] = ['COMPREHENSION', 'DICTATION'];
 
+/** What a Writing exercise is, for the CMS filter and card label (owner 2026-11-19). */
+export type WritingKind = 'TRANSLATION' | 'PICTURE' | 'SENTENCE' | 'EMAIL';
+export const WRITING_KINDS: WritingKind[] = [
+  'TRANSLATION',
+  'PICTURE',
+  'SENTENCE',
+  'EMAIL',
+];
+
+const PICTURE_TASK_TYPES = ['PICTURE_SENTENCE', 'DESCRIBE_PICTURE'];
+
+/**
+ * "Dịch câu" is stored on WRITING_PICTURE under its own topic, so the quiz
+ * type alone cannot tell it from a picture exercise: the filter "Viết theo
+ * tranh" used to list 8 translation exercises among 11.
+ */
+export function writingKindOf(row: {
+  type?: string | null;
+  isTranslation?: boolean;
+  taskTypes?: string[];
+  hasImage?: boolean;
+}): WritingKind {
+  const taskTypes = (row.taskTypes ?? []).map((t) => t.toUpperCase());
+  if (row.isTranslation || taskTypes.includes('SENTENCE_TRANSLATION'))
+    return 'TRANSLATION';
+  if (row.type === 'WRITING_EMAIL') return 'EMAIL';
+  if (row.hasImage || taskTypes.some((t) => PICTURE_TASK_TYPES.includes(t)))
+    return 'PICTURE';
+  return 'SENTENCE';
+}
+
+/** Each quiz's task types, from its question rows. */
+export function taskTypesByQuiz(
+  rows: Array<{ quizId: number | null; content: unknown }>,
+) {
+  const types = new Map<number, string[]>();
+  for (const { quizId, content } of rows) {
+    const taskType = (content as { taskType?: unknown } | null)?.taskType;
+    if (quizId == null || typeof taskType !== 'string' || !taskType.trim())
+      continue;
+    types.set(quizId, [...(types.get(quizId) ?? []), taskType.trim()]);
+  }
+  return types;
+}
+
 export type QuizListRow = {
   id: number;
   tracks?: string[];
@@ -40,6 +85,7 @@ export type QuizListRow = {
   questionsWithAudio?: number;
   _count?: { questions?: number };
   listeningAudioArtifacts?: Array<{ version: number; status: string }>;
+  writingKind?: WritingKind;
 };
 
 /** A listening quiz's form; anything unknown is a comprehension quiz. */
@@ -132,6 +178,7 @@ export function filterQuizList<T extends QuizListRow>(
       (isAll(query.audio) || audioToneOf(row) === query.audio) &&
       (isAll(query.mode) || listeningModeOf(row) === query.mode) &&
       (isAll(query.type) || row.type === query.type) &&
+      (isAll(query.kind) || row.writingKind === query.kind) &&
       matchesTrack(row.tracks, query.track),
   );
   const questions = (row: T) => row._count?.questions ?? 0;

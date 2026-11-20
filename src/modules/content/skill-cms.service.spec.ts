@@ -630,6 +630,8 @@ describe('SkillCmsService', () => {
           prompt: 'Write an email.',
           level: 'B1',
           keywords: ['reply', 'confirm'],
+          // The grader reads requiredKeywords (owner 2026-11-19).
+          requiredKeywords: ['reply', 'confirm'],
           wordRange: [100, 130],
           sampleSentences: ['Dear team,'],
         },

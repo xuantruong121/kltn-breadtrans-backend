@@ -1,5 +1,3 @@
-import { keywordsOf } from '../writing/writing.service';
-import { levelFromTitle, pictureCardHiddenReason } from './skill-cms-list';
 import { historyEditProblem } from './edit-with-history';
 import { skillDeleteRefusal } from './skill-content-delete';
 import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
@@ -52,7 +50,10 @@ import {
   firstImageByQuiz,
   quizListFacets,
   speakingSetFacets,
+  taskTypesByQuiz,
+  writingKindOf,
 } from './skill-cms-list';
+import { writingQuestionContent } from './writing-question-content.logic';
 import { UploadService } from '../upload/upload.service';
 import {
   SENTENCE_TRANSLATION,
@@ -307,10 +308,31 @@ export class SkillCmsService {
     const quizTracks = wantsPage(query)
       ? await this.tracksByContent('QUIZ')
       : new Map<number, LearningTrack[]>();
-    const thumbnails = await this.quizThumbnails(
-      domain,
-      quizzes.map((quiz) => quiz.id),
-    );
+    // Writing reads every task once: the first image and each task type decide
+    // the card's kind ("Dịch câu", tranh, câu, email; owner 2026-11-19).
+    const writingTasks =
+      domain === 'writing' && quizzes.length
+        ? await this.prisma.question.findMany({
+            where: { quizId: { in: quizzes.map((quiz) => quiz.id) } },
+            orderBy: { order: 'asc' },
+            select: { quizId: true, content: true },
+          })
+        : null;
+    const thumbnails = writingTasks
+      ? firstImageByQuiz(
+          writingTasks.filter((row) =>
+            String(
+              (row.content as { imageUrl?: unknown } | null)?.imageUrl ?? '',
+            ).startsWith('http'),
+          ),
+        )
+      : await this.quizThumbnails(
+          domain,
+          quizzes.map((quiz) => quiz.id),
+        );
+    const taskTypes = writingTasks
+      ? taskTypesByQuiz(writingTasks)
+      : new Map<number, string[]>();
     // The list card names a "Dịch câu" exercise by its topic.
     const translationTopic =
       domain === 'writing' && this.prisma.practiceTopic?.findFirst
@@ -323,8 +345,17 @@ export class SkillCmsService {
       ...quiz,
       tracks: quizTracks.get(quiz.id) ?? [],
       thumbnailUrl: thumbnails.get(quiz.id) ?? null,
-      ...(translationTopic && quiz.practiceTopicId === translationTopic.id
-        ? { writingKind: 'TRANSLATION' as const }
+      ...(domain === 'writing'
+        ? {
+            writingKind: writingKindOf({
+              type: quiz.type,
+              isTranslation:
+                !!translationTopic &&
+                quiz.practiceTopicId === translationTopic.id,
+              taskTypes: taskTypes.get(quiz.id),
+              hasImage: thumbnails.has(quiz.id),
+            }),
+          }
         : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
@@ -347,63 +378,6 @@ export class SkillCmsService {
         questionsWithAudio: counts.get(quiz.id) ?? 0,
       })),
       query,
-    );
-  }
-
-  /**
-   * One card per picture, the way learners see them. Exam tasks stay out: they
-   * belong to their exam, like every other Writing list here.
-   */
-  async listWritingPictures(user: Admin) {
-    this.admin(user);
-    const quizzes = await this.prisma.quiz.findMany({
-      where: {
-        type: QuizType.WRITING_PICTURE,
-        toeicWritingSetItems: { none: {} },
-      },
-      orderBy: { id: 'asc' },
-      select: {
-        id: true,
-        title: true,
-        isPremiumContent: true,
-        publicationStatus: true,
-        practiceTopicId: true,
-        questions: {
-          select: { id: true, content: true },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-        },
-      },
-    });
-    return quizzes.flatMap((quiz) =>
-      quiz.questions
-        .filter(
-          (question) =>
-            (question.content as { taskType?: unknown } | null)?.taskType ===
-            'PICTURE_SENTENCE',
-        )
-        .map((question, index, tasks) => {
-          const content = question.content as Record<string, unknown>;
-          const imageUrl =
-            typeof content.imageUrl === 'string' ? content.imageUrl : null;
-          const keywords = keywordsOf(content);
-          return {
-            quizId: quiz.id,
-            title: quiz.title,
-            questionId: question.id,
-            position: index + 1,
-            total: tasks.length,
-            imageUrl,
-            keywords,
-            isPremiumContent: quiz.isPremiumContent,
-            level: levelFromTitle(quiz.title) || null,
-            hiddenReason: pictureCardHiddenReason({
-              publicationStatus: quiz.publicationStatus,
-              hasPracticeTopic: quiz.practiceTopicId !== null,
-              imageUrl,
-              keywords,
-            }),
-          };
-        }),
     );
   }
 
@@ -1590,49 +1564,12 @@ export class SkillCmsService {
     return id;
   }
 
+  /** The stored content after a form save: lib in writing-question-content.logic.ts. */
   private writingContent(
     dto: WritingQuestionDto,
     previous?: unknown,
   ): Prisma.InputJsonValue {
-    const translation =
-      dto.taskType?.trim().toUpperCase() === SENTENCE_TRANSLATION;
-    const kept = (previous ?? {}) as Record<string, unknown>;
-    const trimmed = (list?: string[]) => [
-      ...new Set((list ?? []).map((x) => x.trim()).filter(Boolean)),
-    ];
-    return {
-      ...(translation
-        ? {
-            acceptedAnswers: trimmed(dto.acceptedAnswers),
-            hints: (dto.hints ?? [])
-              .map((h) => ({ vi: h.vi.trim(), en: h.en.trim() }))
-              .filter((h) => h.vi && h.en),
-            grammarTip: dto.grammarTip?.trim() ?? '',
-            ...(Array.isArray(kept.dismissedAnswers)
-              ? { dismissedAnswers: kept.dismissedAnswers }
-              : {}),
-          }
-        : {}),
-      skill: 'WRITING',
-      prompt: dto.prompt.trim(),
-      ...(dto.taskType?.trim() ? { taskType: dto.taskType.trim() } : {}),
-      ...(dto.level?.trim() ? { level: dto.level.trim() } : {}),
-      ...(dto.imageUrl?.trim() ? { imageUrl: dto.imageUrl.trim() } : {}),
-      ...(dto.keywords?.length
-        ? { keywords: dto.keywords.map((x) => x.trim()).filter(Boolean) }
-        : {}),
-      ...(dto.wordRange ? { wordRange: dto.wordRange } : {}),
-      ...(dto.sampleSentences?.length
-        ? {
-            sampleSentences: dto.sampleSentences
-              .map((x) => x.trim())
-              .filter(Boolean),
-          }
-        : {}),
-      ...(dto.explanation?.trim()
-        ? { explanation: dto.explanation.trim() }
-        : {}),
-    };
+    return writingQuestionContent(dto, previous) as Prisma.InputJsonValue;
   }
 
   private assertWritingTaskType(
