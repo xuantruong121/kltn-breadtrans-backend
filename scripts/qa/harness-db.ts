@@ -5,6 +5,9 @@
  * fixtures such as promoting a harness account to ADMIN.
  */
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const PROTECTED = ['7674533776495505443', '7699757546958700579'];
 const psql = (db: string) => [
@@ -19,10 +22,33 @@ const psql = (db: string) => [
 ];
 
 /**
- * `db` defaults to HARNESS_DB (the database the running harness backend
- * uses), else the shared clone. Always a database inside harness-pg.
+ * The database a fixture writes to: HARNESS_DB, else the one the running QA
+ * backend uses (written by `finalization-harness.sh qa-backend`), else the
+ * shared clone. Without the middle step a script against `qa-backend dev_qa`
+ * promoted its admin in harness_clone and every admin call answered 403
+ * (owner 2026-11-20). Always a database inside harness-pg.
  */
-const DEFAULT_DB = process.env.HARNESS_DB ?? 'harness_clone';
+export function harnessDbName(
+  env: NodeJS.ProcessEnv,
+  readMarker: (path: string) => string | null,
+): string {
+  if (env.HARNESS_DB) return env.HARNESS_DB;
+  const work =
+    env.HARNESS_WORK ?? join(env.TEMP ?? tmpdir(), 'breadtrans-harness');
+  const marked = readMarker(join(work, 'qa-backend.db'))?.trim() ?? '';
+  return /^[a-z_][a-z0-9_]*$/.test(marked) &&
+    !['kltn_db', 'kltn_shadow', 'postgres'].includes(marked)
+    ? marked
+    : 'harness_clone';
+}
+
+const DEFAULT_DB = harnessDbName(process.env, (path) => {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+});
 
 export function harnessQuery(sql: string, db = DEFAULT_DB): string[][] {
   return run(sql, true, db);
