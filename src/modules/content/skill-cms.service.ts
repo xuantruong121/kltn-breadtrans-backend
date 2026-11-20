@@ -335,12 +335,7 @@ export class SkillCmsService {
       : new Map<number, string[]>();
     // The list card names a "Dịch câu" exercise by its topic.
     const translationTopic =
-      domain === 'writing' && this.prisma.practiceTopic?.findFirst
-        ? await this.prisma.practiceTopic.findFirst({
-            where: { name: SENTENCE_TRANSLATION_TOPIC.name },
-            select: { id: true },
-          })
-        : null;
+      domain === 'writing' ? await this.translationTopic() : null;
     const tagged = quizzes.map((quiz) => ({
       ...quiz,
       tracks: quizTracks.get(quiz.id) ?? [],
@@ -450,11 +445,45 @@ export class SkillCmsService {
       },
     });
     if (!quiz) throw new NotFoundException('Không tìm thấy nội dung kỹ năng.');
+    // An empty "Dịch câu" exercise has no sentence to tell it from a picture
+    // one: its topic does (owner 2026-11-20, the AI draft did not open).
+    const translationTopic =
+      domain === 'writing' ? await this.translationTopic() : null;
     return {
       ...quiz,
       passage: quiz.theoryContent,
       tracks: await this.tracksOf('QUIZ', quiz.id),
+      ...(domain === 'writing'
+        ? {
+            writingKind: writingKindOf({
+              type: quiz.type,
+              isTranslation:
+                !!translationTopic &&
+                quiz.practiceTopicId === translationTopic.id,
+              taskTypes: quiz.questions
+                .map(
+                  (q) => (q.content as { taskType?: unknown } | null)?.taskType,
+                )
+                .filter((t): t is string => typeof t === 'string'),
+              hasImage: quiz.questions.some((q) =>
+                String(
+                  (q.content as { imageUrl?: unknown } | null)?.imageUrl ?? '',
+                ).startsWith('http'),
+              ),
+            }),
+          }
+        : {}),
     };
+  }
+
+  /** The "Dịch câu" topic, if it exists yet. */
+  private async translationTopic() {
+    return this.prisma.practiceTopic?.findFirst
+      ? this.prisma.practiceTopic.findFirst({
+          where: { name: SENTENCE_TRANSLATION_TOPIC.name },
+          select: { id: true },
+        })
+      : null;
   }
 
   private async tracksByContent(contentType: LearningContentType) {
