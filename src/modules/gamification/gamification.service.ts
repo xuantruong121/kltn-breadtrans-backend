@@ -1024,55 +1024,6 @@ export class GamificationService {
   }
 
   /**
-   * Awards TOEIC test Bánh Mì: 120 for FULL_TEST, 30 for PRACTICE / part.
-   * - Guarded by UserToeicReward unique constraint (userId, examId, mode).
-   * - Counts toward the daily 150 cap.
-   */
-  async awardToeicReward(
-    userId: number,
-    examId: number,
-    mode: string,
-    attemptId?: number,
-  ): Promise<{ granted: number; reason?: string }> {
-    const rewardAmount = mode === 'FULL_TEST' ? 120 : 30;
-
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`toeic_reward:${userId}:${examId}:${mode}`}))`;
-
-      const existing = await tx.userToeicReward.findUnique({
-        where: { userId_examId_mode: { userId, examId, mode } },
-      });
-      const previouslyGranted = existing?.banhGranted ?? 0;
-      const remainingReward = Math.max(0, rewardAmount - previouslyGranted);
-      if (remainingReward === 0) {
-        return { granted: 0, reason: 'ALREADY_REWARDED' };
-      }
-
-      if (!existing) {
-        await tx.userToeicReward.create({ data: { userId, examId, mode } });
-      }
-
-      const awardResult = await this.awardBanh(
-        userId,
-        remainingReward,
-        'TOEIC_COMPLETION',
-        `toeic:${examId}:${mode}:remaining:${previouslyGranted}`,
-        { isCapped: true, metadata: { examId, mode, attemptId } },
-        tx,
-      );
-
-      if (awardResult.granted > 0) {
-        await tx.userToeicReward.update({
-          where: { userId_examId_mode: { userId, examId, mode } },
-          data: { banhGranted: { increment: awardResult.granted } },
-        });
-      }
-
-      return { granted: awardResult.granted };
-    });
-  }
-
-  /**
    * Deducts Bánh Mì from a user's wallet atomically.
    * - Idempotency: (userId, source, reference) must be unique in BanhTransaction —
    *   mirrors awardBanh's pre-check-under-advisory-lock pattern, so a retried/

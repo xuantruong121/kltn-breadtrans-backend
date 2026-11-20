@@ -1300,65 +1300,6 @@ describe('GamificationService weekly cron hardening', () => {
     });
   });
 
-  describe('awardToeicReward', () => {
-    it('awards 120 Bánh Mì for FULL_TEST and 0 for repeated attempt of same exam & mode', async () => {
-      let rewarded = false;
-      const tx: any = {
-        $executeRaw: jest.fn().mockResolvedValue(1),
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([]) // INSERT
-          .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]), // SELECT
-        userToeicReward: {
-          findUnique: jest.fn().mockImplementation(() =>
-            Promise.resolve(
-              rewarded
-                ? {
-                    id: 1,
-                    userId: 4,
-                    examId: 1,
-                    mode: 'FULL_TEST',
-                    banhGranted: 120,
-                  }
-                : null,
-            ),
-          ),
-          create: jest.fn().mockImplementation(() => {
-            rewarded = true;
-            return Promise.resolve({ id: 1 });
-          }),
-          update: jest.fn().mockResolvedValue({}),
-        },
-        userStats: {
-          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 0 }),
-          upsert: jest.fn().mockResolvedValue({ totalBanhRan: 120 }),
-        },
-        dailyBanhEarning: {
-          update: jest.fn().mockResolvedValue({}),
-        },
-        banhTransaction: {
-          findUnique: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({}),
-        },
-      };
-      const prisma: any = {
-        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
-      };
-      const service = new GamificationService(
-        prisma,
-        { emit: jest.fn() } as any,
-        {} as any,
-      );
-
-      const res1 = await service.awardToeicReward(4, 1, 'FULL_TEST', 10);
-      expect(res1.granted).toBe(120);
-
-      const res2 = await service.awardToeicReward(4, 1, 'FULL_TEST', 11);
-      expect(res2.granted).toBe(0);
-      expect(res2.reason).toBe('ALREADY_REWARDED');
-    });
-  });
-
   describe('Streak management and rollover', () => {
     it('clears streakCount to 0 without overwriting lastStreakUpdate when freezes are 0', async () => {
       const updates: any[] = [];
