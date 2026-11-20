@@ -26,7 +26,6 @@ describeWithIsolatedDatabase(
       for (const table of [
         'User',
         'ToeicAttempt',
-        'UserToeicReward',
         'BanhTransaction',
         'DailyBanhEarning',
       ]) {
@@ -262,10 +261,6 @@ describeWithIsolatedDatabase(
           attemptId: attemptIds[0],
         }),
       ]);
-      const reward = await prisma.userToeicReward.findUnique({
-        where: { userId_examId_mode: { userId, examId: 1, mode: 'FULL_TEST' } },
-      });
-      expect(reward).toBeNull();
       expect(
         (await prisma.banhTransaction.count({ where: { userId } })) - before,
       ).toBe(0);

@@ -18,6 +18,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import {
   extendedNotice,
   grantedNotice,
+  noticePlanName,
   revokedNotice,
 } from './admin-subscription-notice';
 import {
@@ -515,7 +516,7 @@ export class SubscriptionAdminService {
   private planName(sub: {
     planVersion: { displayName: string | null; plan: { displayName: string } };
   }) {
-    return sub.planVersion.displayName ?? sub.planVersion.plan.displayName;
+    return noticePlanName(sub);
   }
 
   /** The plan change is committed, so a failed notification only gets logged. */
