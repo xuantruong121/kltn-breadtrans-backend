@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/require-await -- the fake AI provider and
+   reviewers implement async interfaces with fixed data; `async` keeps a thrown
+   QA error (quota, reviewer outage) a rejected promise, as the real calls give. */
 import { Test } from '@nestjs/testing';
 import { applyHttpSecurity } from '../../src/common/http/security';
 import { ValidationPipe } from '@nestjs/common';
@@ -600,8 +603,8 @@ async function bootstrap() {
     await app.close();
     process.exit(0);
   };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', () => void shutdown());
+  process.once('SIGTERM', () => void shutdown());
 }
 
 startFakeCloudflare();
