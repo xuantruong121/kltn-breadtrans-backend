@@ -14,6 +14,7 @@ import {
   translationTaskIssues,
   translationTaskOf,
 } from './sentence-translation.logic';
+import { pendingForQuiz, pendingSummary } from './translation-review.logic';
 
 /** Learner answers older than this are not offered for review. */
 const LOOKBACK_DAYS = 90;
@@ -51,12 +52,34 @@ type Row = {
 export class TranslationReviewService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: { page?: number; limit?: number }) {
+  /**
+   * One page of the queue. `quizId` keeps one exercise only: the Writing CMS
+   * opens the queue from an exercise card (owner 2026-11-19).
+   */
+  async list(query: { page?: number; limit?: number; quizId?: number }) {
     const page = Math.max(1, Math.floor(Number(query.page) || 1));
     const limit = Math.min(
       100,
       Math.max(1, Math.floor(Number(query.limit) || 20)),
     );
+    const rows = pendingForQuiz(await this.pendingRows(), query.quizId);
+    const total = rows.length;
+    return {
+      data: rows.slice((page - 1) * limit, page * limit),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  /** How many translations wait, in all and per exercise: the Writing tab and card counts. */
+  async summary() {
+    return pendingSummary(await this.pendingRows());
+  }
+
+  /** Every translation still to decide, most frequent first. */
+  private async pendingRows(): Promise<Row[]> {
     const submissions = await this.prisma.submission.findMany({
       where: {
         submittedAt: { gte: new Date(Date.now() - LOOKBACK_DAYS * 86_400_000) },
@@ -159,17 +182,9 @@ export class TranslationReviewService {
         acceptedAnswers: task.acceptedAnswers,
       });
     }
-    rows.sort(
+    return rows.sort(
       (a, b) => b.count - a.count || b.lastAt.getTime() - a.lastAt.getTime(),
     );
-    const total = rows.length;
-    return {
-      data: rows.slice((page - 1) * limit, page * limit),
-      total,
-      page,
-      limit,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    };
   }
 
   /** Adds the learner's translation to the sentence's accepted answers. */
