@@ -18,6 +18,13 @@
 # read once per process start: after editing it, stop and run again (watch
 # mode reloads code changes only). The standalone scripts (`start:dev`,
 # `start:speaking-worker:dev`) are unchanged.
+#
+# -NoWatch (`npm run serve:backend`): build once with `nest build`, then run the
+# compiled API (and worker) with no file watcher. Use it while other people use
+# the site: the watcher also reacts to files elsewhere in Project/ (agent notes,
+# git in the frontend repo, worktrees) and restarts the API, which drops
+# requests and sockets. Code changes then need a stop and a new run.
+param([switch]$NoWatch)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
@@ -121,8 +128,15 @@ $redisUrl = Read-EnvValue 'REDIS_URL'; if (-not $redisUrl) { $redisUrl = 'redis:
 $redis = Get-HostPort $redisUrl 6379
 if (-not (Test-Tcp $redis[0] $redis[1])) { Fail "Redis is not reachable at $($redis[0]):$($redis[1]). Start it with: docker-compose up -d" }
 
-Write-Host "[dev:backend] API port $port | SPEAKING_PIPELINE_MODE=$pipeline | DIAGNOSTIC_GRADER_MODE=$graderMode" -ForegroundColor Cyan
+$mode = if ($NoWatch) { 'built, no watch' } else { 'watch' }
+Write-Host "[dev:backend] API port $port | mode $mode | SPEAKING_PIPELINE_MODE=$pipeline | DIAGNOSTIC_GRADER_MODE=$graderMode" -ForegroundColor Cyan
 Write-Host "[dev:backend] PostgreSQL $($db[0]):$($db[1]) and Redis $($redis[0]):$($redis[1]) reachable" -ForegroundColor Cyan
+
+if ($NoWatch) {
+  Write-Host '[dev:backend] building once (nest build)...' -ForegroundColor Cyan
+  & node node_modules/@nestjs/cli/bin/nest.js build
+  if ($LASTEXITCODE -ne 0) { Fail "nest build failed (exit $LASTEXITCODE); nothing was started." }
+}
 
 $job = [DevBackendJob]::Create()
 $children = @()
@@ -135,9 +149,17 @@ function Start-Managed([string]$label, [string[]]$arguments) {
 }
 
 try {
-  $children += Start-Managed 'API (nest watch)' @('node_modules/@nestjs/cli/bin/nest.js', 'start', '--watch')
+  if ($NoWatch) {
+    $children += Start-Managed 'API (built, no watch)' @('dist/src/main.js')
+  } else {
+    $children += Start-Managed 'API (nest watch)' @('node_modules/@nestjs/cli/bin/nest.js', 'start', '--watch')
+  }
   if ($pipeline -eq 'bullmq') {
-    $children += Start-Managed 'Speaking worker (node watch)' @('--watch', '--require', 'ts-node/register', 'src/worker/speaking-worker.main.ts')
+    if ($NoWatch) {
+      $children += Start-Managed 'Speaking worker (built, no watch)' @('dist/src/worker/speaking-worker.main.js')
+    } else {
+      $children += Start-Managed 'Speaking worker (node watch)' @('--watch', '--require', 'ts-node/register', 'src/worker/speaking-worker.main.ts')
+    }
   } else {
     Write-Host '[dev:backend] Speaking worker not started: legacy mode processes ordinary Speaking inside the API.' -ForegroundColor Cyan
   }

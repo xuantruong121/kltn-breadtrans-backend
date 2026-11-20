@@ -101,6 +101,17 @@ describe('translation review queue', () => {
     });
   });
 
+  it('filters by exercise and its count matches the summary (owner 2026-11-19)', async () => {
+    const { service } = setup([
+      check(1, 'My mother works as a teacher.'),
+      check(3, 'Mom is a teacher.'),
+    ]);
+    const summary = await service.summary();
+    expect(summary).toEqual({ total: 2, byQuiz: { 91: 2 } });
+    expect((await service.list({ quizId: 91 })).total).toBe(summary.byQuiz[91]);
+    expect((await service.list({ quizId: 92 })).total).toBe(0);
+  });
+
   it('leaves out an answer that was dismissed', async () => {
     const { service } = setup(
       [check(1, 'Mom is a teacher.')],

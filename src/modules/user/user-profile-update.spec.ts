@@ -41,3 +41,47 @@ describe('UserService.updateUserProfile', () => {
     });
   });
 });
+
+/** PATCH /users/cosmetics (owner 2026-11-19): only owned shop items, null takes off. */
+describe('UserService.updateCosmetics', () => {
+  const build = (orderSlugs: string[]) => {
+    const upsert = jest.fn().mockResolvedValue({ userId: 5 });
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([
+        { items: orderSlugs.map((slug) => ({ slug, quantity: 1 })) },
+      ]);
+    const service = Object.create(UserService.prototype) as UserService;
+    (service as unknown as { prisma: unknown }).prisma = {
+      profile: { upsert },
+      marketOrder: { findMany },
+    };
+    return { service, upsert, findMany };
+  };
+
+  it('wears an owned frame', async () => {
+    const { service, upsert } = build(['frame-crown']);
+    await service.updateCosmetics(5, { avatarFrame: 'frame-crown' });
+    expect(upsert.mock.calls[0][0].update).toEqual({
+      avatarFrame: 'frame-crown',
+    });
+  });
+
+  it('refuses an item the learner has no order for', async () => {
+    const { service, upsert } = build(['frame-crown']);
+    await expect(
+      service.updateCosmetics(5, { badgeKey: 'badge-star' }),
+    ).rejects.toThrow(/chưa sở hữu/);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('takes an item off without looking at orders', async () => {
+    const { service, upsert, findMany } = build([]);
+    await service.updateCosmetics(5, { avatarFrame: null, badgeKey: null });
+    expect(findMany).not.toHaveBeenCalled();
+    expect(upsert.mock.calls[0][0].update).toEqual({
+      avatarFrame: null,
+      badgeKey: null,
+    });
+  });
+});

@@ -84,7 +84,15 @@ export async function newAdmin(label = 'admin') {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { harnessExec } = require('./harness-db');
   const s = await newStudent(label);
-  harnessExec(`update "User" set role = 'ADMIN' where email = '${s.email}'`);
+  const promoted = harnessExec(
+    `update "User" set role = 'ADMIN' where email = '${s.email}' returning id`,
+  ) as string[][];
+  // The account lives in the QA backend's database: finding nothing here
+  // means the fixture wrote to another one, and every admin call would be 403.
+  if (!promoted.some((row) => /^\d+$/.test(row[0] ?? '')))
+    throw new Error(
+      `newAdmin: ${s.email} is not in the harness database used here; set HARNESS_DB to the database qa-backend runs on`,
+    );
   const login = await call('POST', '/auth/login', undefined, {
     email: s.email,
     password: s.password,

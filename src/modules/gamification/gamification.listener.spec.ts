@@ -20,7 +20,6 @@ describe('GamificationListener', () => {
     awardBanh: jest.Mock;
     awardVocabMasteryReward: jest.Mock;
     awardSpeakingReward: jest.Mock;
-    awardToeicReward: jest.Mock;
     awardBadgeIfEarned: jest.Mock;
     syncBadges: jest.Mock;
     advanceDailyQuestAndGrantRewardsTx: jest.Mock;
@@ -81,7 +80,6 @@ describe('GamificationListener', () => {
         .fn()
         .mockResolvedValue({ granted: 1, firstMastery: true }),
       awardSpeakingReward: jest.fn().mockResolvedValue({ granted: 5 }),
-      awardToeicReward: jest.fn().mockResolvedValue({ granted: 120 }),
       awardBadgeIfEarned: jest.fn().mockResolvedValue(true),
       syncBadges: jest.fn().mockResolvedValue([]),
       advanceDailyQuestAndGrantRewardsTx: jest.fn().mockResolvedValue({
@@ -521,7 +519,6 @@ describe('GamificationListener', () => {
         mode: 'FULL_TEST',
         attemptId: 42,
       });
-      expect(gamificationServiceMock.awardToeicReward).not.toHaveBeenCalled();
       expect(gamificationServiceMock.awardXp).not.toHaveBeenCalled();
       expect(gamificationServiceMock.awardBanh).not.toHaveBeenCalled();
     });

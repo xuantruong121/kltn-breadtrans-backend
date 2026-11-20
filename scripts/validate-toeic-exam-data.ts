@@ -150,7 +150,6 @@ async function main() {
           'ToeicAttempt',
           'ToeicAttemptAnswer',
           'ToeicIntegrityEvent',
-          'UserToeicReward',
         ],
         attemptModel: 'ToeicAttempt',
         migrationCreated: false,

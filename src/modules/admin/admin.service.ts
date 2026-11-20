@@ -239,8 +239,13 @@ export class AdminService {
         _sum: { amountVnd: true },
         _count: { id: true },
       }),
+      // A subscription past its end date keeps status ACTIVE (every reader checks
+      // endsAt instead of a sweep), so the dashboard counts the live ones only.
       this.prisma.subscription.count({
-        where: { status: SubscriptionStatus.ACTIVE },
+        where: {
+          status: SubscriptionStatus.ACTIVE,
+          endsAt: { gt: new Date() },
+        },
       }),
     ]);
 

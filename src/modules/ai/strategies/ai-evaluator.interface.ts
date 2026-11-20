@@ -304,6 +304,18 @@ export interface IAIEvaluator {
     count: number;
   }): Promise<ContextualListeningQuestionsSuggestion>;
 
+  /**
+   * A whole Writing exercise (email or "Dịch câu"). The raw model answer is
+   * returned; writing-full-draft.logic.ts checks every task.
+   */
+  suggestWritingFullDraft?(input: {
+    sourceText?: string;
+    topic: string;
+    level: string;
+    kind: 'EMAIL' | 'TRANSLATION';
+    count: number;
+  }): Promise<unknown>;
+
   /** Phase 5B: Writing task candidates only, without media fabrication. */
   suggestWritingTask?(input: {
     sourceText?: string;

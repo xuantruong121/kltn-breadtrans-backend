@@ -208,6 +208,9 @@ case "${1:-}" in
         nohup npx ts-node --transpile-only "$server" \
         > "$WORK/qa-backend.log" 2>&1 < /dev/null &)
     wait_http http://localhost:3101/writing/topics 200
+    # harness-db.ts reads this, so fixtures (newAdmin, funding) write to the
+    # database this backend uses, not the default clone.
+    echo "$db" > "$WORK/qa-backend.db"
     echo "qa backend :3101 on $db (log $WORK/qa-backend.log)"
     ;;
   qa-frontend)
@@ -223,6 +226,7 @@ case "${1:-}" in
   stop)
     kill_port 3100
     kill_port 3101
+    rm -f "$WORK/qa-backend.db"
     kill_port 9460
     echo "harness servers stopped (containers kept)"
     ;;

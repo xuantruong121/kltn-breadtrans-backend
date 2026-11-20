@@ -5405,6 +5405,22 @@ async function main() {
       update: { name, description, criteria },
       create: { id, name, description, criteria },
     });
+  // Shop badges (owner 2026-11-19), matched by name, never a fixed id: the
+  // purchase creates the same row on first sale (market.service createOrder).
+  for (const [slug, name] of [
+    ['badge-star', 'Ngôi Sao'],
+    ['badge-master', 'Bậc Thầy Từ Vựng'],
+  ] as const) {
+    const found = await prisma.badge.findFirst({ where: { name } });
+    if (!found)
+      await prisma.badge.create({
+        data: {
+          name,
+          description: 'Đổi trong Cửa hàng Bánh Mì.',
+          criteria: { source: 'shop', slug },
+        },
+      });
+  }
   for (const student of students) {
     await prisma.userBadge.upsert({
       where: { userId_badgeId: { userId: student.id, badgeId: 1 } },

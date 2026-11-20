@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   BadRequestException,
   NotFoundException,
@@ -6,6 +7,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { streakShieldUsedNotice } from './streak-shield.logic';
+import {
+  OWNING_ORDER_STATUSES,
+  ordersHoldSlug,
+  PET_BUN_SLUG,
+  PET_BUN_SPECIES,
+} from '../market/market-effects';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -1017,55 +1024,6 @@ export class GamificationService {
   }
 
   /**
-   * Awards TOEIC test Bánh Mì: 120 for FULL_TEST, 30 for PRACTICE / part.
-   * - Guarded by UserToeicReward unique constraint (userId, examId, mode).
-   * - Counts toward the daily 150 cap.
-   */
-  async awardToeicReward(
-    userId: number,
-    examId: number,
-    mode: string,
-    attemptId?: number,
-  ): Promise<{ granted: number; reason?: string }> {
-    const rewardAmount = mode === 'FULL_TEST' ? 120 : 30;
-
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`toeic_reward:${userId}:${examId}:${mode}`}))`;
-
-      const existing = await tx.userToeicReward.findUnique({
-        where: { userId_examId_mode: { userId, examId, mode } },
-      });
-      const previouslyGranted = existing?.banhGranted ?? 0;
-      const remainingReward = Math.max(0, rewardAmount - previouslyGranted);
-      if (remainingReward === 0) {
-        return { granted: 0, reason: 'ALREADY_REWARDED' };
-      }
-
-      if (!existing) {
-        await tx.userToeicReward.create({ data: { userId, examId, mode } });
-      }
-
-      const awardResult = await this.awardBanh(
-        userId,
-        remainingReward,
-        'TOEIC_COMPLETION',
-        `toeic:${examId}:${mode}:remaining:${previouslyGranted}`,
-        { isCapped: true, metadata: { examId, mode, attemptId } },
-        tx,
-      );
-
-      if (awardResult.granted > 0) {
-        await tx.userToeicReward.update({
-          where: { userId_examId_mode: { userId, examId, mode } },
-          data: { banhGranted: { increment: awardResult.granted } },
-        });
-      }
-
-      return { granted: awardResult.granted };
-    });
-  }
-
-  /**
    * Deducts Bánh Mì from a user's wallet atomically.
    * - Idempotency: (userId, source, reference) must be unique in BanhTransaction —
    *   mirrors awardBanh's pre-check-under-advisory-lock pattern, so a retried/
@@ -1363,6 +1321,8 @@ export class GamificationService {
               select: {
                 fullName: true,
                 avatar: true,
+                avatarFrame: true,
+                badgeKey: true,
               },
             },
           },
@@ -1375,6 +1335,8 @@ export class GamificationService {
       userId: entry.userId,
       displayName: entry.user?.profile?.fullName || `Học viên #${entry.userId}`,
       avatarUrl: entry.user?.profile?.avatar || null,
+      avatarFrame: entry.user?.profile?.avatarFrame ?? null,
+      badgeKey: entry.user?.profile?.badgeKey ?? null,
       tier: entry.tier,
       totalPoints: entry.totalPoints,
       weeklyExp: entry.weeklyExp,
@@ -1386,6 +1348,8 @@ export class GamificationService {
       userId: number;
       displayName: string;
       avatarUrl: string | null;
+      avatarFrame: string | null;
+      badgeKey: string | null;
       tier: string;
       totalPoints: number;
       weeklyExp: number;
@@ -1407,6 +1371,8 @@ export class GamificationService {
                   select: {
                     fullName: true,
                     avatar: true,
+                    avatarFrame: true,
+                    badgeKey: true,
                   },
                 },
               },
@@ -1439,6 +1405,8 @@ export class GamificationService {
             displayName:
               myBoard.user?.profile?.fullName || `Học viên #${myBoard.userId}`,
             avatarUrl: myBoard.user?.profile?.avatar || null,
+            avatarFrame: myBoard.user?.profile?.avatarFrame ?? null,
+            badgeKey: myBoard.user?.profile?.badgeKey ?? null,
             tier: myBoard.tier,
             totalPoints: myBoard.totalPoints,
             weeklyExp: myBoard.weeklyExp,
@@ -1625,6 +1593,8 @@ export class GamificationService {
     ) {
       return 'foxy';
     }
+    // Bought in the shop. An exact key: seeded pets named "Bun" stay Bready.
+    if (n === PET_BUN_SPECIES || n.includes('pet bun')) return PET_BUN_SPECIES;
     return 'bready';
   }
 
@@ -2043,6 +2013,19 @@ export class GamificationService {
     );
     const currentSpecies = this.normalizeSpeciesKey(pet.name);
     const targetSpecies = this.normalizeSpeciesKey(targetPetName);
+
+    // Bun is owned through its shop order; without one it stays locked.
+    if (targetSpecies === PET_BUN_SPECIES) {
+      const orders = await tx.marketOrder.findMany({
+        where: { userId, status: { in: OWNING_ORDER_STATUSES } },
+        select: { items: true },
+      });
+      if (!ordersHoldSlug(orders, PET_BUN_SLUG)) {
+        throw new ForbiddenException(
+          'Bạn chưa sở hữu thú ảo Bun. Đổi Bun trong Cửa hàng để mở.',
+        );
+      }
+    }
 
     const roster = ((pet as any).roster as Record<string, any>) || {};
 

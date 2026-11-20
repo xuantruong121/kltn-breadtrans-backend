@@ -1,7 +1,14 @@
+import { OWNING_ORDER_STATUSES } from '../market/market-effects';
+import {
+  cosmeticsData,
+  unownedCosmetic,
+  type CosmeticsChange,
+} from './profile-cosmetics.logic';
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -448,6 +455,34 @@ export class UserService {
         userId,
         fullName: updateData.fullName || 'User',
       },
+    });
+  }
+
+  /**
+   * The shop frame and badge the learner wears (owner 2026-11-19). Saved on
+   * the profile so every device and every other learner sees the same; an
+   * item must be owned through an order, so a refund takes it back.
+   */
+  async updateCosmetics(userId: number, change: CosmeticsChange) {
+    const data = cosmeticsData(change);
+    const wanted = [data.avatarFrame, data.badgeKey].some(
+      (value) => typeof value === 'string',
+    );
+    if (wanted) {
+      const orders = await this.prisma.marketOrder.findMany({
+        where: { userId, status: { in: OWNING_ORDER_STATUSES } },
+        select: { items: true },
+      });
+      if (unownedCosmetic(data, orders)) {
+        throw new ForbiddenException(
+          'Bạn chưa sở hữu món này. Đổi trong Cửa hàng trước khi dùng.',
+        );
+      }
+    }
+    return this.prisma.profile.upsert({
+      where: { userId },
+      update: data,
+      create: { userId, fullName: 'User', ...data },
     });
   }
 

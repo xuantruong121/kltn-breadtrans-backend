@@ -4,6 +4,10 @@ import {
   PLUS_CARD_DAYS,
   PLUS_CARD_SLUG,
   extendDoubleBanhUntil,
+  OWNING_ORDER_STATUSES,
+  ordersHoldSlug,
+  PET_BUN_SLUG,
+  SHOP_BADGE_NAMES,
 } from './market-effects';
 import {
   Injectable,
@@ -256,6 +260,30 @@ export class MarketService {
         };
       }
 
+      // Pet Bun is bought once: it unlocks a pet, a second one adds nothing.
+      // Checked before stock and Bánh Mì move, under a per-learner lock so two
+      // checkouts in parallel cannot both pass.
+      const petBun = resolvedItems.find(
+        ({ product }) => product.slug === PET_BUN_SLUG,
+      );
+      if (petBun) {
+        if (petBun.quantity > 1) {
+          throw new BadRequestException(
+            'Thú ảo Bun chỉ cần đổi một lần cho mỗi tài khoản.',
+          );
+        }
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pet_bun:${userId}`}))`;
+        const owning = await tx.marketOrder.findMany({
+          where: { userId, status: { in: OWNING_ORDER_STATUSES } },
+          select: { items: true },
+        });
+        if (ordersHoldSlug(owning, PET_BUN_SLUG)) {
+          throw new BadRequestException(
+            'Bạn đã sở hữu thú ảo Bun. Vào trang Thú ảo để đổi sang Bun.',
+          );
+        }
+      }
+
       // 2a. Trừ tồn kho Stock theo CAS nguyên tử. The price and the on-sale
       // flag are part of it (audit R12, 2026-11-18): a gift repriced or taken
       // off sale after the catalog read above was sold at the old price.
@@ -366,27 +394,30 @@ export class MarketService {
           });
         }
 
-        // Tự động trao Huy hiệu nếu mua vật phẩm Huy hiệu
-        if (
-          product.name.includes('Huy Hiệu') ||
-          product.name.includes('Bậc Thầy Từ Vựng')
-        ) {
-          const badge = await tx.badge.findFirst({
-            where: {
-              OR: [
-                { name: 'Bậc Thầy Từ Vựng' },
-                { name: { contains: 'Bậc Thầy' } },
-              ],
-            },
+        // A shop badge grants its own Badge (owner 2026-11-19). The old check
+        // matched names ("Huy Hiệu" with a capital H never matched, and the
+        // Bậc Thầy badge did not exist), so neither purchase granted anything.
+        const badgeName = SHOP_BADGE_NAMES[product.slug];
+        if (badgeName) {
+          // The Badge row is created on first sale; the lock keeps two
+          // checkouts from creating it twice (Badge.name is not unique).
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shop_badge:${badgeName}`}))`;
+          const exists = await tx.badge.findFirst({
+            where: { name: badgeName },
+            select: { id: true },
           });
-          if (badge) {
-            // ON CONFLICT DO NOTHING (audit C5): two checkouts at once no
-            // longer roll the whole order back on the unique badge.
-            await tx.userBadge.createMany({
-              data: [{ userId, badgeId: badge.id }],
-              skipDuplicates: true,
+          if (!exists) {
+            await tx.badge.create({
+              data: {
+                name: badgeName,
+                description: 'Đổi trong Cửa hàng Bánh Mì.',
+                criteria: { source: 'shop', slug: product.slug },
+              },
             });
           }
+          await this.gamificationService.awardBadgeIfEarned(userId, badgeName, {
+            tx,
+          });
         }
       }
 

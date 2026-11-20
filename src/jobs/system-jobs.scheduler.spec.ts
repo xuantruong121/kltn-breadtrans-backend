@@ -35,6 +35,8 @@ describe('SystemJobsScheduler', () => {
       enqueueWeekly: jest.fn(),
       enqueueDatabaseBackupR2Sync: jest.fn(),
       enqueueAccountPurge: jest.fn(),
+      enqueuePlanExpiryReminder: jest.fn(),
+      enqueueWeeklyReport: jest.fn(),
     });
     const startAt = async (iso: string) => {
       jest.useFakeTimers().setSystemTime(new Date(iso));
@@ -43,6 +45,17 @@ describe('SystemJobsScheduler', () => {
       jest.useRealTimers();
       return fake;
     };
+
+    it('catches up the 08:00 weekly report and the 09:00 plan reminder (owner 2026-11-20)', async () => {
+      // Monday 2026-11-16 10:15 local: the host was off at 08:00 and 09:00.
+      const fake = await startAt('2026-11-16T03:15:00.000Z');
+      expect(fake.enqueueWeeklyReport).toHaveBeenCalledWith('2026-11-16');
+      expect(fake.enqueuePlanExpiryReminder).toHaveBeenCalledWith('2026-11-16');
+      // Monday 07:30 local: both are left to their crons.
+      const early = await startAt('2026-11-16T00:30:00.000Z');
+      expect(early.enqueueWeeklyReport).not.toHaveBeenCalled();
+      expect(early.enqueuePlanExpiryReminder).not.toHaveBeenCalled();
+    });
 
     it('leaves the new day and week to the 00:01 cron when started at 00:00:30', async () => {
       // Monday 2026-11-09 00:00:30 in Ho Chi Minh City.

@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/require-await -- the fake AI provider and
+   reviewers implement async interfaces with fixed data; `async` keeps a thrown
+   QA error (quota, reviewer outage) a rejected promise, as the real calls give. */
 import { Test } from '@nestjs/testing';
 import { applyHttpSecurity } from '../../src/common/http/security';
 import { ValidationPipe } from '@nestjs/common';
@@ -231,6 +234,39 @@ const provider = {
     return examBatch(input);
   },
   generateToeicSpeakingWritingDraft: async () => examSpeakingWriting(),
+  // Writing full draft (owner 2026-11-19): the last task is broken on purpose,
+  // so the harness proves a bad task is dropped.
+  suggestWritingFullDraft: async (input: {
+    kind: 'EMAIL' | 'TRANSLATION';
+    count: number;
+    topic: string;
+  }) => ({
+    title: `QA ${input.topic}`,
+    description: 'Bài soạn cho kiểm thử.',
+    tasks: [
+      ...Array.from({ length: Math.max(1, input.count - 1) }, (_, i) =>
+        input.kind === 'TRANSLATION'
+          ? {
+              prompt: `Tôi có ${i + 2} quyển sách.`,
+              acceptedAnswers: [
+                `I have ${i + 2} books.`,
+                `I've got ${i + 2} books.`,
+              ],
+              hints: [{ vi: 'quyển sách', en: 'book' }],
+              grammarTip: 'Danh từ số nhiều thêm "s".',
+            }
+          : {
+              taskType: 'REQUEST',
+              prompt: `Write to your manager about request ${i + 1}.`,
+              wordRange: [60, 100],
+              explanation: 'Nêu rõ yêu cầu và lý do.',
+            },
+      ),
+      input.kind === 'TRANSLATION'
+        ? { prompt: 'Toi muon an pho.', acceptedAnswers: ['I want pho.'] }
+        : { taskType: 'OPINION', prompt: 'Write an essay.' },
+    ],
+  }),
   suggestVocabFullDraft: async (input: { count: number; topic: string }) => ({
     title: input.topic,
     description: 'Bộ từ soạn cho kiểm thử.',
@@ -567,8 +603,8 @@ async function bootstrap() {
     await app.close();
     process.exit(0);
   };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', () => void shutdown());
+  process.once('SIGTERM', () => void shutdown());
 }
 
 startFakeCloudflare();

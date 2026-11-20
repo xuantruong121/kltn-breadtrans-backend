@@ -1165,6 +1165,81 @@ describe('GamificationService weekly cron hardening', () => {
       expect(switched.happiness).toBe(80);
       expect(switched.satiety).toBe(70);
     });
+
+    const breadyPet = () => ({
+      id: 1,
+      userId: 5,
+      name: 'Bánh Mì Dũng Cảm',
+      level: 2,
+      exp: 300,
+      health: 90,
+      happiness: 90,
+      satiety: 80,
+      lastFedAt: null,
+      stateUpdatedAt: new Date().toISOString(),
+      roster: {},
+    });
+    const prismaWithOrders = (orders: Array<{ items: unknown }>) => {
+      const prisma: any = {
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue(breadyPet()),
+          update: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ id: 1, userId: 5, ...data }),
+            ),
+        },
+        marketOrder: { findMany: jest.fn().mockResolvedValue(orders) },
+        $executeRaw: jest.fn(),
+        $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
+      };
+      return prisma;
+    };
+
+    it('keeps Bun locked without a Pet Bun order', async () => {
+      const prisma = prismaWithOrders([
+        { items: [{ slug: 'streak-freeze', quantity: 1 }] },
+      ]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      await expect(service.changePetType(5, 'petbun')).rejects.toThrow(
+        /chưa sở hữu thú ảo Bun/,
+      );
+      // getMyPet may save due decay first; nothing may make the pet Bun.
+      const names = prisma.userPet.update.mock.calls.map(
+        ([arg]: [{ data: { name?: string } }]) => arg.data.name,
+      );
+      expect(names).not.toContain('petbun');
+    });
+
+    it('switches to Bun once a Pet Bun order exists', async () => {
+      const prisma = prismaWithOrders([
+        { items: [{ slug: 'pet-bun', quantity: 1 }] },
+      ]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      const switched = await service.changePetType(5, 'petbun');
+      expect(switched.name).toBe('petbun');
+      expect(switched.level).toBe(1);
+    });
+
+    it('a pet named "Bun" by the seed is still Bready, not the bought Bun', async () => {
+      const prisma = prismaWithOrders([]);
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+      const switched = await service.changePetType(5, 'Bun');
+      expect(prisma.marketOrder.findMany).not.toHaveBeenCalled();
+      expect(switched.name).toBe('Bun');
+    });
   });
 
   describe('awardVocabMasteryReward', () => {
@@ -1222,65 +1297,6 @@ describe('GamificationService weekly cron hardening', () => {
       const res2 = await service.awardVocabMasteryReward(3, 99);
       expect(res2.granted).toBe(0);
       expect(res2.reason).toBe('ALREADY_MASTERED');
-    });
-  });
-
-  describe('awardToeicReward', () => {
-    it('awards 120 Bánh Mì for FULL_TEST and 0 for repeated attempt of same exam & mode', async () => {
-      let rewarded = false;
-      const tx: any = {
-        $executeRaw: jest.fn().mockResolvedValue(1),
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([]) // INSERT
-          .mockResolvedValueOnce([{ id: 1, earnedBanh: 0 }]), // SELECT
-        userToeicReward: {
-          findUnique: jest.fn().mockImplementation(() =>
-            Promise.resolve(
-              rewarded
-                ? {
-                    id: 1,
-                    userId: 4,
-                    examId: 1,
-                    mode: 'FULL_TEST',
-                    banhGranted: 120,
-                  }
-                : null,
-            ),
-          ),
-          create: jest.fn().mockImplementation(() => {
-            rewarded = true;
-            return Promise.resolve({ id: 1 });
-          }),
-          update: jest.fn().mockResolvedValue({}),
-        },
-        userStats: {
-          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 0 }),
-          upsert: jest.fn().mockResolvedValue({ totalBanhRan: 120 }),
-        },
-        dailyBanhEarning: {
-          update: jest.fn().mockResolvedValue({}),
-        },
-        banhTransaction: {
-          findUnique: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({}),
-        },
-      };
-      const prisma: any = {
-        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
-      };
-      const service = new GamificationService(
-        prisma,
-        { emit: jest.fn() } as any,
-        {} as any,
-      );
-
-      const res1 = await service.awardToeicReward(4, 1, 'FULL_TEST', 10);
-      expect(res1.granted).toBe(120);
-
-      const res2 = await service.awardToeicReward(4, 1, 'FULL_TEST', 11);
-      expect(res2.granted).toBe(0);
-      expect(res2.reason).toBe('ALREADY_REWARDED');
     });
   });
 

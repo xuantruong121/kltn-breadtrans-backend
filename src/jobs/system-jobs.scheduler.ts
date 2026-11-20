@@ -10,6 +10,7 @@ import {
   isPastBusinessRollover,
 } from '../common/time/business-time.util';
 import { SystemJobsService } from './system-jobs.service';
+import { missedTimedJobs } from './timed-catch-up.logic';
 
 @Injectable()
 export class SystemJobsScheduler implements OnModuleInit {
@@ -31,6 +32,14 @@ export class SystemJobsScheduler implements OnModuleInit {
       if (isPastBusinessRollover(getBusinessWeekStart(now), now)) {
         await this.jobs.enqueueWeekly(getBusinessWeekKey(now), true);
       }
+      // A host that was off at 09:00 or at Monday 08:00 still sends the plan
+      // reminder and the weekly report (owner 2026-11-20). Same keys as the
+      // cron, and both jobs skip a learner who already has the notice.
+      const missed = missedTimedJobs(now);
+      if (missed.planExpiryDayKey)
+        await this.jobs.enqueuePlanExpiryReminder(missed.planExpiryDayKey);
+      if (missed.weeklyReportDayKey)
+        await this.jobs.enqueueWeeklyReport(missed.weeklyReportDayKey);
       await this.jobs.enqueueDatabaseBackupR2Sync();
       // Account purge has no fixed minute to wait for: catch the day up. Its
       // own key, so a start before 02:30 does not swallow the 02:30 run.

@@ -6,7 +6,12 @@ import {
   Logger,
   Optional,
   BadRequestException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import {
+  cleanWritingFullDraft,
+  type WritingFullDraft,
+} from '../writing/writing-full-draft.logic';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import type { SpeakingTaskType } from '../speaking/speaking-contract';
@@ -657,6 +662,32 @@ export class AiService {
       );
     }
     return this.aiEvaluator.suggestListeningQuestions(input);
+  }
+
+  /** Email or "Dịch câu" tasks, each checked; none usable is a 422. */
+  async suggestWritingFullDraft(input: {
+    sourceText?: string;
+    topic: string;
+    level: string;
+    kind: 'EMAIL' | 'TRANSLATION';
+    count: number;
+  }): Promise<WritingFullDraft> {
+    await this.checkAndIncrementDailyQuota();
+    if (!this.aiEvaluator.suggestWritingFullDraft) {
+      throw new BadRequestException(
+        'Chiến lược AI hiện tại không hỗ trợ soạn bài Writing',
+      );
+    }
+    const draft = cleanWritingFullDraft(
+      await this.aiEvaluator.suggestWritingFullDraft(input),
+      input.kind,
+      input.count,
+    );
+    if (!draft.tasks.length)
+      throw new UnprocessableEntityException(
+        'AI chưa soạn được câu nào đạt yêu cầu. Hãy thử lại hoặc đổi chủ đề.',
+      );
+    return draft;
   }
 
   async suggestWritingTask(input: {

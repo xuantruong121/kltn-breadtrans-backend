@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -30,6 +36,13 @@ class TranslationReviewQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  /** Only this "Dịch câu" exercise (Writing CMS card, owner 2026-11-19). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quizId?: number;
 }
 
 class TranslationDecisionDto {
@@ -55,8 +68,25 @@ export class TranslationReviewController {
   @ApiOperation({
     summary: 'Câu dịch AI chấm đúng nhưng chưa có trong đáp án mẫu',
   })
+  @ApiQuery({ name: 'quizId', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: '{ data, total, page, limit, totalPages }',
+  })
   list(@Query() query: TranslationReviewQueryDto) {
     return this.service.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({
+    summary: 'Số câu dịch chờ duyệt: tổng và theo từng bài Dịch câu',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '{ total, byQuiz: { [quizId]: n } }',
+  })
+  summary() {
+    return this.service.summary();
   }
 
   @Post('approve')
