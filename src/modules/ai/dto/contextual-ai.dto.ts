@@ -394,6 +394,35 @@ export class SuggestReadingFullDraftDto {
   count?: number = 5;
 }
 
+/** "Tạo bằng AI" on the Writing page: email or "Dịch câu" only (owner 2026-11-19). */
+export class SuggestWritingFullDraftDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  sourceText?: string;
+
+  @IsNotEmpty({ message: 'Cần nhập chủ đề' })
+  @IsString()
+  @MaxLength(300)
+  topic: string;
+
+  @IsNotEmpty()
+  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  level: string;
+
+  @IsIn(['EMAIL', 'TRANSLATION'], {
+    message: 'AI chỉ soạn bài Viết email hoặc Dịch câu',
+  })
+  kind: 'EMAIL' | 'TRANSLATION';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
+  count?: number = 5;
+}
+
 export class SuggestVocabFullDraftDto {
   @IsNotEmpty()
   @IsString()

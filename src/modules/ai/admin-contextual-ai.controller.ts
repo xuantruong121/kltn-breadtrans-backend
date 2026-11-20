@@ -9,6 +9,7 @@ import {
   BadGatewayException,
   BadRequestException,
   Optional,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -34,6 +35,7 @@ import {
   SuggestListeningContentDto,
   SuggestListeningQuestionsDto,
   SuggestWritingTaskDto,
+  SuggestWritingFullDraftDto,
   SuggestSpeakingPracticeSetDto,
   SuggestSpeakingExercisesDto,
   SuggestSpeakingFullDraftDto,
@@ -240,6 +242,39 @@ export class AdminContextualAiController {
       throw new BadGatewayException(
         'Không thể tạo câu hỏi nghe từ AI lúc này. Vui lòng thử lại sau.',
       );
+    }
+  }
+
+  @Post('writing/ai/full-draft')
+  @ApiOperation({
+    summary:
+      'Soạn cả bài Viết nháp (email hoặc Dịch câu); bài theo tranh không dùng AI',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ kind, title, description, tasks[], dropped }',
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'AI không trả câu nào đạt kiểm tra',
+  })
+  async suggestWritingFullDraft(@Body() dto: SuggestWritingFullDraftDto) {
+    try {
+      return await this.aiService.suggestWritingFullDraft({
+        topic: dto.topic,
+        level: dto.level,
+        kind: dto.kind,
+        count: dto.count || 5,
+        sourceText: dto.sourceText,
+      });
+    } catch (error: any) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnprocessableEntityException
+      )
+        throw error;
+      this.logger.warn(`AI Writing full draft failed: ${error?.message || ''}`);
+      throw new BadGatewayException('Không thể soạn bài Writing lúc này.');
     }
   }
 
