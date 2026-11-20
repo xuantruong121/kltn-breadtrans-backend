@@ -63,19 +63,64 @@ export const SCRUBBED_RECIPIENT = {
 };
 
 /**
- * The R2 key behind a stored file reference: a key as is, or a URL under our
- * public bucket address. Anything else (a Google avatar, another host) is not
- * ours to delete: null.
+ * Where the server writes a learner's recordings. Every prefix carries the
+ * owner (user id, or the diagnostic attempt), so a key outside them is never
+ * this learner's to delete.
  */
-export function storageKeyOf(
-  ref: string | null | undefined,
-  publicBaseUrl: string,
+const RECORDING_PREFIXES = [
+  'premium/speaking/practice/',
+  'premium/speaking/diagnostic/',
+  'speaking/pending/',
+] as const;
+
+/** A plain object key: no scheme, no leading slash, no `..` or backslash. */
+function plainKey(value: string | null | undefined): string | null {
+  const key = (value ?? '').trim();
+  if (!key || key.startsWith('/') || key.includes('://')) return null;
+  if (key.includes('\\') || key.split('/').includes('..')) return null;
+  return key;
+}
+
+/**
+ * The R2 key of a recording the server stored for this learner, or null.
+ * Security review 2026-11-21: the purge used to delete whatever a learner had
+ * typed into their avatar or a suggestion link, so a throwaway account could
+ * delete exam media or another learner's file. Only server-written recording
+ * keys under the owner's own prefix are deleted now:
+ * - a speaking practice recording or upload intent: under the user's id;
+ * - a diagnostic speaking answer: under its assessment and attempt.
+ */
+export function ownedRecordingKey(
+  ref:
+    | { kind: 'speaking'; key: string | null | undefined }
+    | {
+        kind: 'diagnostic';
+        key: string | null | undefined;
+        assessmentId: number;
+        attemptId: number;
+      },
+  userId: number,
 ): string | null {
-  const value = (ref ?? '').trim();
-  if (!value) return null;
-  if (!/^https?:\/\//i.test(value)) return value.replace(/^\/+/, '') || null;
-  const base = publicBaseUrl.replace(/\/+$/, '');
-  if (!base || !value.startsWith(`${base}/`)) return null;
-  const key = decodeURIComponent(value.slice(base.length + 1).split(/[?#]/)[0]);
-  return key || null;
+  const key = plainKey(ref.key);
+  if (!key) return null;
+  const allowed =
+    ref.kind === 'speaking'
+      ? [
+          `premium/speaking/practice/${userId}/`,
+          `premium/speaking/practice/legacy/${userId}/`,
+          `premium/speaking/practice/pending/${userId}/`,
+          `speaking/pending/${userId}/`,
+        ]
+      : [`premium/speaking/diagnostic/${ref.assessmentId}/${ref.attemptId}/`];
+  return allowed.some((prefix) => key.startsWith(prefix)) ? key : null;
+}
+
+/**
+ * Whether a key queued for a delete retry is a learner recording at all. A key
+ * queued before the 2026-11-21 fix may be anything a learner typed; those are
+ * dropped instead of retried.
+ */
+export function isRecordingKey(value: string | null | undefined): boolean {
+  const key = plainKey(value);
+  return !!key && RECORDING_PREFIXES.some((prefix) => key.startsWith(prefix));
 }

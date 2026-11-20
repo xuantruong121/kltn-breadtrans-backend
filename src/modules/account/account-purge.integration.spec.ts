@@ -99,7 +99,7 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('deletes an account without kept records, with its files', async () => {
+  it('deletes an account without kept records, leaving typed file links alone', async () => {
     const user = await makeUser('plain', new Date(Date.now() - 1000));
 
     await expect(service.purgeUser(user.id)).resolves.toBe('DELETED');
@@ -114,7 +114,11 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
         where: { email: { startsWith: `deleted-${user.id}-` } },
       }),
     ).toBe(0);
-    expect(r2.deleteFile).toHaveBeenCalledWith(`avatars/plain-${suffix}.png`);
+    // The avatar is a value the learner typed: never a delete target
+    // (security review 2026-11-21); only owned recordings are deleted.
+    expect(r2.deleteFile).not.toHaveBeenCalledWith(
+      `avatars/plain-${suffix}.png`,
+    );
   });
 
   it('keeps orders and the ledger on an anonymous shell', async () => {

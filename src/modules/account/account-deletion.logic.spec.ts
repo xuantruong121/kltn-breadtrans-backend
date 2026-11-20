@@ -4,8 +4,9 @@ import {
   cancelTokenKey,
   deletionScheduledAt,
   hasKeptRecords,
+  isRecordingKey,
+  ownedRecordingKey,
   shellEmail,
-  storageKeyOf,
 } from './account-deletion.logic';
 
 describe('account deletion logic (owner 2026-11-16)', () => {
@@ -53,27 +54,71 @@ describe('account deletion logic (owner 2026-11-16)', () => {
     );
   });
 
-  describe('storageKeyOf', () => {
-    const base = 'https://cdn.example.com/';
-    it('takes a bare key as is', () => {
-      expect(storageKeyOf('premium/speaking/1/a.webm', base)).toBe(
-        'premium/speaking/1/a.webm',
-      );
-      expect(storageKeyOf('/avatars/x.png', base)).toBe('avatars/x.png');
+  describe('ownedRecordingKey (security review 2026-11-21)', () => {
+    const speaking = (key: string | null) => ({
+      kind: 'speaking' as const,
+      key,
     });
-    it('turns our public URL back into a key', () => {
-      expect(
-        storageKeyOf('https://cdn.example.com/avatars/a%20b.png?v=2', base),
-      ).toBe('avatars/a b.png');
+    const diagnostic = (key: string) => ({
+      kind: 'diagnostic' as const,
+      key,
+      assessmentId: 5,
+      attemptId: 61,
     });
-    it('never returns a key for another host or an empty value', () => {
+
+    it("keeps the learner's own speaking recordings and upload intents", () => {
+      for (const key of [
+        'premium/speaking/practice/19/0b8f.wav',
+        'premium/speaking/practice/legacy/19/a.webm',
+        'premium/speaking/practice/pending/19/abc.wav',
+        'speaking/pending/19/abc.wav',
+      ])
+        expect(ownedRecordingKey(speaking(key), 19)).toBe(key);
+    });
+
+    it('keeps a diagnostic answer only under its own assessment and attempt', () => {
       expect(
-        storageKeyOf('https://lh3.googleusercontent.com/a/photo', base),
+        ownedRecordingKey(
+          diagnostic('premium/speaking/diagnostic/5/61/12/x.webm'),
+          19,
+        ),
+      ).toBe('premium/speaking/diagnostic/5/61/12/x.webm');
+      expect(
+        ownedRecordingKey(
+          diagnostic('premium/speaking/diagnostic/5/62/12/x.webm'),
+          19,
+        ),
       ).toBeNull();
-      expect(storageKeyOf('https://cdn.example.com.evil/x', base)).toBeNull();
-      expect(storageKeyOf('', base)).toBeNull();
-      expect(storageKeyOf(null, base)).toBeNull();
-      expect(storageKeyOf('https://cdn.example.com/x', '')).toBeNull();
+    });
+
+    it("never returns another user's recording, shared media or a typed value", () => {
+      for (const key of [
+        'premium/speaking/practice/20/0b8f.wav', // another learner
+        'premium/speaking/practice/190/0b8f.wav', // id prefix of another id
+        'premium/listening/quiz-12/audio/v1/full.mp3', // paid listening audio
+        'ai/toeic-exams/exam-5/writing/1.jpg', // exam media
+        'avatars/x.png',
+        'https://cdn.example.com/premium/speaking/practice/19/a.wav',
+        '/premium/speaking/practice/19/a.wav',
+        'premium/speaking/practice/19/../20/a.wav',
+        'premium\\speaking\\practice\\19\\a.wav',
+        '',
+      ])
+        expect(ownedRecordingKey(speaking(key), 19)).toBeNull();
+      expect(ownedRecordingKey(speaking(null), 19)).toBeNull();
+    });
+
+    it('retries only recording keys from the queue', () => {
+      expect(isRecordingKey('premium/speaking/practice/19/a.wav')).toBe(true);
+      expect(isRecordingKey('premium/speaking/diagnostic/5/61/1/a.webm')).toBe(
+        true,
+      );
+      expect(
+        isRecordingKey('premium/listening/quiz-12/audio/v1/full.mp3'),
+      ).toBe(false);
+      expect(isRecordingKey('ai/toeic-exams/exam-5/writing/1.jpg')).toBe(false);
+      expect(isRecordingKey('premium/speaking/practice/../../x')).toBe(false);
+      expect(isRecordingKey('')).toBe(false);
     });
   });
 });
