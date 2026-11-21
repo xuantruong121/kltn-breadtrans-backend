@@ -11,6 +11,20 @@ const SIGN_OFF = ['Trân trọng,', 'Đội ngũ BreadTrans'];
 const AUTOMATIC = 'Đây là email tự động, vui lòng không trả lời.';
 const appBase = (appUrl: string) => appUrl.replace(/\/+$/, '');
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const two = (n: number) => String(n).padStart(2, '0');
+const vnLocal = (date: Date) => new Date(date.getTime() + VN_OFFSET_MS);
+/** "22/11/2026" in Vietnam time. */
+export function vnDate(date: Date): string {
+  const local = vnLocal(date);
+  return `${two(local.getUTCDate())}/${two(local.getUTCMonth() + 1)}/${local.getUTCFullYear()}`;
+}
+/** "20:06 ngày 22/11/2026" in Vietnam time. */
+export function vnClock(date: Date): string {
+  const local = vnLocal(date);
+  return `${two(local.getUTCHours())}:${two(local.getUTCMinutes())} ngày ${vnDate(date)}`;
+}
+
 export function passwordResetEmail(resetUrl: string): RenderedEmail {
   return {
     subject: 'Đặt lại mật khẩu tài khoản BreadTrans',
@@ -67,6 +81,63 @@ export function accountDeletionEmail(input: {
       },
       signOff: SIGN_OFF,
       footer: `Nếu bạn không gửi yêu cầu này, hãy đăng nhập ngay để huỷ và đổi mật khẩu. ${AUTOMATIC}`,
+    }),
+  };
+}
+
+/**
+ * Security notice after a password change (owner 2026-11-21): the owner of the
+ * mailbox learns of a change they did not make. A reset signs every device
+ * out; a change from the account page keeps the device that made it.
+ */
+export function passwordChangedEmail(input: {
+  changedAt: Date;
+  signedOut: 'all' | 'others';
+  appUrl: string;
+}): RenderedEmail {
+  const when = vnClock(input.changedAt);
+  const devices =
+    input.signedOut === 'all'
+      ? 'Để an toàn, tài khoản đã được đăng xuất trên mọi thiết bị. Hãy đăng nhập lại bằng mật khẩu mới.'
+      : 'Để an toàn, tài khoản đã được đăng xuất trên các thiết bị khác. Thiết bị vừa đổi mật khẩu vẫn đăng nhập như cũ.';
+  return {
+    subject: 'Mật khẩu tài khoản BreadTrans vừa được đổi',
+    html: renderEmail({
+      preheader: `Mật khẩu đã được đổi lúc ${when}.`,
+      greeting: 'Chào bạn,',
+      paragraphs: [
+        `Mật khẩu của tài khoản BreadTrans dùng địa chỉ email này vừa được đổi lúc ${when}.`,
+        devices,
+        'Nếu không phải bạn đổi mật khẩu, hãy đặt lại mật khẩu ngay bằng nút bên dưới.',
+      ],
+      action: {
+        label: 'Đặt lại mật khẩu',
+        url: `${appBase(input.appUrl)}/forgot-password`,
+      },
+      signOff: SIGN_OFF,
+      footer: `Nếu bạn vừa đổi mật khẩu, không cần làm gì thêm. ${AUTOMATIC}`,
+    }),
+  };
+}
+
+/** The account was purged as its owner asked (owner 2026-11-21). */
+export function accountDeletedEmail(input: {
+  accountEmail: string;
+  deletedAt: Date;
+}): RenderedEmail {
+  const day = vnDate(input.deletedAt);
+  return {
+    subject: 'Tài khoản BreadTrans đã được xoá',
+    html: renderEmail({
+      preheader: `Tài khoản đã được xoá vĩnh viễn ngày ${day}.`,
+      greeting: 'Chào bạn,',
+      paragraphs: [
+        `Theo yêu cầu của bạn, tài khoản BreadTrans dùng địa chỉ ${input.accountEmail} đã được xoá vĩnh viễn ngày ${day}.`,
+        'Hồ sơ, bài làm, ghi âm và tiến độ học đã bị xoá. Lịch sử đơn hàng và thanh toán được giữ lại ở dạng ẩn danh để phục vụ đối soát, không còn gắn với email này.',
+        'Nếu muốn học tiếp, bạn có thể đăng ký tài khoản mới bằng email này bất cứ lúc nào.',
+      ],
+      signOff: SIGN_OFF,
+      footer: AUTOMATIC,
     }),
   };
 }

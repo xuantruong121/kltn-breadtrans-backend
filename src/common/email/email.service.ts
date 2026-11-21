@@ -80,6 +80,16 @@ export class EmailService {
     return this.send(to, subject, html);
   }
 
+  /** Security notice: the account password changed (passwordChangedEmail). */
+  sendPasswordChanged(to: string, email: RenderedEmail): Promise<void> {
+    return this.send(to, email.subject, email.html);
+  }
+
+  /** The account was purged as its owner asked (accountDeletedEmail). */
+  sendAccountDeleted(to: string, email: RenderedEmail): Promise<void> {
+    return this.send(to, email.subject, email.html);
+  }
+
   sendRegistrationOtp(to: string, otp: string): Promise<void> {
     const email = registrationOtpEmail(otp);
     return this.send(to, email.subject, email.html);

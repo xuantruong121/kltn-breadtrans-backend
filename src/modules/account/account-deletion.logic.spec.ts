@@ -10,12 +10,38 @@ import {
 } from './account-deletion.logic';
 
 describe('account deletion logic (owner 2026-11-16)', () => {
-  it('schedules the purge 7 days after the request, inside the 20-day limit', () => {
-    const at = new Date('2026-11-16T10:00:00.000Z');
-    expect(DELETION_GRACE_DAYS).toBe(7);
-    expect(deletionScheduledAt(at).toISOString()).toBe(
-      '2026-11-23T10:00:00.000Z',
-    );
+  describe('deletionScheduledAt (owner 2026-11-21: purge at 00:02)', () => {
+    // Vietnam time is UTC+7: 00:00 on day D is 17:00Z on day D-1.
+    it('schedules 00:00 Vietnam time after 7 full days, inside the 20-day limit', () => {
+      // 15:00 on 21/11 in Vietnam.
+      const at = new Date('2026-11-21T08:00:00.000Z');
+      expect(DELETION_GRACE_DAYS).toBe(7);
+      // 00:00 on 29/11 in Vietnam.
+      expect(deletionScheduledAt(at).toISOString()).toBe(
+        '2026-11-28T17:00:00.000Z',
+      );
+    });
+
+    it('counts the request day by Vietnam time at both ends of the day', () => {
+      // 00:01 on 21/11 in Vietnam (still 20/11 in UTC).
+      expect(
+        deletionScheduledAt(new Date('2026-11-20T17:01:00.000Z')).toISOString(),
+      ).toBe('2026-11-28T17:00:00.000Z');
+      // 23:59 on 21/11 in Vietnam.
+      expect(
+        deletionScheduledAt(new Date('2026-11-21T16:59:00.000Z')).toISOString(),
+      ).toBe('2026-11-28T17:00:00.000Z');
+    });
+
+    it('always leaves at least 7 full days, across a month end', () => {
+      // 23:59 on 30/11 in Vietnam -> 00:00 on 08/12.
+      const at = new Date('2026-11-30T16:59:00.000Z');
+      const scheduled = deletionScheduledAt(at);
+      expect(scheduled.toISOString()).toBe('2026-12-07T17:00:00.000Z');
+      expect(scheduled.getTime() - at.getTime()).toBeGreaterThanOrEqual(
+        7 * 86_400_000,
+      );
+    });
   });
 
   it('gives the shell an address that is unique and not a mailbox', () => {

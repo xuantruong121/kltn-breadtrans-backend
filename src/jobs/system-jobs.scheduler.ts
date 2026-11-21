@@ -42,7 +42,7 @@ export class SystemJobsScheduler implements OnModuleInit {
         await this.jobs.enqueueWeeklyReport(missed.weeklyReportDayKey);
       await this.jobs.enqueueDatabaseBackupR2Sync();
       // Account purge has no fixed minute to wait for: catch the day up. Its
-      // own key, so a start before 02:30 does not swallow the 02:30 run.
+      // own key, so a start before 00:02 does not swallow the 00:02 run.
       await this.jobs.enqueueAccountPurge(`start-${dayKey}`);
     } catch (error) {
       this.logger.warn(
@@ -102,8 +102,10 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueR2Cleanup(getBusinessWeekKey());
   }
 
-  // Accounts whose 7-day deletion grace period ended (owner 2026-11-16).
-  @Cron('30 2 * * *', { timeZone: BUSINESS_TIMEZONE })
+  // Accounts whose 7-day deletion grace period ended (owner 2026-11-16). At
+  // 00:02 (owner 2026-11-21): deletionScheduledAt is 00:00 of the purge day,
+  // so the day the e-mail names is the day the account goes.
+  @Cron('2 0 * * *', { timeZone: BUSINESS_TIMEZONE })
   async enqueueAccountPurge(): Promise<void> {
     await this.jobs.enqueueAccountPurge(getBusinessDayKey(new Date()));
   }
