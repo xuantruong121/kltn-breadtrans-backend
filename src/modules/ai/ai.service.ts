@@ -711,8 +711,7 @@ export class AiService {
   async suggestSpeakingPracticeSet(input: {
     topic: string;
     level: string;
-    category: string;
-    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    trackContext?: import('./strategies/ai-evaluator.interface').SpeakingTrackAiContext;
     currentTitle?: string;
     currentDescription?: string;
   }): Promise<ContextualSpeakingPracticeSetSuggestion> {
@@ -729,8 +728,7 @@ export class AiService {
     practiceSetTitle: string;
     practiceSetDescription?: string;
     level: string;
-    category: string;
-    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    trackContext?: import('./strategies/ai-evaluator.interface').SpeakingTrackAiContext;
     currentTitle?: string;
     currentTargetText?: string;
     taskType?: SpeakingTaskType;
@@ -750,8 +748,7 @@ export class AiService {
     sourceText?: string;
     topic: string;
     level: string;
-    category: string;
-    categoryContext?: import('./strategies/ai-evaluator.interface').SpeakingCategoryAiContext;
+    trackContext?: import('./strategies/ai-evaluator.interface').SpeakingTrackAiContext;
     objective?: string;
     taskType?: SpeakingTaskType;
     count: number;

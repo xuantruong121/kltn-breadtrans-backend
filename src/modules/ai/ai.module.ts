@@ -12,7 +12,6 @@ import { GeminiCredentialManager } from './gemini/gemini-credential-manager.serv
 import { AiImageSemanticValidator } from './ai-image-semantic-validator.service';
 import { UploadModule } from '../upload/upload.module';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { SpeakingCategoryService } from '../content/speaking-category.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { TutorService } from './tutor.service';
 import { MistakesModule } from '../mistakes/mistakes.module';
@@ -23,7 +22,6 @@ import { MistakesModule } from '../mistakes/mistakes.module';
   providers: [
     AiService,
     DocumentTextService,
-    SpeakingCategoryService,
     GeminiModelRouter,
     GeminiCredentialManager,
     AiImageSemanticValidator,

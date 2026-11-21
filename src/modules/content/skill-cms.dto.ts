@@ -120,9 +120,8 @@ export class SkillContentDto {
   publicationStatus?: QuizPublicationStatus;
 
   // Speaking set fields. Kept explicit so the admin UI never sends arbitrary JSON.
-  @IsOptional()
-  @IsString()
-  category?: string;
+  // No category: Phân loại folded into Lĩnh vực (2026-11-21), set with PUT
+  // :domain/:id/tracks. A new set gets the GENERAL category silently.
 
   @IsOptional()
   @IsString()
@@ -377,10 +376,6 @@ export class SpeakingExerciseDto {
   @IsString()
   @IsNotEmpty()
   targetText!: string;
-
-  @IsOptional()
-  @IsString()
-  category?: string;
 
   @IsOptional()
   @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])

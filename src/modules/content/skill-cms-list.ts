@@ -216,7 +216,6 @@ export type SpeakingSetRow = {
   tracks?: string[];
   title: string;
   description?: string | null;
-  category?: string | null;
   level?: string | null;
   publicationStatus?: string | null;
   updatedAt?: Date | string | null;
@@ -234,17 +233,19 @@ function speakingLevelRank(level?: string | null) {
   );
 }
 
-/** Speaking sets after search, level, category and status, newest first. */
+/**
+ * Speaking sets after search, level, status and track, newest first. The old
+ * category filter is gone: Phân loại folded into Lĩnh vực (2026-11-21).
+ */
 export function filterSpeakingSets<T extends SpeakingSetRow>(
   rows: T[],
   query: ListQuery,
 ): T[] {
   const visible = rows.filter(
     (row) =>
-      (matchesSearch(query.q, row.title, row.description, row.category) ||
+      (matchesSearch(query.q, row.title, row.description) ||
         hasTitleId(query, row.id)) &&
       (isAll(query.level) || row.level === query.level) &&
-      (isAll(query.category) || row.category === query.category) &&
       (isAll(query.status) || row.publicationStatus === query.status) &&
       matchesTrack(row.tracks, query.track),
   );

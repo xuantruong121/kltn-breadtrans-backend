@@ -1,4 +1,5 @@
 import {
+  activeTrackChips,
   buildTrackUsage,
   GENERAL_TRACK,
   isPermutation,
@@ -129,6 +130,23 @@ describe('newTrackSortOrder', () => {
         { code: 'A', sortOrder: 20 },
       ]),
     ).toEqual({ sortOrder: 30 });
+  });
+});
+
+describe('activeTrackChips', () => {
+  it('keeps active tracks only, by sortOrder then name', () => {
+    expect(
+      activeTrackChips([
+        { code: 'B', name: 'Bán hàng', sortOrder: 20, isActive: true },
+        { code: 'OFF', name: 'Đã tắt', sortOrder: 5, isActive: false },
+        { code: 'A2', name: 'Ăn uống', sortOrder: 10, isActive: true },
+        { code: 'A1', name: 'An toàn', sortOrder: 10, isActive: true },
+      ]),
+    ).toEqual([
+      { code: 'A1', name: 'An toàn', sortOrder: 10 },
+      { code: 'A2', name: 'Ăn uống', sortOrder: 10 },
+      { code: 'B', name: 'Bán hàng', sortOrder: 20 },
+    ]);
   });
 });
 

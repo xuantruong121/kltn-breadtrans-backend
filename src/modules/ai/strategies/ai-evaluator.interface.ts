@@ -331,8 +331,7 @@ export interface IAIEvaluator {
   suggestSpeakingPracticeSet?(input: {
     topic: string;
     level: string;
-    category: string;
-    categoryContext?: SpeakingCategoryAiContext;
+    trackContext?: SpeakingTrackAiContext;
     currentTitle?: string;
     currentDescription?: string;
   }): Promise<ContextualSpeakingPracticeSetSuggestion>;
@@ -342,8 +341,7 @@ export interface IAIEvaluator {
     practiceSetTitle: string;
     practiceSetDescription?: string;
     level: string;
-    category: string;
-    categoryContext?: SpeakingCategoryAiContext;
+    trackContext?: SpeakingTrackAiContext;
     currentTitle?: string;
     currentTargetText?: string;
     taskType?: SpeakingTaskType;
@@ -355,8 +353,7 @@ export interface IAIEvaluator {
     sourceText?: string;
     topic: string;
     level: string;
-    category: string;
-    categoryContext?: SpeakingCategoryAiContext;
+    trackContext?: SpeakingTrackAiContext;
     objective?: string;
     taskType?: SpeakingTaskType;
     count: number;
@@ -586,15 +583,16 @@ export interface ContextualWritingTaskSuggestion {
 export interface ContextualSpeakingPracticeSetSuggestion {
   title: string;
   description: string;
-  category: string;
   level: string;
+  /** The track the draft was written for (the request's), or null. */
+  track: string | null;
 }
 
-export interface SpeakingCategoryAiContext {
+/** The Lĩnh vực a Speaking draft is written for (2026-11-21). */
+export interface SpeakingTrackAiContext {
   code: string;
-  displayLabel: string;
-  allowPracticeSet: boolean;
-  allowExercise: boolean;
+  name: string;
+  description: string | null;
 }
 
 export interface ContextualSpeakingExerciseCandidate {

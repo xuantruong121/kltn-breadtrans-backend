@@ -97,6 +97,9 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
+/** The speaking category every new set gets (categoryId is NOT NULL). */
+const GENERAL_SPEAKING_CATEGORY = 'GENERAL';
+
 /** Tags in the order admins set for the tracks. */
 const TRACK_ORDER = [
   { trackRef: { sortOrder: 'asc' as const } },
@@ -150,13 +153,6 @@ export class SkillCmsService {
         `SpeakingPracticeSet.level phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
       );
     }
-  }
-
-  private async speakingCategory(
-    code: string,
-    scope: 'practiceSet' | 'exercise',
-  ) {
-    return this.speakingCategoryService?.getByCode(code, scope);
   }
 
   private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
@@ -255,7 +251,6 @@ export class SkillCmsService {
             id: true,
             title: true,
             description: true,
-            category: true,
             level: true,
             publicationStatus: true,
             updatedAt: true,
@@ -590,19 +585,21 @@ export class SkillCmsService {
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       this.assertSpeakingSetContract(dto);
-      const categoryCode =
-        dto.category?.trim() ||
-        (this.speakingCategoryService
-          ? (await this.speakingCategoryService.getDefault('practiceSet')).code
-          : 'GENERAL');
-      const category = await this.speakingCategory(categoryCode, 'practiceSet');
+      // Phân loại folded into Lĩnh vực (2026-11-21): nobody picks a category
+      // any more, but categoryId is still required, so a new set gets GENERAL
+      // (even if it was switched off).
+      const category = await this.speakingCategoryService?.getByCode(
+        GENERAL_SPEAKING_CATEGORY,
+        'practiceSet',
+        { allowInactive: true },
+      );
       const title = dto.title.trim();
       const id = `speaking-${randomUUID()}`;
       const data: any = {
         id,
         title,
         description: dto.description?.trim() ?? '',
-        category: category?.code || categoryCode,
+        category: GENERAL_SPEAKING_CATEGORY,
         level: dto.level?.trim() || 'A1-B1',
         publicationStatus: QuizPublicationStatus.DRAFT,
       };
@@ -656,19 +653,15 @@ export class SkillCmsService {
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       await this.assertSpeakingEditable(rawId);
-      const category = dto.category
-        ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
-        : undefined;
-      const data: any = {
-        title: dto.title?.trim(),
-        description: dto.description?.trim(),
-        category: category?.code || dto.category?.trim(),
-        level: dto.level?.trim(),
-      };
-      if (category) data.categoryId = category.id;
+      // The set keeps its category as it is: a save never checks it again
+      // (two seeded sets sat on categories closed to sets and got 400).
       return this.prisma.speakingPracticeSet.update({
         where: { id: rawId },
-        data,
+        data: {
+          title: dto.title?.trim(),
+          description: dto.description?.trim(),
+          level: dto.level?.trim(),
+        },
       });
     }
     const id = this.id(rawId);
@@ -925,13 +918,13 @@ export class SkillCmsService {
       stimulus,
     });
     if (semanticErrors.length) throw new BadRequestException(semanticErrors);
-    const category = dto.category
-      ? await this.speakingCategory(dto.category.trim(), 'exercise')
-      : undefined;
+    // An exercise takes its set's legacy category string and no category of
+    // its own: Lĩnh vực sits on the set.
     const data: any = {
       title: dto.title.trim(),
       targetText: dto.targetText.trim(),
-      category: category?.code || set.category,
+      category: set.category,
+      categoryId: null,
       difficulty: dto.difficulty || set.level,
       imageUrl: dto.imageUrl,
       audioUrl: dto.audioUrl,
@@ -942,7 +935,6 @@ export class SkillCmsService {
       practiceSetId: rawSetId,
       publicationStatus: QuizPublicationStatus.DRAFT,
     };
-    if (this.speakingCategoryService) data.categoryId = category?.id ?? null;
     return this.inTransaction(
       client,
       async (tx) => {
@@ -996,11 +988,7 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
-      include: {
-        categoryTaxonomy: true,
-        practiceSet: { select: { category: true, categoryId: true } },
-        stimulus: true,
-      },
+      include: { stimulus: true },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     if (dto.order !== undefined) {
@@ -1034,16 +1022,10 @@ export class SkillCmsService {
         })
       : [];
     if (semanticErrors.length) throw new BadRequestException(semanticErrors);
-    const hasCategoryInput = dto.category !== undefined;
-    const category =
-      hasCategoryInput && dto.category
-        ? await this.speakingCategory(dto.category.trim(), 'exercise')
-        : undefined;
+    // No category here: an exercise has none of its own any more.
     const data: any = {
       title: dto.title?.trim(),
       targetText: dto.targetText?.trim(),
-      category:
-        category?.code || exercise.practiceSet?.category || exercise.category,
       difficulty: dto.difficulty,
       imageUrl: dto.imageUrl,
       // A new sample sentence retires the clip that reads the old one; the
@@ -1059,9 +1041,6 @@ export class SkillCmsService {
       taskType,
       stimulusId: dto.stimulusId === null ? null : stimulus?.id,
     };
-    if (hasCategoryInput && this.speakingCategoryService) {
-      data.categoryId = category?.id ?? null;
-    }
     return db.speakingExercise.update({
       where: { id: exerciseId },
       data,

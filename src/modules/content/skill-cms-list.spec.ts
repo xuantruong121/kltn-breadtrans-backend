@@ -157,9 +157,14 @@ describe('speaking set list rules', () => {
 
   it('filters and sorts sets', () => {
     expect(filterSpeakingSets(sets, {}).map((s) => s.id)).toEqual(['b', 'a']);
-    expect(filterSpeakingSets(sets, { q: 'work' }).map((s) => s.id)).toEqual([
+    expect(filterSpeakingSets(sets, { q: 'phỏng' }).map((s) => s.id)).toEqual([
       'b',
     ]);
+    // Phân loại folded into Lĩnh vực: no category search or filter.
+    expect(filterSpeakingSets(sets, { q: 'work' })).toEqual([]);
+    expect(
+      filterSpeakingSets(sets, { category: 'Work' }).map((s) => s.id),
+    ).toEqual(['b', 'a']);
     expect(filterSpeakingSets(sets, { level: 'A1' }).map((s) => s.id)).toEqual([
       'a',
     ]);

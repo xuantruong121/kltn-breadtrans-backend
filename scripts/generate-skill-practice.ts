@@ -150,11 +150,6 @@ const speakingTask = (cefr: string, i: number) =>
     : i % 2 === 0
       ? 'RESPOND_TO_QUESTION'
       : 'EXPRESS_OPINION';
-const speakingCategory = (track: Track) =>
-  ['IT_SOFTWARE', 'OFFICE_BUSINESS', 'SALES_CUSTOMER_SERVICE'].includes(track)
-    ? 'BUSINESS'
-    : 'GENERAL';
-
 function plan() {
   const spec = buildSpec();
   for (const skill of SKILLS) {
@@ -200,16 +195,15 @@ async function generate() {
           ],
           count: 5,
         });
-      else if (item.skill === 'SPEAKING') {
-        const category = speakingCategory(item.track);
+      // The topic carries the track's field; the set is tagged on apply.
+      else if (item.skill === 'SPEAKING')
         drafts[item.key] = await ai.suggestSpeakingFullDraft({
           topic: item.topic,
           level: item.cefr,
-          category,
           taskType: speakingTask(item.cefr, i),
           count: 5,
         });
-      } else
+      else
         drafts[item.key] = await ai.suggestWritingTask({
           taskType: writingTaskType(item.cefr),
           level: item.cefr,
@@ -432,7 +426,6 @@ async function apply() {
             title: d.practiceSet.title,
             description: d.practiceSet.description,
             level: item.cefr,
-            category: speakingCategory(item.track),
           },
           user,
         );

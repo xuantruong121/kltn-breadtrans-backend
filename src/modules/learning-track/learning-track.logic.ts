@@ -120,6 +120,23 @@ export function newTrackSortOrder(
     : { sortOrder };
 }
 
+/** What a learner sees of an item's tracks: the active ones, in the admin order. */
+export function activeTrackChips(
+  tracks: ReadonlyArray<{
+    code: string;
+    name: string;
+    sortOrder: number;
+    isActive: boolean;
+  }>,
+) {
+  return tracks
+    .filter((track) => track.isActive)
+    .sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'vi'),
+    )
+    .map(({ code, name, sortOrder }) => ({ code, name, sortOrder }));
+}
+
 export type TrackUsage = {
   listening: number;
   reading: number;

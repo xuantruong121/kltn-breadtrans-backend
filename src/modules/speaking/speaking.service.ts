@@ -45,6 +45,7 @@ import {
   parseCefrRange,
 } from '../subscription/practice-level';
 import { SpeakingCategoryService } from '../content/speaking-category.service';
+import { activeTrackChips } from '../learning-track/learning-track.logic';
 import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 import {
   aiQuotaExhausted,
@@ -585,7 +586,23 @@ export class SpeakingService {
       include: {
         categoryTaxonomy: true,
         stimulus: true,
-        practiceSet: { include: { categoryTaxonomy: true } },
+        practiceSet: {
+          include: {
+            categoryTaxonomy: true,
+            tracks: {
+              select: {
+                trackRef: {
+                  select: {
+                    code: true,
+                    name: true,
+                    sortOrder: true,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -640,6 +657,8 @@ export class SpeakingService {
         description: string;
         category: string;
         categoryLabel: string;
+        /** The set's Lĩnh vực, active ones only, in the admin order. */
+        tracks: Array<{ code: string; name: string; sortOrder: number }>;
         exerciseCount: number;
         completedCount: number;
         exerciseIds: number[];
@@ -662,6 +681,9 @@ export class SpeakingService {
         categoryLabel:
           taxonomy?.name ||
           SpeakingCategoryService.labelForLegacyCode(effectiveCategory),
+        tracks: activeTrackChips(
+          (items[0].practiceSet?.tracks ?? []).map((tag) => tag.trackRef),
+        ),
         exerciseCount: items.length,
         completedCount: items.filter((item) =>
           completedExerciseIds.has(item.id),

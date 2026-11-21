@@ -30,11 +30,14 @@ export class SpeakingCatalogController {
   @ApiQuery({
     name: 'category',
     required: false,
-    description: 'Speaking category code; resolved by the taxonomy source',
+    deprecated: true,
+    description:
+      'Deprecated (2026-11-21): Phân loại đã gộp vào Lĩnh vực; lọc theo practiceSet.tracks. Mã phân loại cũ vẫn được nhận.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Bài tập kèm bộ luyện và trạng thái khoá',
+    description:
+      'Bài tập kèm bộ luyện và trạng thái khoá; practiceSet.tracks là [{ code, name, sortOrder }] các lĩnh vực đang bật của bộ',
   })
   findAllExercises(
     @Query('category') category: string,

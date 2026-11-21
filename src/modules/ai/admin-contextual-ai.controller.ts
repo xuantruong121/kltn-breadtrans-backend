@@ -8,7 +8,6 @@ import {
   Logger,
   BadGatewayException,
   BadRequestException,
-  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -25,7 +24,6 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiService } from './ai.service';
-import { SpeakingCategoryService } from '../content/speaking-category.service';
 import {
   SuggestVocabWordDto,
   SuggestGrammarQuestionsDto,
@@ -70,27 +68,22 @@ export class AdminContextualAiController {
     private readonly aiService: AiService,
     private readonly documents: DocumentTextService,
     private readonly prisma: PrismaService,
-    @Optional()
-    private readonly speakingCategoryService?: SpeakingCategoryService,
   ) {}
 
-  private async speakingCategoryContext(code: string) {
-    if (!this.speakingCategoryService) {
-      throw new BadRequestException('Speaking taxonomy service chưa sẵn sàng');
-    }
-    const category = await this.speakingCategoryService.getByCode(
-      code,
-      'practiceSet',
-    );
-    return {
-      category: category.code,
-      categoryContext: {
-        code: category.code,
-        displayLabel: category.name,
-        allowPracticeSet: category.allowPracticeSet,
-        allowExercise: category.allowExercise,
-      },
-    };
+  /**
+   * The Lĩnh vực a Speaking draft is written for: its name and description
+   * go to the prompt. No code means a general draft. Only an active track
+   * can be picked, as for tags.
+   */
+  private async speakingTrackContext(code?: string) {
+    if (!code) return {};
+    const track = await this.prisma.learningTrack.findFirst({
+      where: { code, isActive: true },
+      select: { code: true, name: true, description: true },
+    });
+    if (!track)
+      throw new BadRequestException('Lĩnh vực không tồn tại hoặc đã tắt.');
+    return { trackContext: track };
   }
 
   @Post('vocab/ai/suggest-word')
@@ -301,14 +294,25 @@ export class AdminContextualAiController {
   }
 
   @Post('speaking/ai/suggest-practice-set')
-  @ApiOperation({ summary: 'Gợi ý bộ luyện nói nháp, cần Admin xem lại' })
+  @ApiOperation({
+    summary:
+      'Gợi ý bộ luyện nói nháp, cần Admin xem lại; track (tuỳ chọn) là mã lĩnh vực đang bật',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ title, description, level, track }',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Lĩnh vực không tồn tại hoặc đã tắt',
+  })
   async suggestSpeakingPracticeSet(@Body() dto: SuggestSpeakingPracticeSetDto) {
     try {
-      const taxonomy = await this.speakingCategoryContext(dto.category);
+      const track = await this.speakingTrackContext(dto.track);
       return await this.aiService.suggestSpeakingPracticeSet({
         topic: dto.topic,
         level: dto.level,
-        ...taxonomy,
+        ...track,
         currentTitle: dto.currentTitle,
         currentDescription: dto.currentDescription,
       });
@@ -324,15 +328,22 @@ export class AdminContextualAiController {
   }
 
   @Post('speaking/ai/suggest-exercises')
-  @ApiOperation({ summary: 'Gợi ý câu luyện nói nháp từ ngữ cảnh bộ luyện' })
+  @ApiOperation({
+    summary:
+      'Gợi ý câu luyện nói nháp từ ngữ cảnh bộ luyện; track (tuỳ chọn) là mã lĩnh vực đang bật',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Lĩnh vực không tồn tại hoặc đã tắt',
+  })
   async suggestSpeakingExercises(@Body() dto: SuggestSpeakingExercisesDto) {
     try {
-      const taxonomy = await this.speakingCategoryContext(dto.category);
+      const track = await this.speakingTrackContext(dto.track);
       return await this.aiService.suggestSpeakingExercises({
         practiceSetTitle: dto.practiceSetTitle,
         practiceSetDescription: dto.practiceSetDescription,
         level: dto.level,
-        ...taxonomy,
+        ...track,
         currentTitle: dto.currentTitle,
         currentTargetText: dto.currentTargetText,
         taskType: dto.taskType,
@@ -349,14 +360,26 @@ export class AdminContextualAiController {
   }
 
   @Post('speaking/ai/full-draft')
-  @ApiOperation({ summary: 'Soạn bộ luyện Speaking cùng các câu luyện nháp' })
+  @ApiOperation({
+    summary:
+      'Soạn bộ luyện Speaking cùng các câu luyện nháp; track (tuỳ chọn) là mã lĩnh vực đang bật',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      '{ practiceSet: { title, description, level, track }, exercises[] }',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Lĩnh vực không tồn tại hoặc đã tắt',
+  })
   async suggestSpeakingFullDraft(@Body() dto: SuggestSpeakingFullDraftDto) {
     try {
-      const taxonomy = await this.speakingCategoryContext(dto.category);
+      const track = await this.speakingTrackContext(dto.track);
       return await this.aiService.suggestSpeakingFullDraft({
         topic: dto.topic,
         level: dto.level,
-        ...taxonomy,
+        ...track,
         objective: dto.objective,
         taskType: dto.taskType,
         count: dto.count || 5,
