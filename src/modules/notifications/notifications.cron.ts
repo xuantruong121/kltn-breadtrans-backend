@@ -260,6 +260,7 @@ export class NotificationsCronService {
         practicedCount: quizzes + speaking,
         streak: stats?.streakCount ?? 0,
         learnerName: plan.user.profile?.fullName,
+        appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       });
       await this.notificationsService.createNotification({
         userId: plan.userId,
