@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -47,6 +48,10 @@ import {
   nextLevel,
 } from './progression.logic';
 import { LevelAccessService } from './level-access.service';
+import {
+  GENERAL_TRACK,
+  unavailableTracks,
+} from '../learning-track/learning-track.logic';
 
 /** Extra open items offered beside the daily plan. */
 const MORE_CHOICES = 12;
@@ -379,7 +384,10 @@ export class LearningPathService {
   async getProfile(userId: number) {
     await this.backfillPlacement(userId);
     const [profile, levels, events, unlocked] = await Promise.all([
-      this.prisma.learnerProfile.findUnique({ where: { userId } }),
+      this.prisma.learnerProfile.findUnique({
+        where: { userId },
+        include: { trackRef: { select: { name: true } } },
+      }),
       this.prisma.learnerSkillLevel.findMany({ where: { userId } }),
       this.prisma.learnerProgressEvent.findMany({
         where: { userId },
@@ -392,8 +400,11 @@ export class LearningPathService {
       }),
       this.levelAccess.unlockedLevels(userId),
     ]);
+    const track = profile?.track ?? GENERAL_TRACK;
     return {
-      track: profile?.track ?? 'GENERAL',
+      track,
+      /** The track's name as admins set it ("Chung" for GENERAL). */
+      trackName: profile?.trackRef?.name ?? (await this.trackName(track)),
       goal: profile?.goal ?? 'GENERAL',
       minutesPerDay: profile?.minutesPerDay ?? 15,
       targetDate: profile?.targetDate ?? null,
@@ -442,6 +453,32 @@ export class LearningPathService {
     if (attempt) await refreshFourSkillResult(this.prisma, attempt.id);
   }
 
+  private async trackName(code: string) {
+    const track = await this.prisma.learningTrack.findUnique({
+      where: { code },
+      select: { name: true },
+    });
+    return track?.name ?? code;
+  }
+
+  /**
+   * A new choice must be an active track. The learner's current one is kept
+   * even after an admin deactivates it, so saving other answers still works.
+   */
+  private async assertTrackChoice(code: string, current: string) {
+    if (code === current) return;
+    const active = await this.prisma.learningTrack.findFirst({
+      where: { code, isActive: true },
+      select: { code: true },
+    });
+    if (
+      unavailableTracks([code], [current], active ? [active.code] : []).length
+    )
+      throw new BadRequestException(
+        'Lĩnh vực này không tồn tại hoặc đã tắt. Hãy chọn lĩnh vực khác.',
+      );
+  }
+
   async updateProfile(userId: number, dto: UpdateLearnerProfileDto) {
     const current = await this.prisma.learnerProfile.findUnique({
       where: { userId },
@@ -450,6 +487,8 @@ export class LearningPathService {
       throw new ConflictException(
         'Bạn đã có mức luyện tập từ bài đánh giá đầu vào. Mức cao hơn được mở qua bài kiểm tra mở khóa hoặc tiến độ luyện tập.',
       );
+    if (dto.track)
+      await this.assertTrackChoice(dto.track, current?.track ?? GENERAL_TRACK);
     const data = {
       ...(dto.track ? { track: dto.track } : {}),
       ...(dto.goal ? { goal: dto.goal } : {}),

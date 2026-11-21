@@ -945,6 +945,7 @@ model SpeakingPracticeSet {
   exercises            SpeakingExercise[]
   assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentSpeakingSource")
   categoryTaxonomy     SpeakingCategory           @relation("SpeakingPracticeSetCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  tracks               SpeakingSetTrack[]
 
   @@index([categoryId])
 }
@@ -2570,14 +2571,26 @@ model UserVocabMasteryReward {
 // xuất". They are not CEFR levels and not a certificate.
 // ---------------------------------------------------------------------------
 
-/// Career or study direction the learner chose; drives content matching.
-enum LearningTrack {
-  GENERAL
-  IT_SOFTWARE
-  OFFICE_BUSINESS
-  SALES_CUSTOMER_SERVICE
-  HOSPITALITY_TOURISM
-  STUDENT_ACADEMIC
+/// Career or study direction ("Lĩnh vực") a learner chooses and content is
+/// tagged with; drives content matching. Admins manage the list (owner
+/// 2026-11-21). The code is the key and never changes. GENERAL is the
+/// default every learner starts on: it can be renamed, never deactivated or
+/// deleted. A deactivated track is not offered for new choices or tags; the
+/// choices and tags already made stay.
+model LearningTrack {
+  code           String   @id
+  name           String
+  /// No diacritics, lower case, single spaces: blocks duplicate names.
+  nameNormalized String   @unique
+  description    String?  @db.Text
+  sortOrder      Int      @default(100)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  learners     LearnerProfile[]
+  contentTags  ContentTrackTag[]
+  speakingSets SpeakingSetTrack[]
 }
 
 /// Internal practice level: Mất gốc / Cơ bản / Trung cấp / Nâng cao.
@@ -2635,7 +2648,8 @@ enum LearningPlanItemStatus {
 model LearnerProfile {
   userId             Int             @id
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track              LearningTrack   @default(GENERAL)
+  track              String          @default("GENERAL")
+  trackRef           LearningTrack   @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
   goal               LearningGoal    @default(GENERAL)
   minutesPerDay      Int             @default(15)
   targetDate         DateTime?
@@ -2647,6 +2661,8 @@ model LearnerProfile {
   onboardedAt        DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
+
+  @@index([track])
 }
 
 /// The learner's current level and ability per skill.
@@ -2732,15 +2748,32 @@ model GateAttempt {
   @@index([userId, skill, level, createdAt])
 }
 
-/// Track tags on existing content; no change to the content tables.
+/// Track tags on existing content; no change to the content tables. Quizzes
+/// only: a speaking set keeps its tags in SpeakingSetTrack (2026-11-21).
 model ContentTrackTag {
   contentType LearningContentType
   contentId   Int
-  track       LearningTrack
+  track       String
+  trackRef    LearningTrack       @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
   createdById Int?
   createdAt   DateTime            @default(now())
 
   @@id([contentType, contentId, track])
+  @@index([track])
+}
+
+/// Track tags of a speaking set, on the set itself (2026-11-21). They used to
+/// sit on the set's first exercise in ContentTrackTag: deleting that exercise
+/// dropped the tags, and a set without exercises could not be tagged.
+model SpeakingSetTrack {
+  setId       String
+  set         SpeakingPracticeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  track       String
+  trackRef    LearningTrack       @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  createdById Int?
+  createdAt   DateTime            @default(now())
+
+  @@id([setId, track])
   @@index([track])
 }
 

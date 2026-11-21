@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  normalizeTrackCode,
+  normalizeTrackName,
+} from '../learning-track/learning-track.logic';
+import {
   CreateSpeakingCategoryDto,
   UpdateSpeakingCategoryDto,
 } from './speaking-category.dto';
@@ -20,28 +24,15 @@ const LEGACY_LABELS: Record<string, string> = {
   DAILY_LIFE: 'Đời sống hằng ngày',
 };
 
-function stripDiacritics(value: string) {
-  return value
-    .replace(/[Đđ]/g, (char) => (char === 'Đ' ? 'D' : 'd'))
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
+/** The track code normaliser (learning-track.logic.ts), refusing an empty code. */
 export function normalizeSpeakingCategoryCode(value: string) {
-  const normalized = stripDiacritics(value.trim())
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  const normalized = normalizeTrackCode(value);
   if (!normalized)
     throw new BadRequestException('Mã phân loại không được để trống');
   return normalized;
 }
 
-function normalizeSpeakingCategoryName(value: string) {
-  return stripDiacritics(value.trim())
-    .toLocaleLowerCase('vi-VN')
-    .replace(/\s+/g, ' ');
-}
+const normalizeSpeakingCategoryName = normalizeTrackName;
 
 @Injectable()
 export class SpeakingCategoryService {

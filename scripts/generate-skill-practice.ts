@@ -10,7 +10,8 @@
  *             SKILL_PRACTICE_GEMINI_AUTHORIZED=generate.
  *   balance   spreads Listening/Reading answer keys over A-D in a seeded
  *             random order (the raw drafts had D in 5 of 120).
- *   apply     DRAFT content + ContentTrackTag rows on --target, then the CMS
+ *   apply     DRAFT content + track tags on --target (ContentTrackTag for a
+ *             quiz, SpeakingSetTrack for a speaking set), then the CMS
  *             validation of each item (applied.json). A non-harness target
  *             needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply.
  *
@@ -22,7 +23,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LearningTrack, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 import { AiService } from '../src/modules/ai/ai.service';
 import { GeminiEvaluatorStrategy } from '../src/modules/ai/strategies/gemini-evaluator.strategy';
@@ -55,15 +56,17 @@ const LEVELS = [
   'C1',
   'C1',
 ];
-const TRACKS: LearningTrack[] = [
+/** Track codes (rows of LearningTrack) the 2026-10-30 batch was spread over. */
+const TRACKS = [
   'IT_SOFTWARE',
   'OFFICE_BUSINESS',
   'SALES_CUSTOMER_SERVICE',
   'HOSPITALITY_TOURISM',
   'STUDENT_ACADEMIC',
   'GENERAL',
-];
-const TOPICS: Record<LearningTrack, string[]> = {
+] as const;
+type Track = (typeof TRACKS)[number];
+const TOPICS: Record<Track, string[]> = {
   IT_SOFTWARE: [
     'a software team stand-up meeting',
     'reporting a bug to a developer',
@@ -107,7 +110,7 @@ type SpecItem = {
   key: string;
   skill: PracticeSkill;
   cefr: string;
-  track: LearningTrack;
+  track: Track;
   topic: string;
 };
 
@@ -147,7 +150,7 @@ const speakingTask = (cefr: string, i: number) =>
     : i % 2 === 0
       ? 'RESPOND_TO_QUESTION'
       : 'EXPRESS_OPINION';
-const speakingCategory = (track: LearningTrack) =>
+const speakingCategory = (track: Track) =>
   ['IT_SOFTWARE', 'OFFICE_BUSINESS', 'SALES_CUSTOMER_SERVICE'].includes(track)
     ? 'BUSINESS'
     : 'GENERAL';
@@ -283,13 +286,21 @@ async function apply() {
   const applied: Record<string, unknown> = existsSync(appliedFile)
     ? JSON.parse(readFileSync(appliedFile, 'utf8'))
     : {};
-  const tag = (
-    contentType: 'QUIZ' | 'SPEAKING_SET',
-    contentId: number,
-    track: LearningTrack,
-  ) =>
+  const tag = (quizId: number, track: string) =>
     prisma.contentTrackTag.createMany({
-      data: [{ contentType, contentId, track, createdById: admin.id }],
+      data: [
+        {
+          contentType: 'QUIZ',
+          contentId: quizId,
+          track,
+          createdById: admin.id,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  const tagSet = (setId: string, track: string) =>
+    prisma.speakingSetTrack.createMany({
+      data: [{ setId, track, createdById: admin.id }],
       skipDuplicates: true,
     });
 
@@ -349,7 +360,7 @@ async function apply() {
             },
             user,
           );
-        await tag('QUIZ', Number(quiz.id), item.track);
+        await tag(Number(quiz.id), item.track);
       } else if (item.skill === 'READING') {
         domain = 'reading';
         const quiz = await cms.create(
@@ -383,7 +394,7 @@ async function apply() {
             },
             user,
           );
-        await tag('QUIZ', Number(quiz.id), item.track);
+        await tag(Number(quiz.id), item.track);
       } else if (item.skill === 'WRITING') {
         domain = 'writing';
         const quiz = await cms.create(
@@ -412,7 +423,7 @@ async function apply() {
           },
           user,
         );
-        await tag('QUIZ', Number(quiz.id), item.track);
+        await tag(Number(quiz.id), item.track);
       } else {
         domain = 'speaking';
         const set = await cms.create(
@@ -443,12 +454,7 @@ async function apply() {
             },
             user,
           );
-        const first = await prisma.speakingExercise.findFirst({
-          where: { practiceSetId: String(set.id) },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-          select: { id: true },
-        });
-        if (first) await tag('SPEAKING_SET', first.id, item.track);
+        await tagSet(String(set.id), item.track);
       }
       let validation: unknown;
       try {

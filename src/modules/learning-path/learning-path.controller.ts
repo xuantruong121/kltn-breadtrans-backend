@@ -42,7 +42,11 @@ export class LearningPathController {
   @ApiOperation({
     summary: 'Hồ sơ học tập: mục tiêu, hướng nghề, thời gian, mức luyện tập',
   })
-  @ApiResponse({ status: 200, description: 'Hồ sơ và mức từng kỹ năng.' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Hồ sơ và mức từng kỹ năng; track là mã lĩnh vực, trackName là tên admin đặt.',
+  })
   getProfile(@Request() req: { user: { id: number } }) {
     return this.learningPath.getProfile(req.user.id);
   }
@@ -52,6 +56,10 @@ export class LearningPathController {
     summary: 'Cập nhật hồ sơ học tập (onboarding, tự chọn mức)',
   })
   @ApiResponse({ status: 200, description: 'Hồ sơ sau cập nhật.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Lĩnh vực mới chọn không tồn tại hoặc đã tắt.',
+  })
   @ApiResponse({
     status: 409,
     description: 'Đã có mức từ bài đánh giá đầu vào; không tự chọn mức.',

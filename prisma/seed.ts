@@ -5760,6 +5760,11 @@ async function main() {
       update: setData,
       create: { id: set.id, ...setData },
     });
+    // The set's Lĩnh vực tags; a tag an admin added later stays.
+    await prisma.speakingSetTrack.createMany({
+      data: set.tracks.map((track) => ({ setId: set.id, track })),
+      skipDuplicates: true,
+    });
     let order = 1;
     for (const id of set.members) {
       const audioUrl = speakingAudioFor(id, premium);

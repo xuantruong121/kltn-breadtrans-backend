@@ -5,7 +5,11 @@
  */
 export const IMG = 'catalog/toeic/shared/images';
 
-/** Reviewed grouping of the 30 authored items, with the reason for each level. */
+/**
+ * Reviewed grouping of the 30 authored items, with the reason for each level.
+ * `tracks` are the set's Lĩnh vực tags (SpeakingSetTrack), the ones
+ * scripts/track-tagging.ts gives the same sets.
+ */
 export const SETS = [
   {
     id: 'practice-read-aloud-a1-a2',
@@ -15,6 +19,7 @@ export const SETS = [
     category: 'GENERAL',
     level: 'A1-A2',
     taskType: 'READ_ALOUD',
+    tracks: ['GENERAL'],
     members: [1, 2, 3, 4, 5],
   },
   {
@@ -25,6 +30,7 @@ export const SETS = [
     category: 'BUSINESS',
     level: 'B1-B2',
     taskType: 'READ_ALOUD',
+    tracks: ['OFFICE_BUSINESS'],
     members: [6, 7, 8, 9, 10, 25, 26],
   },
   {
@@ -35,6 +41,7 @@ export const SETS = [
     category: 'GENERAL',
     level: 'B1',
     taskType: 'PRONUNCIATION_DRILL',
+    tracks: ['OFFICE_BUSINESS'],
     members: [11, 12, 13, 14, 15],
   },
   {
@@ -45,6 +52,7 @@ export const SETS = [
     category: 'TOEIC',
     level: 'B1',
     taskType: 'DESCRIBE_PICTURE',
+    tracks: ['GENERAL'],
     members: [27, 28],
   },
   {
@@ -55,6 +63,7 @@ export const SETS = [
     category: 'TOEIC',
     level: 'B1-B2',
     taskType: 'RESPOND_USING_INFORMATION',
+    tracks: ['OFFICE_BUSINESS'],
     members: [29],
   },
   {
@@ -65,6 +74,7 @@ export const SETS = [
     category: 'DAILY_LIFE',
     level: 'A2',
     taskType: 'RESPOND_TO_QUESTION',
+    tracks: ['GENERAL'],
     members: [16, 17],
   },
   {
@@ -75,6 +85,7 @@ export const SETS = [
     category: 'GENERAL',
     level: 'B1-B2',
     taskType: 'RESPOND_TO_QUESTION',
+    tracks: ['STUDENT_ACADEMIC', 'OFFICE_BUSINESS'],
     members: [18, 19, 20],
   },
   {
@@ -85,6 +96,7 @@ export const SETS = [
     category: 'GENERAL',
     level: 'B1-B2',
     taskType: 'EXPRESS_OPINION',
+    tracks: ['GENERAL'],
     members: [21, 22, 23, 24, 30],
   },
   {
@@ -95,6 +107,7 @@ export const SETS = [
     category: 'ACADEMIC',
     level: 'C1',
     taskType: 'EXPRESS_OPINION',
+    tracks: ['GENERAL'],
     members: [] as number[],
   },
 ] as const;
