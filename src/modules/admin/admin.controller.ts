@@ -228,7 +228,7 @@ export class AdminController {
   @ApiQuery({
     name: 'sort',
     required: false,
-    enum: ['NEWEST', 'TITLE', 'LEVEL', 'FEWEST'],
+    enum: ['NEWEST', 'OLDEST', 'TITLE', 'LEVEL', 'FEWEST'],
   })
   @ApiResponse({
     status: 200,

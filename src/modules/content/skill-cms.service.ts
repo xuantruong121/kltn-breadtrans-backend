@@ -253,7 +253,7 @@ export class SkillCmsService {
             description: true,
             level: true,
             publicationStatus: true,
-            updatedAt: true,
+            createdAt: true,
             tracks: { orderBy: TRACK_ORDER, select: { track: true } },
             _count: { select: { exercises: true } },
           },
@@ -351,7 +351,7 @@ export class SkillCmsService {
         : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
-      return this.listPage(tagged, query);
+      return this.listPage(tagged, query, domain === 'writing');
     // Comprehension and dictation play one clip per question: count them.
     const withAudio = await this.prisma.question.groupBy({
       by: ['quizId'],
@@ -391,11 +391,12 @@ export class SkillCmsService {
   private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
     rows: T[],
     query: ListQuery,
+    writing = false,
   ) {
     if (!wantsPage(query)) return rows;
     return {
       ...pageOf(filterQuizList(rows, query), query),
-      facets: quizListFacets(rows),
+      facets: quizListFacets(rows, { writing }),
     };
   }
 

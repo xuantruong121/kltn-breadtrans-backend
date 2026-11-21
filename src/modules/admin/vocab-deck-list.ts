@@ -25,7 +25,10 @@ const levelRank = (row: DeckListRow) => {
   return index < 0 ? 99 : index;
 };
 
-/** `level=NONE` keeps decks without a level. Newest (highest id) first. */
+/**
+ * `level=NONE` keeps decks without a level. Newest (highest id) first;
+ * OLDEST reverses it.
+ */
 export function filterDeckList<T extends DeckListRow>(
   rows: T[],
   query: ListQuery,
@@ -40,6 +43,7 @@ export function filterDeckList<T extends DeckListRow>(
   );
   const order: Record<string, (a: T, b: T) => number> = {
     NEWEST: (a, b) => b.id - a.id,
+    OLDEST: (a, b) => a.id - b.id,
     TITLE: (a, b) => a.title.localeCompare(b.title, 'vi'),
     LEVEL: (a, b) => levelRank(a) - levelRank(b) || b.id - a.id,
     FEWEST: (a, b) => wordCount(a) - wordCount(b) || b.id - a.id,

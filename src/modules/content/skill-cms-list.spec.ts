@@ -131,6 +131,22 @@ describe('skill CMS list rules', () => {
       levels: ['A1', 'A2', 'B1', 'B2'],
     });
   });
+
+  it('counts each Writing kind for the Writing list only', () => {
+    const writing = [
+      quiz(1, { writingKind: 'TRANSLATION' }),
+      quiz(2, { writingKind: 'TRANSLATION' }),
+      quiz(3, { writingKind: 'PICTURE' }),
+      quiz(4, { writingKind: 'EMAIL' }),
+    ];
+    expect(quizListFacets(writing, { writing: true }).kinds).toEqual({
+      TRANSLATION: 2,
+      PICTURE: 1,
+      SENTENCE: 0,
+      EMAIL: 1,
+    });
+    expect(quizListFacets(writing)).not.toHaveProperty('kinds');
+  });
 });
 
 describe('speaking set list rules', () => {
@@ -141,7 +157,9 @@ describe('speaking set list rules', () => {
       category: 'Daily',
       level: 'A1',
       publicationStatus: 'PUBLISHED',
-      updatedAt: '2026-10-01',
+      createdAt: '2026-10-01',
+      // Edited last: an edit must not move it up the list.
+      updatedAt: '2026-11-20',
       exerciseCount: 5,
     },
     {
@@ -150,13 +168,21 @@ describe('speaking set list rules', () => {
       category: 'Work',
       level: 'B2',
       publicationStatus: 'DRAFT',
+      createdAt: '2026-10-20',
       updatedAt: '2026-10-20',
       exerciseCount: 2,
     },
   ];
 
   it('filters and sorts sets', () => {
+    // Newest created first, as on the other lists; OLDEST reverses it.
     expect(filterSpeakingSets(sets, {}).map((s) => s.id)).toEqual(['b', 'a']);
+    expect(
+      filterSpeakingSets(sets, { sort: 'NEWEST' }).map((s) => s.id),
+    ).toEqual(['b', 'a']);
+    expect(
+      filterSpeakingSets(sets, { sort: 'OLDEST' }).map((s) => s.id),
+    ).toEqual(['a', 'b']);
     expect(filterSpeakingSets(sets, { q: 'phỏng' }).map((s) => s.id)).toEqual([
       'b',
     ]);
