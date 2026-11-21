@@ -19,8 +19,9 @@ import {
   R2_RETRY_SET,
   SCRUBBED_RECIPIENT,
   hasKeptRecords,
+  isRecordingKey,
+  ownedRecordingKey,
   shellEmail,
-  storageKeyOf,
 } from './account-deletion.logic';
 
 export type PurgeOutcome = 'DELETED' | 'ANONYMIZED';
@@ -230,51 +231,50 @@ export class AccountPurgeService {
     ) as Record<KeptTable, number>;
   }
 
-  /** R2 keys of the learner's own files: recordings, uploads, avatar, attachments. */
+  /**
+   * R2 keys of the recordings the server stored for this learner. Only keys
+   * under the owner's own prefix (ownedRecordingKey). Values a learner types
+   * are never delete targets (security review 2026-11-21): the avatar (a data
+   * URI kept in the row since 2026-11-17; an older one is a free string) and
+   * suggestion attachments (any http(s) link; generic uploads carry no owner).
+   * Their rows go with the account; a file behind them, if any, stays.
+   * ToeicSpeakingWritingSubmission.audioUrl has no writer, so it is skipped.
+   */
   async filesOf(userId: number): Promise<string[]> {
-    const base = this.r2.getPublicUrl();
-    const [speaking, intents, diagnostic, toeicSw, profile, attachments] =
-      await Promise.all([
-        this.prisma.speakingSubmission.findMany({
-          where: { userId },
-          select: { audioKey: true },
-        }),
-        this.prisma.speakingUploadIntent.findMany({
-          where: { userId },
-          select: { objectKey: true },
-        }),
-        this.prisma.diagnosticSpeakingResponse.findMany({
-          where: { userId },
-          select: { audioKey: true },
-        }),
-        this.prisma.toeicSpeakingWritingSubmission.findMany({
-          where: { userId },
-          select: { audioUrl: true },
-        }),
-        this.prisma.profile.findUnique({
-          where: { userId },
-          select: { avatar: true },
-        }),
-        this.prisma.suggestionAttachment.findMany({
-          where: { suggestion: { userId } },
-          select: { url: true },
-        }),
-      ]);
-    const refs = [
-      ...speaking.map((r) => r.audioKey),
-      ...intents.map((r) => r.objectKey),
-      ...diagnostic.map((r) => r.audioKey),
-      ...toeicSw.map((r) => r.audioUrl),
-      profile?.avatar,
-      ...attachments.map((r) => r.url),
-    ];
-    return [
-      ...new Set(
-        refs
-          .map((ref) => storageKeyOf(ref, base))
-          .filter((k): k is string => !!k),
+    const [speaking, intents, diagnostic] = await Promise.all([
+      this.prisma.speakingSubmission.findMany({
+        where: { userId },
+        select: { audioKey: true },
+      }),
+      this.prisma.speakingUploadIntent.findMany({
+        where: { userId },
+        select: { objectKey: true },
+      }),
+      this.prisma.diagnosticSpeakingResponse.findMany({
+        where: { userId },
+        select: { audioKey: true, assessmentId: true, attemptId: true },
+      }),
+    ]);
+    const keys = [
+      ...speaking.map((r) =>
+        ownedRecordingKey({ kind: 'speaking', key: r.audioKey }, userId),
+      ),
+      ...intents.map((r) =>
+        ownedRecordingKey({ kind: 'speaking', key: r.objectKey }, userId),
+      ),
+      ...diagnostic.map((r) =>
+        ownedRecordingKey(
+          {
+            kind: 'diagnostic',
+            key: r.audioKey,
+            assessmentId: r.assessmentId,
+            attemptId: r.attemptId,
+          },
+          userId,
+        ),
       ),
     ];
+    return [...new Set(keys.filter((k): k is string => !!k))];
   }
 
   private async deleteFiles(keys: string[]) {
@@ -293,6 +293,12 @@ export class AccountPurgeService {
       .catch(() => [] as string[]);
     let done = 0;
     for (const key of keys) {
+      // A key queued before the 2026-11-21 fix may be anything a learner
+      // typed: drop it from the queue instead of deleting it.
+      if (!isRecordingKey(key)) {
+        await this.redis.srem(R2_RETRY_SET, key).catch(() => 0);
+        continue;
+      }
       try {
         await this.r2.deleteFile(key);
         await this.redis.srem(R2_RETRY_SET, key);
