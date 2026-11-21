@@ -63,7 +63,10 @@ describe('AccountDeletionService (owner 2026-11-16)', () => {
       expect(days).toBeLessThan(7.01);
       expect(email.sendAccountDeletionScheduled).toHaveBeenCalledWith(
         'learner@example.com',
-        expect.stringContaining('Huỷ yêu cầu xoá'),
+        expect.objectContaining({
+          subject: 'Yêu cầu xoá tài khoản BreadTrans đã được ghi nhận',
+          html: expect.stringContaining('Huỷ yêu cầu xoá'),
+        }),
       );
     });
 

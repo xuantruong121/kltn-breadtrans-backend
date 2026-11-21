@@ -6,6 +6,11 @@ import {
   parseSkipDomains,
   recipientDomain,
 } from './email-recipient.logic';
+import {
+  type RenderedEmail,
+  passwordResetEmail,
+  registrationOtpEmail,
+} from './email-templates';
 
 @Injectable()
 export class EmailService {
@@ -62,9 +67,12 @@ export class EmailService {
     return this.send(to, subject, html);
   }
 
-  /** The account will be deleted on a date; signing in before it cancels. HTML escaped by the caller. */
-  sendAccountDeletionScheduled(to: string, html: string): Promise<void> {
-    return this.send(to, 'BreadTrans - Tài khoản sẽ bị xoá', html);
+  /** The account will be deleted on a date; signing in before it cancels (accountDeletionEmail). */
+  sendAccountDeletionScheduled(
+    to: string,
+    email: RenderedEmail,
+  ): Promise<void> {
+    return this.send(to, email.subject, email.html);
   }
 
   /** A personal win-back discount, a few days after a paid plan ended. */
@@ -73,11 +81,8 @@ export class EmailService {
   }
 
   sendRegistrationOtp(to: string, otp: string): Promise<void> {
-    return this.send(
-      to,
-      'BreadTrans - Xác thực đăng ký',
-      `<p>Mã OTP của bạn là <strong>${otp}</strong>.</p><p>Mã có hiệu lực trong 5 phút.</p>`,
-    );
+    const email = registrationOtpEmail(otp);
+    return this.send(to, email.subject, email.html);
   }
 
   sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
@@ -94,10 +99,7 @@ export class EmailService {
       return Promise.resolve();
     }
 
-    return this.send(
-      to,
-      'BreadTrans - Đặt lại mật khẩu',
-      `<p>Bạn vừa yêu cầu đặt lại mật khẩu BreadTrans.</p><p><a href="${resetUrl}">Đặt lại mật khẩu</a></p><p>Liên kết có hiệu lực trong 15 phút và chỉ sử dụng được một lần.</p><p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>`,
-    );
+    const email = passwordResetEmail(resetUrl);
+    return this.send(to, email.subject, email.html);
   }
 }

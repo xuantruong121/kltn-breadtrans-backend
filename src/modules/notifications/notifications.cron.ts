@@ -471,6 +471,7 @@ export class NotificationsCronService {
         percentOff: promo.percentOff,
         validTo,
         learnerName: sub.user.profile?.fullName,
+        appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       });
       await this.notificationsService.createNotification({
         userId: sub.userId,

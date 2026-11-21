@@ -13,11 +13,14 @@ export const escapeHtml = (text: string) =>
       ]!,
   );
 
+/** A paragraph, or a code shown large in a box (a sign-up code, a discount code). */
+export type EmailBlock = string | { code: string };
+
 export type EmailContent = {
   /** Shown by mail clients next to the subject, hidden in the body. */
   preheader: string;
   greeting: string;
-  paragraphs: string[];
+  paragraphs: EmailBlock[];
   /** One button; its address is also written out for clients that block buttons. */
   action?: { label: string; url: string };
   signOff: string[];
@@ -28,8 +31,10 @@ export type EmailContent = {
 const FONT = 'Arial,Helvetica,sans-serif';
 
 export function renderEmail(content: EmailContent): string {
-  const paragraph = (text: string) =>
-    `<p style="margin:0 0 16px;">${escapeHtml(text)}</p>`;
+  const paragraph = (block: EmailBlock) =>
+    typeof block === 'string'
+      ? `<p style="margin:0 0 16px;">${escapeHtml(block)}</p>`
+      : `<p style="margin:0 0 16px;"><span style="display:inline-block;padding:10px 18px;border:1px solid #fcd34d;border-radius:8px;background:#fffbeb;font:700 22px/1.2 'Courier New',Courier,monospace;letter-spacing:2px;color:#92400e;">${escapeHtml(block.code)}</span></p>`;
   const action = content.action
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 20px;"><tr><td style="border-radius:8px;background:#d97706;"><a href="${escapeHtml(content.action.url)}" style="display:inline-block;padding:12px 24px;font:700 15px/1.2 ${FONT};color:#ffffff;text-decoration:none;border-radius:8px;">${escapeHtml(content.action.label)}</a></td></tr></table>` +
       `<p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#475569;">Nếu nút trên không mở được, hãy truy cập: <a href="${escapeHtml(content.action.url)}" style="color:#1d4ed8;">${escapeHtml(content.action.url)}</a></p>`

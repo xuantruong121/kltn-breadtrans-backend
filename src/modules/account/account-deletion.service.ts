@@ -12,16 +12,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
 import { forgetAuthUser } from '../auth/auth-user-cache';
 import { AuthSessionStore } from '../auth/session-store';
+import { accountDeletionEmail } from '../../common/email/email-templates';
 import { cancelTokenKey, deletionScheduledAt } from './account-deletion.logic';
-
-const escapeHtml = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
-        c
-      ] as string,
-  );
 
 /**
  * "Xoá tài khoản" (owner 2026-11-16): the request locks the account and signs
@@ -94,8 +86,11 @@ export class AccountDeletionService {
     try {
       await this.email.sendAccountDeletionScheduled(
         user.email,
-        `<p>Tài khoản BreadTrans <strong>${escapeHtml(user.email)}</strong> sẽ bị xoá vĩnh viễn vào ngày <strong>${day}</strong>.</p>` +
-          '<p>Nếu đổi ý, hãy đăng nhập lại trước ngày đó và chọn "Huỷ yêu cầu xoá".</p>',
+        accountDeletionEmail({
+          accountEmail: user.email,
+          day,
+          appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        }),
       );
     } catch (error) {
       this.logger.warn(
