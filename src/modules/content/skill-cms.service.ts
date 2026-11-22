@@ -39,6 +39,7 @@ import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authorin
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
 import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
+import { isPremiumSpeaking } from '../speaking/speaking-content-access.logic';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 import { SpeakingService } from '../speaking/speaking.service';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
@@ -1045,21 +1046,23 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
+      include: { practiceSet: { select: { scope: true, level: true } } },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     const text = exercise.targetText.trim();
     if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
-    if (
-      exercise.isPremiumContent &&
-      !this.uploadService.isPrivateStorageConfigured()
-    )
+    // The learner endpoint drops a public URL on paid content, and paid is
+    // decided from the set level (B1+), not from the stored flag (QA
+    // 2026-11-22: a B1-B2 clip saved public never played). Same rule here.
+    const premium = isPremiumSpeaking(exercise);
+    if (premium && !this.uploadService.isPrivateStorageConfigured())
       throw new ServiceUnavailableException(
         'Kho lưu trữ âm thanh Nói chưa được cấu hình.',
       );
     const audio = await this.speakingService.generateTts(text, 'US', 1);
     const file = `${exerciseId}.r${Date.now()}.mp3`;
     let audioUrl: string;
-    if (exercise.isPremiumContent) {
+    if (premium) {
       audioUrl = `premium/speaking/reference/${file}`;
       await this.uploadService.putPrivateObjectAtKey(
         audioUrl,

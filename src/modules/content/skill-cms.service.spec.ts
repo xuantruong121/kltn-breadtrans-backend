@@ -906,4 +906,88 @@ describe('Speaking reference audio follows the sample sentence', () => {
       data: { audioUrl: key },
     });
   });
+
+  // QA 2026-11-22: a B1-B2 exercise keeps isPremiumContent false, but access
+  // treats B1+ as paid and drops a public URL, so its new clip never played.
+  const storeFor = async (level: string) => {
+    const prisma = prismaWith();
+    prisma.speakingExercise.findFirst.mockResolvedValue({
+      ...exercise,
+      isPremiumContent: false,
+      practiceSet: { scope: 'SKILL_PRACTICE', level },
+    });
+    const upload = {
+      putObjectAtKey: jest.fn().mockImplementation((key: string) => ({
+        key,
+        url: `https://pub/${key}`,
+      })),
+      putPrivateObjectAtKey: jest.fn(),
+      isPrivateStorageConfigured: jest.fn().mockReturnValue(true),
+    };
+    const service = new SkillCmsService(
+      prisma as any,
+      undefined,
+      undefined,
+      { generateTts: jest.fn().mockResolvedValue(Buffer.from('mp3')) } as any,
+      upload as any,
+    );
+    await service.generateSpeakingReferenceAudio('set-1', '30', admin);
+    return { prisma, upload };
+  };
+
+  it.each(['B1', 'B1-B2', 'C1-C2'])(
+    'stores the clip of a %s set privately, as access reads it',
+    async (level) => {
+      const { prisma, upload } = await storeFor(level);
+      expect(upload.putObjectAtKey).not.toHaveBeenCalled();
+      const key = upload.putPrivateObjectAtKey.mock.calls[0][0] as string;
+      expect(key).toMatch(/^premium\/speaking\/reference\/30\.r\d+\.mp3$/);
+      expect(
+        prisma.speakingExercise.update.mock.calls[0][0].data.audioUrl,
+      ).toBe(key);
+    },
+  );
+
+  it.each(['A1', 'A1-A2'])(
+    'keeps the clip of a free %s set public',
+    async (level) => {
+      const { upload } = await storeFor(level);
+      expect(upload.putPrivateObjectAtKey).not.toHaveBeenCalled();
+      expect(upload.putObjectAtKey.mock.calls[0][0]).toMatch(
+        /^catalog\/speaking\/reference\//,
+      );
+    },
+  );
+
+  it('loads the set level the rule needs', async () => {
+    const { prisma } = await storeFor('B1-B2');
+    expect(prisma.speakingExercise.findFirst).toHaveBeenCalledWith({
+      where: { id: 30, practiceSetId: 'set-1' },
+      include: { practiceSet: { select: { scope: true, level: true } } },
+    });
+  });
+
+  it('refuses a paid clip when private storage is missing, before any TTS', async () => {
+    const prisma = prismaWith();
+    prisma.speakingExercise.findFirst.mockResolvedValue({
+      ...exercise,
+      practiceSet: { scope: 'SKILL_PRACTICE', level: 'B2' },
+    });
+    const speaking = { generateTts: jest.fn() };
+    const service = new SkillCmsService(
+      prisma as any,
+      undefined,
+      undefined,
+      speaking as any,
+      {
+        putObjectAtKey: jest.fn(),
+        putPrivateObjectAtKey: jest.fn(),
+        isPrivateStorageConfigured: jest.fn().mockReturnValue(false),
+      } as any,
+    );
+    await expect(
+      service.generateSpeakingReferenceAudio('set-1', '30', admin),
+    ).rejects.toThrow('Kho lưu trữ âm thanh Nói chưa được cấu hình.');
+    expect(speaking.generateTts).not.toHaveBeenCalled();
+  });
 });
