@@ -23,7 +23,9 @@ import {
   type ListeningFullDraftMode,
 } from '../strategies/ai-evaluator.interface';
 
-const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
+// C2 too (owner 2026-11-22): the CMS level select offers it, and a C2
+// draft was refused with 400 in every AI form.
+const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
 
 export class SuggestVocabWordDto {
@@ -79,7 +81,9 @@ export class SuggestReadingPassageDto {
   topic: string;
 
   @IsNotEmpty({ message: 'Cấp độ bài đọc không được để trống' })
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level: string;
 
@@ -103,7 +107,9 @@ export class SuggestReadingQuestionsDto {
   passage: string;
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 
@@ -122,7 +128,9 @@ export class SuggestToeicPart5Dto {
   topic?: string;
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
 
@@ -163,7 +171,9 @@ export class SuggestListeningContentDto {
   mode: 'DIALOGUE' | 'DICTATION';
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   level?: string;
 
   @IsOptional()
@@ -191,7 +201,9 @@ export class SuggestListeningQuestionsDto {
   sourceText: string;
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   level?: string;
 
   @IsOptional()
@@ -213,7 +225,9 @@ export class SuggestWritingTaskDto {
   taskType: string;
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   level?: string;
 
   @IsOptional()
@@ -371,7 +385,9 @@ export class SuggestListeningFullDraftDto {
   topic: string;
 
   @IsOptional()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   level?: string;
 
   /** COMPREHENSION drafts short items, each with its own sentence to hear. */
@@ -431,7 +447,9 @@ export class SuggestWritingFullDraftDto {
   topic: string;
 
   @IsNotEmpty()
-  @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
+  @IsIn(CONTENT_LEVELS, {
+    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+  })
   level: string;
 
   @IsIn(['EMAIL', 'TRANSLATION'], {
