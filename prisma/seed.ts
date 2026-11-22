@@ -5405,6 +5405,16 @@ async function main() {
       update: { name, description, criteria },
       create: { id, name, description, criteria },
     });
+  // The badges above keep fixed IDs; move the serial sequence past them so the
+  // shop badges below get a fresh ID (seed rehearsal 2026-11-22 failed with
+  // P2002 on Badge.id: the sequence still stood at 1 on an empty database).
+  await prisma.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('"Badge"', 'id'),
+      COALESCE((SELECT MAX("id") FROM "Badge"), 1),
+      true
+    )
+  `;
   // Shop badges (owner 2026-11-19), matched by name, never a fixed id: the
   // purchase creates the same row on first sale (market.service createOrder).
   for (const [slug, name] of [
