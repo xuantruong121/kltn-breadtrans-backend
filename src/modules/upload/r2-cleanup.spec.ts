@@ -231,3 +231,31 @@ describe('R2CleanupService - Phase 2 Orphan Upload Intent Cleanup', () => {
     expect(mockR2Service.deleteFile).not.toHaveBeenCalled();
   });
 });
+
+describe('R2CleanupService - content files of deleted content (bug 2026-11-22)', () => {
+  const prisma: any = {
+    speakingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+
+  it('the weekly run retries the queued content files, even with no old recording', async () => {
+    const contentFiles: any = { retryFailed: jest.fn().mockResolvedValue({}) };
+
+    await new R2CleanupService(
+      prisma,
+      {} as R2Service,
+      contentFiles,
+    ).runCleanup();
+
+    expect(contentFiles.retryFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failing retry never fails the job', async () => {
+    const contentFiles: any = {
+      retryFailed: jest.fn().mockRejectedValue(new Error('redis down')),
+    };
+
+    await expect(
+      new R2CleanupService(prisma, {} as R2Service, contentFiles).runCleanup(),
+    ).resolves.toBeUndefined();
+  });
+});

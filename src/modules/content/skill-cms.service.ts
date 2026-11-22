@@ -53,6 +53,10 @@ import {
 } from './skill-cms-list';
 import { writingQuestionContent } from './writing-question-content.logic';
 import { UploadService } from '../upload/upload.service';
+import {
+  ContentFilesService,
+  type ContentFile,
+} from '../upload/content-files.service';
 import { unavailableTracks } from '../learning-track/learning-track.logic';
 import {
   SENTENCE_TRANSLATION,
@@ -114,6 +118,8 @@ export class SkillCmsService {
     private readonly speakingService?: SpeakingService,
     @Optional()
     private readonly uploadService?: UploadService,
+    @Optional()
+    private readonly contentFiles?: ContentFilesService,
   ) {}
 
   private admin(user: Admin) {
@@ -1157,8 +1163,10 @@ export class SkillCmsService {
     // 2026-11-18): that insert either committed before the lock and is
     // counted, or it waits and then fails on the deleted row. Before, one
     // saved between the count and the delete went with the content.
+    // Its own R2 files go after the commit (bug 2026-11-22).
     if (domain === 'speaking') {
-      return this.prisma.$transaction(async (tx) => {
+      let exercises: Array<{ id: number; audioUrl: string | null }> = [];
+      const result = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "SpeakingPracticeSet" WHERE id = ${rawId} FOR UPDATE`;
         await tx.$queryRaw`SELECT id FROM "SpeakingExercise" WHERE "practiceSetId" = ${rawId} FOR UPDATE`;
         const set = await tx.speakingPracticeSet.findUnique({
@@ -1176,6 +1184,10 @@ export class SkillCmsService {
           examInternal: set.scope === 'EXAM_INTERNAL',
         });
         if (refusal) throw new ConflictException(refusal);
+        exercises = await tx.speakingExercise.findMany({
+          where: { practiceSetId: set.id },
+          select: { id: true, audioUrl: true },
+        });
         // practiceSet on SpeakingExercise is SetNull: delete the exercises
         // first so none is left behind without a set.
         await tx.speakingExercise.deleteMany({
@@ -1184,9 +1196,12 @@ export class SkillCmsService {
         await tx.speakingPracticeSet.delete({ where: { id: set.id } });
         return { id: set.id, deleted: true };
       });
+      await this.removeSpeakingExerciseFiles(exercises);
+      return result;
     }
     const id = this.id(rawId);
-    return this.prisma.$transaction(async (tx) => {
+    let files: ContentFile[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Quiz" WHERE id = ${id} FOR UPDATE`;
       const quiz = await tx.quiz.findFirst({
         where: { id, ...this.contentTypeWhere(domain) },
@@ -1203,6 +1218,8 @@ export class SkillCmsService {
         examInternal: await this.isExamTask(id),
       });
       if (refusal) throw new ConflictException(refusal);
+      // Read before the delete: the asset and artifact rows cascade with it.
+      if (domain === 'listening') files = await this.listeningQuizFiles(tx, id);
       try {
         await tx.quiz.delete({ where: { id } });
       } catch (error) {
@@ -1219,6 +1236,54 @@ export class SkillCmsService {
       });
       return { id, deleted: true };
     });
+    await this.removeFiles(files);
+    return result;
+  }
+
+  /**
+   * The audio a listening quiz owns: every version of every question clip,
+   * and every whole-quiz artifact. Each key is checked against the quiz's own
+   * prefix before any delete (ownedContentKey).
+   */
+  private async listeningQuizFiles(
+    db: Prisma.TransactionClient,
+    quizId: number,
+  ): Promise<ContentFile[]> {
+    const owner = { kind: 'listening-quiz', quizId } as const;
+    const assets = await db.quizAudioAsset.findMany({
+      where: { question: { quizId } },
+      select: { key: true },
+    });
+    const artifacts = await db.listeningAudioArtifact.findMany({
+      where: { quizId },
+      select: { r2Key: true },
+    });
+    return [
+      ...assets.map((a) => ({ owner, stored: a.key })),
+      ...artifacts.map((a) => ({ owner, stored: a.r2Key })),
+    ];
+  }
+
+  /**
+   * After the delete has committed: the reference audio the server made for
+   * these exercises. An exam deletes its exercise in its own transaction and
+   * calls this after it commits.
+   */
+  async removeSpeakingExerciseFiles(
+    exercises: Array<{ id: number; audioUrl: string | null }>,
+  ) {
+    await this.removeFiles(
+      exercises.map((e) => ({
+        owner: { kind: 'speaking-exercise', exerciseId: e.id } as const,
+        stored: e.audioUrl,
+      })),
+    );
+  }
+
+  /** Best effort: a file that cannot go never fails the delete. */
+  private async removeFiles(files: ContentFile[]) {
+    if (!files.length || !this.contentFiles) return;
+    await this.contentFiles.removeFiles(files).catch(() => undefined);
   }
 
   async deleteSpeakingExercise(
@@ -1240,7 +1305,7 @@ export class SkillCmsService {
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     await this.assertNoSpeakingHistory(rawSetId, db);
-    return this.inTransaction(
+    const removed = await this.inTransaction(
       client,
       async (tx) => {
         // Counted again with the exercise row locked (audit A5 follow-up,
@@ -1271,6 +1336,9 @@ export class SkillCmsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    // An exam's transaction has not committed yet: the exam removes the file.
+    if (!client) await this.removeSpeakingExerciseFiles([removed]);
+    return removed;
   }
 
   async reorderSpeakingExercises(
@@ -1396,7 +1464,23 @@ export class SkillCmsService {
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
     await this.assertNoHistory(quizId);
-    return this.prisma.question.delete({ where: { id: questionId } });
+    // Read before the delete: the clip rows cascade with the question. Its
+    // reading or writing images are generic uploads and stay.
+    const owner = { kind: 'listening-question', quizId, questionId } as const;
+    const files: ContentFile[] =
+      domain === 'listening'
+        ? (
+            await this.prisma.quizAudioAsset.findMany({
+              where: { questionId },
+              select: { key: true },
+            })
+          ).map((a) => ({ owner, stored: a.key }))
+        : [];
+    const deleted = await this.prisma.question.delete({
+      where: { id: questionId },
+    });
+    await this.removeFiles(files);
+    return deleted;
   }
 
   async validate(rawDomain: string, rawId: string, user: Admin) {

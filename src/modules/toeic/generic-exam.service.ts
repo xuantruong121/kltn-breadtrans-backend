@@ -975,7 +975,7 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.inDraftSpeaking(id, (tx) =>
+    const deleted = await this.inDraftSpeaking(id, (tx) =>
       this.skillCms.deleteSpeakingExercise(
         'speaking',
         setId,
@@ -984,6 +984,9 @@ export class GenericExamService {
         tx,
       ),
     );
+    // Committed: its reference audio can go now (bug 2026-11-22).
+    await this.skillCms.removeSpeakingExerciseFiles([deleted]);
+    return deleted;
   }
 
   async publishSpeakingSource(id: number, user: { id: number; role: any }) {
