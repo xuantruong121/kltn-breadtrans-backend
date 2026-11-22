@@ -142,6 +142,12 @@ export type TrackUsage = {
   reading: number;
   writing: number;
   speaking: number;
+  /**
+   * Quiz tags that count for no skill (owner 2026-11-22): a TOEIC quiz a
+   * script tagged, or a quiz that no longer exists. They still keep the
+   * track from being deleted (foreign key), so they are counted.
+   */
+  other: number;
   learners: number;
 };
 
@@ -150,6 +156,7 @@ export const EMPTY_USAGE: TrackUsage = {
   reading: 0,
   writing: 0,
   speaking: 0,
+  other: 0,
   learners: 0,
 };
 
@@ -164,8 +171,9 @@ export function quizUsageSkill(
 }
 
 /**
- * Items and learners per track: quiz tags by the quiz's type, speaking set
- * tags, and learners who chose the track.
+ * Items and learners per track: quiz tags by the quiz's type (any other type,
+ * or a missing quiz, counts as other), speaking set tags, and learners who
+ * chose the track.
  */
 export function buildTrackUsage(input: {
   codes: readonly string[];
@@ -183,7 +191,7 @@ export function buildTrackUsage(input: {
   };
   for (const tag of input.quizTags) {
     const skill = quizUsageSkill(tag.quizType);
-    if (skill) of(tag.track)[skill] += 1;
+    of(tag.track)[skill ?? 'other'] += 1;
   }
   for (const row of input.speakingSets) of(row.track).speaking += row.count;
   for (const row of input.learners) of(row.track).learners += row.count;

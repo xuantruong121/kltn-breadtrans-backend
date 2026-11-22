@@ -173,17 +173,31 @@ describe('track usage', () => {
       reading: 1,
       writing: 2,
       speaking: 0,
+      other: 0,
       learners: 2,
     });
+    // A TOEIC quiz tag and a tag whose quiz is gone count as other.
     expect(usage.get('GENERAL')).toEqual({
       listening: 0,
       reading: 0,
       writing: 0,
       speaking: 7,
+      other: 2,
       learners: 5,
     });
     expect(isTrackUsed(usage.get('UNUSED')!)).toBe(false);
     expect(isTrackUsed(usage.get('GENERAL')!)).toBe(true);
+  });
+
+  it('a track held only by an other tag is in use (owner 2026-11-22)', () => {
+    const usage = buildTrackUsage({
+      codes: ['HOSPITALITY_TOURISM'],
+      quizTags: [{ track: 'HOSPITALITY_TOURISM', quizType: 'TOEIC' }],
+      speakingSets: [],
+      learners: [],
+    });
+    expect(usage.get('HOSPITALITY_TOURISM')?.other).toBe(1);
+    expect(isTrackUsed(usage.get('HOSPITALITY_TOURISM')!)).toBe(true);
   });
 
   it('maps each skill quiz type to its column', () => {

@@ -30,7 +30,7 @@ import {
 import { LearningTrackService } from './learning-track.service';
 
 const ADMIN_ROW =
-  '{ code, name, description, sortOrder, isActive, isSystem, usage: { listening, reading, writing, speaking, learners } }';
+  '{ code, name, description, sortOrder, isActive, isSystem, usage: { listening, reading, writing, speaking, other, learners } }';
 
 /** The active tracks, for onboarding, the goal editor and tag pickers. */
 @ApiTags('Learning Tracks')
