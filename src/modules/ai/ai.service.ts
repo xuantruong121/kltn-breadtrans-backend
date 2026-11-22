@@ -12,6 +12,10 @@ import {
   cleanWritingFullDraft,
   type WritingFullDraft,
 } from '../writing/writing-full-draft.logic';
+import {
+  dictationDraftCount,
+  dictationFullDraft,
+} from './document-import.logic';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import type { SpeakingTaskType } from '../speaking/speaking-contract';
@@ -771,6 +775,23 @@ export class AiService {
     count: number;
   }): Promise<ContextualListeningFullDraftSuggestion> {
     await this.checkAndIncrementDailyQuota();
+    // "Nghe chép" is a list of sentences, each its own item: a paragraph
+    // plus MCQs could never be published (QA 2026-11-22). The sentences come
+    // from the dictation-lines writer, English only, 20 to 30 of them.
+    if (input.mode === 'DICTATION') {
+      if (!this.aiEvaluator.suggestDictationLines) {
+        throw new BadRequestException(
+          'Chiến lược AI hiện tại không hỗ trợ soạn câu nghe chép',
+        );
+      }
+      const draft = await this.aiEvaluator.suggestDictationLines({
+        topic: input.topic,
+        level: input.level,
+        count: dictationDraftCount(input.count),
+        sourceText: input.sourceText,
+      });
+      return dictationFullDraft(draft, input);
+    }
     if (!this.aiEvaluator.suggestListeningFullDraft) {
       throw new BadRequestException(
         'Chiến lược AI hiện tại không hỗ trợ soạn bài nghe',

@@ -212,7 +212,7 @@ export class AdminContextualAiController {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Listening Content failed: ${error?.message || ''}`);
       throw new BadGatewayException(
-        'Không thể gợi ý nội dung nghe từ AI lúc này. Vui lòng thử lại sau.',
+        'Không thể gợi ý lời thoại từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
@@ -267,7 +267,9 @@ export class AdminContextualAiController {
       )
         throw error;
       this.logger.warn(`AI Writing full draft failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn bài Writing lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài viết lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -288,7 +290,7 @@ export class AdminContextualAiController {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Writing Task failed: ${error?.message || ''}`);
       throw new BadGatewayException(
-        'Không thể gợi ý đề bài Writing từ AI lúc này. Vui lòng thử lại sau.',
+        'Không thể gợi ý đề bài viết từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
@@ -405,7 +407,7 @@ export class AdminContextualAiController {
   @ApiResponse({
     status: 201,
     description:
-      '{ title, description, level, mode, text? (DICTATION), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
+      '{ title, description, level, mode, sentences[]? (DICTATION: 20-30 câu tiếng Anh, questions rỗng), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
   })
   @ApiResponse({
     status: 502,
@@ -425,7 +427,9 @@ export class AdminContextualAiController {
       this.logger.warn(
         `AI Listening full draft failed: ${error?.message || ''}`,
       );
-      throw new BadGatewayException('Không thể soạn bài Listening lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài nghe lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -444,7 +448,9 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Reading full draft failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn bài Reading lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài đọc lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -521,7 +527,9 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI dictation failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn câu nghe chép lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn câu nghe chép lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 

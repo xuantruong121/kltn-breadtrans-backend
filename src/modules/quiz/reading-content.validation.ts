@@ -68,6 +68,27 @@ export function resolveReadingCorrectOption(
       };
 }
 
+/**
+ * An AI-drafted questionType in the stored form: "detail" or "Main idea"
+ * become DETAIL and MAIN_IDEA; anything outside the list becomes the
+ * fallback (QA 2026-11-22: the full draft stored "detail").
+ */
+export function normalizeReadingMicroSkill(
+  value: unknown,
+  fallback: ReadingMicroSkill = 'DETAIL',
+): ReadingMicroSkill {
+  const raw =
+    typeof value === 'string'
+      ? value
+          .trim()
+          .toUpperCase()
+          .replace(/[\s-]+/g, '_')
+      : '';
+  return (READING_MICRO_SKILLS as readonly string[]).includes(raw)
+    ? (raw as ReadingMicroSkill)
+    : fallback;
+}
+
 export function resolveReadingMicroSkillForAuthoring(
   value: unknown,
 ): ReadingMicroSkill | null {

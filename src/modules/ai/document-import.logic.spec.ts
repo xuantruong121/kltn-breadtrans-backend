@@ -1,7 +1,12 @@
 import {
+  DICTATION_MAX_SENTENCES,
+  DICTATION_MIN_SENTENCES,
   DOCUMENT_MAX_DECKS,
   DOCUMENT_MAX_WORDS_PER_DECK,
   deckHeadwords,
+  dictationDraftCount,
+  dictationFullDraft,
+  isEnglishSentence,
   isReadableDocument,
   limitDocumentText,
   normalizeDictationSentences,
@@ -89,5 +94,79 @@ describe('document import logic', () => {
         ' She works in the office. ',
       ]),
     ).toEqual(['The train leaves at nine.', 'She works in the office.']);
+  });
+
+  // QA 2026-11-22: a Vietnamese topic came back as Vietnamese sentences.
+  it('drops dictation lines that are not English', () => {
+    expect(
+      normalizeDictationSentences([
+        'Tôi muốn đặt lịch hẹn vào thứ Hai.',
+        'Toi muon dat lich hen vao thu Hai đi.',
+        'We met at the café near the station.',
+        '我们明天在车站见面吧。',
+        'I’d like to book a table for “two” at 7 p.m. — thanks.',
+        'The ticket costs £12 and €15 at the door.',
+        '   ',
+        42,
+      ]),
+    ).toEqual([
+      'I’d like to book a table for “two” at 7 p.m. — thanks.',
+      'The ticket costs £12 and €15 at the door.',
+    ]);
+    expect(isEnglishSentence('Hẹn gặp lại bạn')).toBe(false);
+    expect(isEnglishSentence('See you later, my friend.')).toBe(true);
+    expect(normalizeDictationSentences(undefined)).toEqual([]);
+  });
+
+  it('keeps a dictation draft between 20 and 30 sentences', () => {
+    expect(dictationDraftCount(5)).toBe(DICTATION_MIN_SENTENCES);
+    expect(dictationDraftCount(25)).toBe(25);
+    expect(dictationDraftCount(99)).toBe(DICTATION_MAX_SENTENCES);
+    expect(dictationDraftCount(undefined)).toBe(20);
+  });
+
+  describe('dictationFullDraft', () => {
+    const english = (n: number) =>
+      Array.from({ length: n }, (_, i) => `Sentence number ${i + 1} is here.`);
+
+    it('makes one English sentence per item and no MCQs', () => {
+      const draft = dictationFullDraft(
+        {
+          title: 'Đặt lịch hẹn',
+          description: 'Nghe và chép lại.',
+          sentences: [...english(21), 'Câu tiếng Việt không được giữ lại.'],
+        },
+        { topic: 'đặt lịch hẹn', level: 'A2', count: 20 },
+      );
+      expect(draft).toMatchObject({
+        title: 'Đặt lịch hẹn',
+        level: 'A2',
+        mode: 'DICTATION',
+        questions: [],
+      });
+      expect(draft.sentences).toHaveLength(20);
+      expect(draft.sentences.every((line) => isEnglishSentence(line))).toBe(
+        true,
+      );
+    });
+
+    it('fails, so the controller answers 502, when no English sentence is left', () => {
+      expect(() =>
+        dictationFullDraft(
+          { title: 'x', sentences: ['Xin chào các bạn nhé.'] },
+          { topic: 'x' },
+        ),
+      ).toThrow('AI không trả về câu nghe chép tiếng Anh hợp lệ');
+      expect(() =>
+        dictationFullDraft({ sentences: 'not a list' }, { topic: 'x' }),
+      ).toThrow();
+    });
+
+    it('falls back to the topic for a missing title', () => {
+      expect(
+        dictationFullDraft({ sentences: english(1) }, { topic: 'Weekend' })
+          .title,
+      ).toBe('Weekend');
+    });
   });
 });

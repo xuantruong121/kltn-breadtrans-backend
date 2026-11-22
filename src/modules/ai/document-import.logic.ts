@@ -83,16 +83,68 @@ export const deckHeadwords = (decks: VocabDeckCandidate[]) => [
   ),
 ];
 
-/** One sentence per line, without numbering, repeats or fragments. */
-export function normalizeDictationSentences(sentences: string[]) {
+/**
+ * A dictation sentence is English: plain ASCII text plus curly quotes,
+ * dashes and a few currency signs. A letter with a diacritic (Vietnamese
+ * "đặt lịch", or "café") or another script means it is not (QA 2026-11-22:
+ * a Vietnamese topic came back as Vietnamese sentences).
+ */
+const ENGLISH_SENTENCE = /^[\x20-\x7E‘’“”–—…£€]+$/;
+
+export const isEnglishSentence = (line: string) =>
+  ENGLISH_SENTENCE.test(line) && /[A-Za-z]/.test(line);
+
+/** One English sentence per line, without numbering, repeats or fragments. */
+export function normalizeDictationSentences(sentences: unknown) {
   const seen = new Set<string>();
-  return sentences
+  return (Array.isArray(sentences) ? sentences : [])
+    .filter((line): line is string => typeof line === 'string')
     .map((line) => line.replace(/^\s*\d+[.)]\s*/, '').trim())
     .filter((line) => line.split(/\s+/).length >= 3)
+    .filter(isEnglishSentence)
     .filter((line) => {
       const id = key(line);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
+}
+
+/** "Nghe chép" holds at least 20 sentences to publish; a draft asks for 20 to 30. */
+export const DICTATION_MIN_SENTENCES = 20;
+export const DICTATION_MAX_SENTENCES = 30;
+
+export const dictationDraftCount = (count?: number) =>
+  Math.min(
+    DICTATION_MAX_SENTENCES,
+    Math.max(DICTATION_MIN_SENTENCES, Math.round(Number(count) || 0)),
+  );
+
+/**
+ * A "Nghe chép" full draft from the dictation-lines answer: the cleaned
+ * sentences, no shared paragraph and no MCQs. Throws when none survive, so
+ * the controller answers 502 instead of an empty draft.
+ */
+export function dictationFullDraft(
+  draft: { title?: unknown; description?: unknown; sentences?: unknown },
+  input: { topic: string; level?: string; count?: number },
+) {
+  const sentences = normalizeDictationSentences(draft?.sentences).slice(
+    0,
+    dictationDraftCount(input.count),
+  );
+  if (!sentences.length)
+    throw new Error('AI không trả về câu nghe chép tiếng Anh hợp lệ');
+  const text = (value: unknown, fallback: string) =>
+    typeof value === 'string' && value.trim()
+      ? value.trim().slice(0, 1200)
+      : fallback;
+  return {
+    title: text(draft?.title, input.topic).slice(0, 200),
+    description: text(draft?.description, ''),
+    level: input.level,
+    mode: 'DICTATION' as const,
+    sentences,
+    questions: [],
+  };
 }

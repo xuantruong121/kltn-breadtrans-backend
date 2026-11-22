@@ -399,10 +399,14 @@ export class SuggestListeningFullDraftDto {
   @IsIn([...LISTENING_FULL_DRAFT_MODES])
   mode: ListeningFullDraftMode;
 
+  /**
+   * Questions (1-10) for DIALOGUE and COMPREHENSION; sentences for DICTATION,
+   * which the service keeps between 20 and 30.
+   */
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(10)
+  @Max(30)
   @Transform(({ value }) => (value !== undefined ? Number(value) : 5))
   count?: number = 5;
 }

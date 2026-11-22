@@ -665,6 +665,8 @@ export interface ContextualListeningFullDraftSuggestion {
   mode: ListeningFullDraftMode;
   text?: string;
   turns?: ContextualListeningTurn[];
+  /** DICTATION: one English sentence per dictation item; questions is empty. */
+  sentences?: string[];
   questions: ContextualListeningQuestionCandidate[];
 }
 

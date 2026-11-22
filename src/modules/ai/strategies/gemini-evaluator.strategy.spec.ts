@@ -755,3 +755,130 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     expect(draft.questions[0]).not.toHaveProperty('turns');
   });
 });
+
+describe('GeminiEvaluatorStrategy Reading drafts store the question type in upper case', () => {
+  const answering = (answer: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(answer) },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    return { strategy, generateContent };
+  };
+  const question = (questionType: unknown, prompt = 'What is it about?') => ({
+    prompt,
+    options: ['Work', 'Food', 'Travel', 'Sport'],
+    correctIndex: 0,
+    explanation: 'Đoạn văn nói về công việc.',
+    questionType,
+  });
+
+  // QA 2026-11-22: the full draft stored "detail".
+  it('normalises each full-draft question type and keeps it with its question', async () => {
+    const { strategy, generateContent } = answering({
+      title: 'Remote work',
+      description: 'Bài đọc về làm việc từ xa.',
+      level: 'B1',
+      passage: 'Many people work from home now.',
+      questions: [
+        question('detail', 'Q1'),
+        // Dropped: three options. Its type must not shift onto the next one.
+        { ...question('PURPOSE', 'Q2'), options: ['a', 'b', 'c'] },
+        question('Main idea', 'Q3'),
+        question('opinion', 'Q4'),
+        question(undefined, 'Q5'),
+      ],
+    });
+    const draft = await strategy.suggestReadingFullDraft({
+      topic: 'Remote work',
+      level: 'B1',
+      count: 5,
+    });
+    expect(draft.questions.map((q: any) => [q.prompt, q.questionType])).toEqual(
+      [
+        ['Q1', 'DETAIL'],
+        ['Q3', 'MAIN_IDEA'],
+        ['Q4', 'DETAIL'],
+        ['Q5', 'DETAIL'],
+      ],
+    );
+    const schema =
+      generateContent.mock.calls[0][0].generationConfig.responseSchema;
+    expect(
+      schema.properties.questions.items.properties.questionType.enum,
+    ).toContain('VOCAB_IN_CONTEXT');
+  });
+
+  it('uses the same rule for the question suggestions', async () => {
+    const { strategy } = answering({
+      candidates: [question('inference'), question('Vocab-in-context', 'Q2')],
+    });
+    const result = await strategy.suggestReadingQuestions({
+      passage: 'Text',
+      count: 2,
+    });
+    expect(result.candidates.map((c: any) => c.questionType)).toEqual([
+      'INFERENCE',
+      'VOCAB_IN_CONTEXT',
+    ]);
+  });
+});
+
+describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
+  const answering = (answer: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(answer) },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    return { strategy, generateContent };
+  };
+
+  // QA 2026-11-22: a Vietnamese topic came back as Vietnamese sentences.
+  it('asks for English at the chosen level whatever the topic language', async () => {
+    const { strategy, generateContent } = answering({
+      title: 'Lịch hẹn',
+      description: 'Nghe chép',
+      sentences: ['I would like to book an appointment.'],
+    });
+    await strategy.suggestDictationLines({
+      topic: 'đặt lịch hẹn',
+      level: 'B1',
+      count: 20,
+    });
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toMatch(/CEFR level B1/);
+    expect(text).toMatch(/Every sentence is in English, whatever language/);
+  });
+
+  it('gives one English sentence for a single dictation item, never Vietnamese', async () => {
+    const english = answering({
+      mode: 'DICTATION',
+      text: '1. Please close the door when you leave.',
+    });
+    await expect(
+      english.strategy.suggestListeningContent({
+        mode: 'DICTATION',
+        level: 'A2',
+        topic: 'nhà',
+      }),
+    ).resolves.toEqual({
+      mode: 'DICTATION',
+      text: 'Please close the door when you leave.',
+    });
+    const vietnamese = answering({
+      mode: 'DICTATION',
+      text: 'Hãy đóng cửa khi bạn ra ngoài.',
+    });
+    await expect(
+      vietnamese.strategy.suggestListeningContent({ mode: 'DICTATION' }),
+    ).rejects.toThrow('AI không thể tạo câu nghe chép hợp lệ');
+  });
+});
