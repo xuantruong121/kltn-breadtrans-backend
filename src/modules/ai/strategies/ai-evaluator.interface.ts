@@ -565,9 +565,15 @@ export interface ContextualListeningQuestionCandidate {
   explanationEn?: string;
   /**
    * "Nghe hiểu (câu ngắn)" full draft only: the sentence the learner hears
-   * for this question, saved as the question's own audioText.
+   * for this question, saved as the question's own audioText. For an
+   * exchange it is the turns' text joined, without speaker labels.
    */
   audioText?: string;
+  /**
+   * "Nghe hiểu (câu ngắn)" full draft only, when the item is a short
+   * exchange: 2-3 turns between speakers A and B, read in two voices.
+   */
+  turns?: Array<{ speaker: string; text: string }>;
 }
 
 export interface ContextualListeningQuestionsSuggestion {

@@ -136,6 +136,45 @@ describe('SpeakingService - Durable Submissions & Security', () => {
     );
   });
 
+  it('gives the CMS exchange labels A/B and Man/Woman two voices in either accent', () => {
+    const exchange = [
+      { speaker: 'A', text: 'Is this seat free?' },
+      { speaker: 'B', text: 'Yes, go ahead.' },
+      { speaker: 'A', text: 'Thanks.' },
+    ];
+    const us = buildDialogueSsml(exchange, 'US');
+    expect(us).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Is this seat free?",
+    );
+    expect(us).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>Yes, go ahead.",
+    );
+    expect(us).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>Thanks.",
+    );
+    const uk = buildDialogueSsml(exchange, 'UK');
+    expect(uk).toContain(
+      "<voice name='en-GB-SoniaNeural'><prosody rate='1.0'>Is this seat free?",
+    );
+    expect(uk).toContain(
+      "<voice name='en-GB-RyanNeural'><prosody rate='1.0'>Yes, go ahead.",
+    );
+    // "Man" speaks first and still takes the male voice through its voiceKey.
+    const gendered = buildDialogueSsml(
+      [
+        { speaker: 'Man', voiceKey: 'male-01', text: 'Where is the lift?' },
+        { speaker: 'Woman', voiceKey: 'female-01', text: 'On your left.' },
+      ],
+      'US',
+    );
+    expect(gendered).toContain(
+      "<voice name='en-US-GuyNeural'><prosody rate='1.0'>Where is the lift?",
+    );
+    expect(gendered).toContain(
+      "<voice name='en-US-JennyNeural'><prosody rate='1.0'>On your left.",
+    );
+  });
+
   describe('submitAudio', () => {
     const validWav = createWavBuffer({ durationSeconds: 1 });
     const mockFile: Express.Multer.File = {

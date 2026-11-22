@@ -25,8 +25,15 @@ export function mergeListeningContent(existing: unknown, incoming: Json): Json {
   if (isObject(defined.explanation) && isObject(before.explanation))
     merged.explanation = { ...before.explanation, ...defined.explanation };
 
-  // Keep each speaker's voice and ids the form does not show.
+  // An exchange edited back into one sentence sends no turns ([]): the old
+  // turns must go, or the clip would still read them.
   if (
+    Array.isArray(defined.transcriptSegments) &&
+    defined.transcriptSegments.length === 0
+  )
+    delete merged.transcriptSegments;
+  // Keep each speaker's voice and ids the form does not show.
+  else if (
     Array.isArray(defined.transcriptSegments) &&
     Array.isArray(before.transcriptSegments)
   ) {

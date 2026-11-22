@@ -404,7 +404,7 @@ export class AdminContextualAiController {
   @ApiResponse({
     status: 201,
     description:
-      '{ title, description, level, mode, text? (DICTATION), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu) } }',
+      '{ title, description, level, mode, text? (DICTATION), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
   })
   @ApiResponse({
     status: 502,

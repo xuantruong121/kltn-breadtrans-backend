@@ -609,6 +609,97 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     ).toEqual(['The museum is closed on Mondays.']);
   });
 
+  it('lets an item be a short exchange between A and B, read in two voices', async () => {
+    const { strategy, generateContent } = strategyAnswering(
+      draftOf([
+        {
+          ...item('Is this seat free? Yes, go ahead.', 'Where are they?'),
+          turns: [
+            { speaker: 'A', text: '  Is this seat free?  ' },
+            { speaker: 'b', text: 'Yes, go ahead.' },
+          ],
+        },
+        // Gemini may answer an optional list with []: still one sentence.
+        { ...item('The bank opens at eight thirty.'), turns: [] },
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'getting around town',
+      level: 'A2',
+      mode: 'COMPREHENSION',
+      count: 2,
+    });
+    expect(draft.questions[0]).toMatchObject({
+      audioText: 'Is this seat free? Yes, go ahead.',
+      turns: [
+        { speaker: 'A', text: 'Is this seat free?' },
+        { speaker: 'B', text: 'Yes, go ahead.' },
+      ],
+    });
+    expect(draft.questions[1].audioText).toBe(
+      'The bank opens at eight thirty.',
+    );
+    expect(draft.questions[1]).not.toHaveProperty('turns');
+    const request = generateContent.mock.calls[0][0];
+    const question = request.generationConfig.responseSchema.properties
+      .questions.items as {
+      properties: Record<string, any>;
+      required: string[];
+    };
+    expect(question.properties.turns.items.properties.speaker.enum).toEqual([
+      'A',
+      'B',
+    ]);
+    expect(question.required).not.toContain('turns');
+    expect(request.contents[0].parts[0].text).toMatch(/2 or 3 turns/);
+  });
+
+  it('drops an exchange that is not 2-3 non-empty turns by both A and B', async () => {
+    const exchange = (turns: unknown) => ({
+      ...item('Exchange text.'),
+      turns,
+    });
+    const { strategy } = strategyAnswering(
+      draftOf([
+        exchange([{ speaker: 'A', text: 'Only one turn.' }]),
+        exchange([
+          { speaker: 'A', text: 'One.' },
+          { speaker: 'B', text: 'Two.' },
+          { speaker: 'A', text: 'Three.' },
+          { speaker: 'B', text: 'Four.' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'A', text: 'Hello again.' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'B', text: '   ' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'C', text: 'Hi.' },
+        ]),
+        exchange('A: Hello. B: Hi.'),
+        exchange([
+          { speaker: 'B', text: 'Are you ready?' },
+          { speaker: 'A', text: 'Almost.' },
+          { speaker: 'B', text: 'Hurry up.' },
+        ]),
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'town',
+      mode: 'COMPREHENSION',
+      count: 7,
+    });
+    expect(draft.questions).toHaveLength(1);
+    expect(draft.questions[0].audioText).toBe(
+      'Are you ready? Almost. Hurry up.',
+    );
+    expect(draft.questions[0].turns).toHaveLength(3);
+  });
+
   it('fails closed when no question carries a sentence, or the mode differs', async () => {
     await expect(
       strategyAnswering(
@@ -632,7 +723,18 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
 
   it('keeps DIALOGUE questions free of a per-question sentence', async () => {
     const { strategy, generateContent } = strategyAnswering({
-      ...draftOf([item('should be ignored')], 'DIALOGUE'),
+      ...draftOf(
+        [
+          {
+            ...item('should be ignored'),
+            turns: [
+              { speaker: 'A', text: 'ignored' },
+              { speaker: 'B', text: 'too' },
+            ],
+          },
+        ],
+        'DIALOGUE',
+      ),
       text: undefined,
     });
     const draft = await strategy.suggestListeningFullDraft({
@@ -647,5 +749,9 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     expect(schema.properties.questions.items.properties).not.toHaveProperty(
       'audioText',
     );
+    expect(schema.properties.questions.items.properties).not.toHaveProperty(
+      'turns',
+    );
+    expect(draft.questions[0]).not.toHaveProperty('turns');
   });
 });

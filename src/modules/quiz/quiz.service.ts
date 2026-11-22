@@ -37,6 +37,7 @@ import {
   PublishedListeningAudioIdentity,
 } from './listening-audio-authoring.service';
 import {
+  comprehensionExchangeSegments,
   normalizeDialogueSegments,
   withSpeakerTurnIds,
   type NormalizedDialogueSegment,
@@ -2081,13 +2082,21 @@ export class QuizService {
   /**
    * Synthesizes a question's own clip and makes it the active asset:
    * a DIALOGUE question reads its turns; a comprehension MCQ reads its
-   * audioText; a DICTATION item reads its answer sentence.
+   * audioText, or its turns in one voice per speaker when it is an exchange;
+   * a DICTATION item reads its answer sentence.
    */
   async generateQuestionAudioAsset(questionId: number) {
     const question = await this.prisma.question.findUnique({
       where: { id: questionId },
       include: {
-        quiz: { select: { id: true, type: true, isPremiumContent: true } },
+        quiz: {
+          select: {
+            id: true,
+            type: true,
+            isPremiumContent: true,
+            bilingualContent: true,
+          },
+        },
       },
     });
     if (!question || question.quiz.type !== QuizType.LISTENING_PRACTICE) {
@@ -2106,7 +2115,19 @@ export class QuizService {
     const content = (question.content ?? {}) as Record<string, unknown>;
     let nextContent = content;
     let audioBuffer: Buffer;
-    if (type === 'DIALOGUE') {
+    const exchange = comprehensionExchangeSegments(
+      question.type,
+      (question.quiz.bilingualContent as { mode?: unknown } | null)?.mode,
+      content,
+    );
+    if (exchange) {
+      // The same voices and accent as a dialogue; the stored content is kept.
+      audioBuffer = await this.speakingService.generateDialogueTts(
+        exchange,
+        content.accent === 'UK' ? 'UK' : 'US',
+        1,
+      );
+    } else if (type === 'DIALOGUE') {
       nextContent = normalizeQuestionContent(
         question.quiz.type,
         question.type,
@@ -2606,6 +2627,7 @@ export class QuizService {
             id: true,
             type: true,
             isPremiumContent: true,
+            bilingualContent: true,
           },
         },
         audioAssets: {
@@ -2748,6 +2770,13 @@ export class QuizService {
     if (typeof expectedAnswer !== 'string') {
       throw new BadRequestException('Câu hỏi chưa có đáp án hợp lệ');
     }
+    // A comprehension exchange is shown turn by turn once answered; the quiz
+    // payload carries no transcript before that.
+    const exchange = comprehensionExchangeSegments(
+      question.type,
+      (question.quiz.bilingualContent as { mode?: unknown } | null)?.mode,
+      content,
+    );
 
     return {
       questionId,
@@ -2761,6 +2790,17 @@ export class QuizService {
           : null,
       translation:
         typeof content.translation === 'string' ? content.translation : null,
+      ...(exchange
+        ? {
+            transcriptSegments: exchange.map((segment) => ({
+              speaker: segment.speaker ?? segment.speakerId ?? '',
+              text: segment.text,
+              ...(segment.translation
+                ? { translation: segment.translation }
+                : {}),
+            })),
+          }
+        : {}),
     };
   }
 
