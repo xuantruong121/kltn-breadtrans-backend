@@ -359,7 +359,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
           JSON.stringify({
             practiceSet: {
               title: 'Hotel check-in',
-              description: 'Arriving at a hotel.',
+              description: 'Luyện nói khi nhận phòng khách sạn.',
               category: 'GENERAL',
               level: 'A1',
             },
@@ -399,7 +399,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
           JSON.stringify({
             practiceSet: {
               title: 'Hotel check-in',
-              description: 'Arriving at a hotel.',
+              description: 'Luyện nói khi nhận phòng khách sạn.',
               level: 'A1',
             },
             exercises: [
@@ -427,7 +427,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
     });
     expect(draft.practiceSet).toEqual({
       title: 'Hotel check-in',
-      description: 'Arriving at a hotel.',
+      description: 'Luyện nói khi nhận phòng khách sạn.',
       level: 'A1',
       track: 'HOSPITALITY_TOURISM',
     });

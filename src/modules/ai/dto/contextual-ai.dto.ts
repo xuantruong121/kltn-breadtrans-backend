@@ -18,6 +18,7 @@ import {
   SPEAKING_TASK_TYPES,
 } from '../../speaking/speaking-contract';
 import type { SpeakingTaskType } from '../../speaking/speaking-contract';
+import { SPEAKING_DRAFT_TASK_TYPES } from '../speaking-draft.logic';
 import {
   LISTENING_FULL_DRAFT_MODES,
   type ListeningFullDraftMode,
@@ -362,8 +363,12 @@ export class SuggestSpeakingFullDraftDto {
   @IsString()
   objective?: string;
 
+  /** Text-only types: a picture or information task needs media a draft cannot bring. */
   @IsOptional()
-  @IsIn([...SPEAKING_TASK_TYPES])
+  @IsIn([...SPEAKING_DRAFT_TASK_TYPES], {
+    message:
+      'Bản nháp AI không soạn câu mô tả tranh hay câu trả lời dựa trên thông tin; hãy thêm các câu đó sau khi tạo bộ.',
+  })
   taskType?: SpeakingTaskType;
 
   @IsOptional()

@@ -362,7 +362,7 @@ export class AdminContextualAiController {
   @Post('speaking/ai/full-draft')
   @ApiOperation({
     summary:
-      'Soạn bộ luyện Speaking cùng các câu luyện nháp; track (tuỳ chọn) là mã lĩnh vực đang bật',
+      'Soạn bộ luyện nói cùng các câu luyện nháp, chỉ loại bài không cần ảnh hay thông tin dùng chung; track (tuỳ chọn) là mã lĩnh vực đang bật',
   })
   @ApiResponse({
     status: 201,
@@ -371,7 +371,8 @@ export class AdminContextualAiController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Lĩnh vực không tồn tại hoặc đã tắt',
+    description:
+      'Lĩnh vực không tồn tại hoặc đã tắt; hoặc taskType là DESCRIBE_PICTURE / RESPOND_USING_INFORMATION',
   })
   async suggestSpeakingFullDraft(@Body() dto: SuggestSpeakingFullDraftDto) {
     try {
@@ -391,7 +392,7 @@ export class AdminContextualAiController {
         `AI Speaking full draft failed: ${error?.message || ''}`,
       );
       throw new BadGatewayException(
-        'Không thể soạn bộ luyện Speaking lúc này.',
+        'Không thể soạn bộ luyện nói từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
