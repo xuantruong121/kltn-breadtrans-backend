@@ -50,6 +50,10 @@ import {
 } from '../vocab/dictionary-entry';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import { deckListFacets, filterDeckList } from './vocab-deck-list';
+import {
+  deckStatsFromEntries,
+  vocabDeckProblems,
+} from './vocab-deck-readiness';
 
 export const DASHBOARD_RANGES = ['30d', '6m', '12m'] as const;
 export type DashboardRange = (typeof DASHBOARD_RANGES)[number];
@@ -877,10 +881,49 @@ export class AdminService {
       orderBy: { id: 'asc' },
     });
     if (!wantsPage(query)) return decks;
+    const page = pageOf(filterDeckList(decks, query), query);
     return {
-      ...pageOf(filterDeckList(decks, query), query),
+      ...page,
+      items: await this.withDeckPublishProblems(page.items),
       facets: deckListFacets(decks),
     };
+  }
+
+  /**
+   * Each draft deck on the page with what blocks its publishing, so the
+   * list's publish icon shows only when the server would accept it. One
+   * query for the page's words; a published deck needs no check.
+   */
+  private async withDeckPublishProblems<
+    T extends { id: number; title: string; publicationStatus: string },
+  >(items: T[]): Promise<Array<T & { publishProblems: string[] }>> {
+    const drafts = items
+      .filter((item) => item.publicationStatus !== 'PUBLISHED')
+      .map((item) => item.id);
+    const words = drafts.length
+      ? await this.prisma.vocabWord.findMany({
+          where: { topicId: { in: drafts } },
+          select: {
+            topicId: true,
+            entry: {
+              select: { ipaUs: true, exampleEn: true, meaningVi: true },
+            },
+          },
+        })
+      : [];
+    return items.map((item) => ({
+      ...item,
+      publishProblems: drafts.includes(item.id)
+        ? vocabDeckProblems({
+            title: item.title,
+            stats: deckStatsFromEntries(
+              words
+                .filter((word) => word.topicId === item.id)
+                .map((word) => word.entry),
+            ),
+          })
+        : [],
+    }));
   }
 
   async getVocabTopicDetail(id: number) {
@@ -971,17 +1014,21 @@ export class AdminService {
     const meanings = [
       ...new Set(meaningRows.map((row) => row.entry.meaningVi.trim())),
     ].map((meaning) => ({ meaning }));
+    const stats = {
+      total,
+      withIpa,
+      withExample,
+      distinctMeanings: meanings.length,
+    };
     return {
       ...topic,
       stats: {
-        total,
-        withIpa,
-        withExample,
+        ...stats,
         withAudio,
-        distinctMeanings: meanings.length,
         // The quiz-step preview draws distractors from these.
         sampleMeanings: meanings.slice(0, 12).map((m) => m.meaning),
       },
+      publishProblems: vocabDeckProblems({ title: topic.title, stats }),
     };
   }
 
@@ -1083,11 +1130,16 @@ export class AdminService {
         include: { words: { include: DECK_WORD_INCLUDE } },
       });
       if (!topic) throw new NotFoundException('Chủ đề từ vựng không tồn tại');
-      if (!topic.words || topic.words.length === 0) {
-        throw new BadRequestException(
-          'Chủ đề từ vựng phải có ít nhất 1 từ vựng trước khi xuất bản',
-        );
-      }
+      // The editor's checklist, item for item (vocabDeckProblems).
+      const missing = vocabDeckProblems({
+        title: topic.title,
+        stats: deckStatsFromEntries(topic.words.map((word) => word.entry)),
+      });
+      if (missing.length)
+        throw new BadRequestException({
+          message: `Chưa xuất bản được. Còn thiếu: ${missing.join('; ')}.`,
+          missing,
+        });
       const invalidWords = topic.words.filter(
         (w) => !w.entry.displayWord?.trim() || !w.entry.meaningVi?.trim(),
       );

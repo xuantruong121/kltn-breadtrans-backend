@@ -78,12 +78,46 @@ describe('AdminVocabCMS (Phase 4)', () => {
       );
     });
 
-    it('publishes a topic when it has at least 1 word', async () => {
+    const readyWord = (id: number, word: string, meaningVi: string) => ({
+      id,
+      entry: {
+        displayWord: word,
+        meaningVi,
+        ipaUs: '/ˈkɒntrækt/',
+        exampleEn: `The ${word} is ready.`,
+      },
+    });
+
+    // QA 2026-11-22: a deck at 2/5 of its checklist was published; the
+    // server now refuses what the editor's checklist refuses.
+    it('rejects a deck the checklist does not pass, naming what is missing', async () => {
+      prisma.vocabTopic.findUnique.mockResolvedValue({
+        id: 101,
+        title: 'Half done',
+        words: [
+          readyWord(1, 'contract', 'hợp đồng'),
+          {
+            id: 2,
+            entry: { displayWord: 'invoice', meaningVi: 'hoá đơn' },
+          },
+        ],
+      });
+
+      await expect(adminService.publishVocabTopic(101)).rejects.toThrow(
+        'Còn thiếu: phiên âm 1/2 từ; câu ví dụ 1/2 từ; ít nhất 4 nghĩa khác nhau cho bước Trắc nghiệm.',
+      );
+      expect(prisma.vocabTopic.update).not.toHaveBeenCalled();
+    });
+
+    it('publishes a deck that passes every checklist item', async () => {
       prisma.vocabTopic.findUnique.mockResolvedValue({
         id: 101,
         title: 'Valid Topic',
         words: [
-          { id: 1, entry: { displayWord: 'Contract', meaningVi: 'Hợp đồng' } },
+          readyWord(1, 'contract', 'hợp đồng'),
+          readyWord(2, 'invoice', 'hoá đơn'),
+          readyWord(3, 'agenda', 'chương trình họp'),
+          readyWord(4, 'deadline', 'hạn chót'),
         ],
       });
       prisma.vocabTopic.update.mockResolvedValue({
@@ -97,7 +131,7 @@ describe('AdminVocabCMS (Phase 4)', () => {
         where: { id: 101 },
         data: {
           publicationStatus: QuizPublicationStatus.PUBLISHED,
-          totalWords: 1,
+          totalWords: 4,
         },
       });
       // The words are counted with the topic locked (audit A8).
