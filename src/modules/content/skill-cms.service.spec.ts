@@ -127,12 +127,17 @@ describe('SkillCmsService', () => {
       { speaker: 'A', text: 'Hi.' },
       { speaker: 'B', text: 'Hello.' },
     ];
-    const run = async (questions: unknown[], recording: unknown) => {
+    const run = async (
+      questions: unknown[],
+      recording: unknown,
+      mode?: string,
+    ) => {
       const prisma = {
         quiz: {
           findFirst: jest.fn().mockResolvedValue({
             id: 58,
             title: 'Hội thoại C1 — A visit',
+            ...(mode ? { bilingualContent: { mode } } : {}),
             questions,
             _count: { submissions: 0 },
           }),
@@ -210,6 +215,160 @@ describe('SkillCmsService', () => {
       expect(badTurns.errors).toContain(
         'Lời thoại: cần ít nhất 2 lượt lời của 2 người nói',
       );
+    });
+
+    // A hand-made "Hội thoại" now has the published shape: one conversation
+    // in every question, no holder, and the shared recording.
+    describe('a "Hội thoại" quiz in the published shape', () => {
+      it('publishes with its conversation in every question and a recording', async () => {
+        const result = await run(
+          [
+            mcq(1, { transcriptSegments: turns }),
+            mcq(2, { transcriptSegments: turns }),
+          ],
+          { id: 3, version: 1 },
+          'DIALOGUE',
+        );
+        expect(result).toMatchObject({ valid: true, errors: [] });
+      });
+
+      it('needs 2 turns by 2 speakers, a choice question and audio', async () => {
+        const oneSpeaker = await run(
+          [
+            mcq(1, {
+              transcriptSegments: [
+                { speaker: 'A', text: 'Hi.' },
+                { speaker: 'A', text: 'Again.' },
+              ],
+            }),
+          ],
+          { id: 3, version: 1 },
+          'DIALOGUE',
+        );
+        expect(oneSpeaker.errors).toEqual([
+          'Lời thoại: cần ít nhất 2 lượt lời của 2 người nói',
+        ]);
+        // No conversation anywhere: nothing to record, nothing to hear.
+        const silent = await run([mcq(1)], null, 'DIALOGUE');
+        expect(silent.errors).toEqual([
+          'Lời thoại: cần ít nhất 2 lượt lời của 2 người nói',
+          'Câu 1: chưa có audio cho học viên',
+        ]);
+        const noChoice = await run(
+          [
+            {
+              id: 1,
+              type: 'DICTATION',
+              content: { correctAnswer: 'Hi.', transcriptSegments: turns },
+              audioAssets: [{ isActive: true }],
+              order: 1,
+            },
+          ],
+          { id: 3, version: 1 },
+          'DIALOGUE',
+        );
+        expect(noChoice.errors).toContain('Cần ít nhất một câu trắc nghiệm');
+      });
+
+      it('accepts a clip on every question instead of the recording', async () => {
+        const clipped = (id: number) => ({
+          ...mcq(id, { transcriptSegments: turns }),
+          audioAssets: [{ isActive: true }],
+        });
+        expect(
+          await run([clipped(1), clipped(2)], null, 'DIALOGUE'),
+        ).toMatchObject({ valid: true });
+      });
+
+      it('still checks a legacy holder as its own row', async () => {
+        const holder = {
+          id: 1,
+          type: 'DIALOGUE',
+          content: { transcriptSegments: turns },
+          audioAssets: [],
+          order: 0,
+        };
+        const result = await run(
+          [holder, mcq(2)],
+          { id: 3, version: 1 },
+          'DIALOGUE',
+        );
+        // The holder plays the recording; the question carries no turns.
+        expect(result.errors).toEqual(['Câu 1: chưa có audio cho học viên']);
+      });
+    });
+
+    describe('the draft conversation on the quiz', () => {
+      const draft = {
+        mode: 'DIALOGUE',
+        levels: ['B1'],
+        draftTranscript: turns,
+      };
+
+      it('is dropped when the quiz is published', async () => {
+        const prisma = {
+          quiz: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 58,
+              title: 'Hội thoại B1 — A visit',
+              bilingualContent: draft,
+              questions: [mcq(1, { transcriptSegments: turns })],
+              _count: { submissions: 0 },
+            }),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ bilingualContent: draft }),
+            update: jest.fn().mockResolvedValue({ id: 58 }),
+          },
+          contentTrackTag: { findMany: jest.fn().mockResolvedValue([]) },
+          toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
+        };
+        const authoring = {
+          getCurrentPublishedArtifact: jest
+            .fn()
+            .mockResolvedValue({ id: 3, version: 1 }),
+        };
+        await new SkillCmsService(prisma as any, authoring as any).publish(
+          'listening',
+          '58',
+          QuizPublicationStatus.PUBLISHED,
+          admin,
+        );
+        expect(
+          prisma.quiz.update.mock.calls[0][0].data.bilingualContent,
+        ).toEqual({ mode: 'DIALOGUE', levels: ['B1'] });
+      });
+
+      it('is kept on a draft, and dropped on a published quiz save', async () => {
+        const save = async (publicationStatus: QuizPublicationStatus) => {
+          const prisma = {
+            quiz: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: 58,
+                title: 'Hội thoại B1 — A visit',
+                type: QuizType.LISTENING_PRACTICE,
+                publicationStatus,
+                bilingualContent: { mode: 'DIALOGUE' },
+              }),
+              update: jest.fn().mockResolvedValue({ id: 58 }),
+            },
+            submission: { count: jest.fn().mockResolvedValue(0) },
+            toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
+          };
+          await new SkillCmsService(prisma as any).update(
+            'listening',
+            '58',
+            { title: 'A visit', bilingualContent: draft },
+            admin,
+          );
+          return prisma.quiz.update.mock.calls[0][0].data.bilingualContent;
+        };
+        expect(await save(QuizPublicationStatus.DRAFT)).toEqual(draft);
+        expect(await save(QuizPublicationStatus.PUBLISHED)).toEqual({
+          mode: 'DIALOGUE',
+          levels: ['B1'],
+        });
+      });
     });
 
     it('lists a hand-made dialogue with its answered questions only', async () => {

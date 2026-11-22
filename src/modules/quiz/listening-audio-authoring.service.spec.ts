@@ -420,6 +420,65 @@ describe('ListeningAudioAuthoringService.generatePreview', () => {
     await expect(svc.validateContent(58)).rejects.toThrow('hai người nói');
   });
 
+  // Quizzes 47–58 and a hand-made "Hội thoại" copy one conversation into
+  // every question: the recording reads it once, not once per question.
+  describe('one conversation in every question', () => {
+    const conversation = [
+      {
+        speaker: 'Khách hàng',
+        text: 'Good morning. Can I have a latte, please?',
+        translation: 'Chào buổi sáng. Cho tôi một ly latte.',
+        voiceKey: 'en-us-female-01',
+      },
+      {
+        speaker: 'Nhân viên',
+        text: 'Sure. Hot or iced?',
+        voiceKey: 'en-us-male-01',
+      },
+      {
+        speaker: 'Khách hàng',
+        text: 'Iced, please.',
+        voiceKey: 'en-us-female-01',
+      },
+    ];
+    const question = (id: number, type = 'MULTIPLE_CHOICE') => ({
+      id,
+      order: id,
+      type,
+      content: {
+        options: ['a', 'b', 'c', 'd'],
+        correctIndex: 0,
+        transcriptSegments: conversation,
+      },
+    });
+    const dialogue = (questions: unknown[]) =>
+      service({
+        id: 58,
+        type: 'LISTENING_PRACTICE',
+        bilingualContent: { mode: 'DIALOGUE' },
+        questions,
+      }).svc.validateContent(58);
+
+    it('gives the same recording for one question or five', async () => {
+      const one = await dialogue([question(1)]);
+      const five = await dialogue([1, 2, 3, 4, 5].map((id) => question(id)));
+      expect(five.turns).toBe(conversation.length);
+      expect(five.synthesisHash).toBe(one.synthesisHash);
+    });
+
+    it('reads a legacy holder and its question copies once', async () => {
+      const withHolder = await dialogue([
+        question(0, 'DIALOGUE'),
+        question(1),
+        question(2),
+      ]);
+      expect(withHolder.turns).toBe(conversation.length);
+      expect(withHolder.synthesisHash).toBe(
+        (await dialogue([question(1)])).synthesisHash,
+      );
+    });
+  });
+
   it('an explicit voiceKey per speaker resolves the clash', async () => {
     const { svc } = service(
       quizWith([

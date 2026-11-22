@@ -6,6 +6,11 @@ import {
   spokenTextChanged,
 } from './listening-question-merge';
 import {
+  dialogueQuizIssues,
+  hasDraftTranscript,
+  withoutDraftTranscript,
+} from './listening-dialogue-conversation';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -729,17 +734,19 @@ export class SkillCmsService {
             SKILL_TITLE_LABEL[domain],
           )
         : dto.title?.trim();
+    const metadata = this.contentMetadata(domain, dto, quiz.bilingualContent);
     return this.prisma.quiz.update({
       where: { id },
       data: {
         title,
         description: dto.description?.trim(),
         theoryContent: dto.passage,
-        bilingualContent: this.contentMetadata(
-          domain,
-          dto,
-          quiz.bilingualContent,
-        ),
+        // Learners read a published quiz's metadata: no draft conversation.
+        bilingualContent:
+          domain === 'listening' &&
+          quiz.publicationStatus === QuizPublicationStatus.PUBLISHED
+            ? withoutDraftTranscript(metadata)
+            : metadata,
         timeLimit: dto.timeLimit,
         type,
         isPremiumContent: dto.isPremiumContent,
@@ -1558,6 +1565,7 @@ export class SkillCmsService {
       id: number;
       type?: QuizType;
       title?: string;
+      bilingualContent?: unknown;
       questions: Array<{
         type: string;
         content: unknown;
@@ -1685,6 +1693,15 @@ export class SkillCmsService {
       )
         errors.push(`${label}: cần ít nhất 2 lượt lời của 2 người nói`);
     }
+    // "Hội thoại": one conversation, carried by the questions, and a choice
+    // question to answer about it (the editor checklist lists the same).
+    if (domain === 'listening')
+      errors.push(
+        ...dialogueQuizIssues(
+          asRecord(quiz.bilingualContent).mode,
+          quiz.questions,
+        ),
+      );
     // A learner hears either the question's own clip or, for questions that
     // share the conversation, the quiz's published recording.
     if (domain === 'listening' && quiz.questions.length) {
@@ -1741,12 +1758,28 @@ export class SkillCmsService {
       });
     }
     const id = this.id(rawId);
+    // The editor's draft conversation stays off a published quiz: learners
+    // read its metadata, and the transcript stays behind the reveal.
+    const stored =
+      domain === 'listening' && status === QuizPublicationStatus.PUBLISHED
+        ? await this.prisma.quiz.findUnique({
+            where: { id },
+            select: { bilingualContent: true },
+          })
+        : null;
     return this.prisma.quiz.update({
       where: { id },
       data: {
         publicationStatus: status,
         publishedAt:
           status === QuizPublicationStatus.PUBLISHED ? new Date() : undefined,
+        ...(hasDraftTranscript(stored?.bilingualContent)
+          ? {
+              bilingualContent: asJson(
+                withoutDraftTranscript(stored?.bilingualContent),
+              ),
+            }
+          : {}),
       },
     });
   }
