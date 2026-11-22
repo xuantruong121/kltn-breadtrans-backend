@@ -556,7 +556,7 @@ export class AdminContextualAiController {
   }
 
   @Post('grammar/ai/full-draft')
-  @ApiOperation({ summary: 'Soạn bài Grammar cùng câu hỏi nháp' })
+  @ApiOperation({ summary: 'Soạn chủ đề ngữ pháp cùng câu hỏi nháp' })
   @ApiResponse({
     status: 502,
     description:
@@ -577,7 +577,9 @@ export class AdminContextualAiController {
       // The model answered, but with a draft the editor cannot use: say why.
       if (error instanceof GrammarDraftRejected)
         throw new BadGatewayException(error.message);
-      throw new BadGatewayException('Không thể soạn bài Grammar lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn chủ đề ngữ pháp lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 }

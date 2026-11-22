@@ -288,6 +288,27 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       ).rejects.toThrow(BadGatewayException);
     });
 
+    it('a failed grammar full draft says so in Vietnamese, with no English word', async () => {
+      mockAiService.suggestGrammarFullDraft = jest
+        .fn()
+        .mockRejectedValue(new Error('503 Service Unavailable'));
+
+      const failure = controller
+        .suggestGrammarFullDraft({
+          topicTitle: 'Câu điều kiện',
+          level: 'INTERMEDIATE',
+          count: 2,
+        })
+        .catch((error: unknown) => error);
+      const error = (await failure) as BadGatewayException;
+
+      expect(error).toBeInstanceOf(BadGatewayException);
+      expect(error.message).toBe(
+        'Không thể soạn chủ đề ngữ pháp lúc này. Vui lòng thử lại sau.',
+      );
+      expect(error.message).not.toMatch(/Grammar/);
+    });
+
     it('preserves BadRequestException when daily quota limit is reached', async () => {
       mockAiService.suggestGrammarQuestions!.mockRejectedValue(
         new BadRequestException(

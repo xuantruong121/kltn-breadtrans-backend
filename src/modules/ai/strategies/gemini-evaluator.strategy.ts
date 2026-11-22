@@ -3534,7 +3534,7 @@ QUESTIONS: use only GrammarQuestion source fields. Each question is an English s
       !parsed?.keyFormula?.trim() ||
       !accented.length
     )
-      throw new Error('AI không thể tạo full draft Grammar hợp lệ');
+      throw new Error('AI chưa soạn được bản nháp ngữ pháp hợp lệ');
     return {
       title: parsed.title.trim().slice(0, 200),
       description,
