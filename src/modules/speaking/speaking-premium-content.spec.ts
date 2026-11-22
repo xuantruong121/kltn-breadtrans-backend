@@ -15,7 +15,6 @@ describe('Speaking premium content boundary', () => {
     audioUrl: 'premium/speaking/exercise-1.mp3',
     isPremiumContent: true,
     difficulty: 'BEGINNER',
-    category: 'GENERAL',
     createdAt: new Date(),
   };
 
@@ -66,7 +65,7 @@ describe('Speaking premium content boundary', () => {
   });
 
   it('returns locked safe metadata without target text or playable audio', async () => {
-    const result = await service.findAllExercises(undefined, 7, Role.STUDENT);
+    const result = await service.findAllExercises(7, Role.STUDENT);
     expect(result[0]).toMatchObject({
       id: 1,
       isPremiumContent: true,

@@ -28,7 +28,6 @@ import { PrismaClient } from '@prisma/client';
 import { AiService } from '../src/modules/ai/ai.service';
 import { GeminiEvaluatorStrategy } from '../src/modules/ai/strategies/gemini-evaluator.strategy';
 import { SkillCmsService } from '../src/modules/content/skill-cms.service';
-import { SpeakingCategoryService } from '../src/modules/content/speaking-category.service';
 import { keyOrder } from './toeic-rewrite-listening-34';
 import {
   parseCefrRange,
@@ -260,12 +259,7 @@ async function apply() {
     );
   const drafts = JSON.parse(readFileSync(join(DIR, 'drafts.json'), 'utf8'));
   const prisma = new PrismaClient({ datasources: { db: { url } } });
-  const cms = new SkillCmsService(
-    prisma,
-    undefined,
-    undefined,
-    new SpeakingCategoryService(prisma),
-  );
+  const cms = new SkillCmsService(prisma);
   const admin = await prisma.user.findFirst({
     where: { role: 'ADMIN' },
     orderBy: { id: 'asc' },

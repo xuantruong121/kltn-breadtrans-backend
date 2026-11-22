@@ -857,23 +857,6 @@ model LearnerEvent {
 }
 
 // Speaking Practice Models
-model SpeakingCategory {
-  id               Int      @id @default(autoincrement())
-  code             String   @unique
-  name             String
-  nameNormalized   String   @unique
-  description      String?  @db.Text
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  allowPracticeSet Boolean  @default(false)
-  allowExercise    Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  practiceSets SpeakingPracticeSet[] @relation("SpeakingPracticeSetCategory")
-  exercises    SpeakingExercise[]    @relation("SpeakingExerciseCategory")
-}
-
 enum SpeakingExerciseTaskType {
   READ_ALOUD
   DESCRIBE_PICTURE
@@ -908,24 +891,20 @@ model SpeakingExercise {
   audioUrl          String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
   isPremiumContent  Boolean                   @default(false)
   difficulty        String                    @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
-  category          String                    @default("TOEIC") // IELTS, TOEIC, GENERAL
   taskType          SpeakingExerciseTaskType?
-  categoryId        Int?
   practiceSetId     String?
   order             Int?
   stimulusId        Int?
   publicationStatus QuizPublicationStatus     @default(DRAFT)
   createdAt         DateTime                  @default(now())
 
-  submissions      SpeakingSubmission[]
-  uploadIntents    SpeakingUploadIntent[]
-  practiceSet      SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
-  categoryTaxonomy SpeakingCategory?      @relation("SpeakingExerciseCategory", fields: [categoryId], references: [id], onDelete: Restrict)
-  stimulus         SpeakingStimulus?      @relation(fields: [stimulusId], references: [id], onDelete: SetNull)
+  submissions   SpeakingSubmission[]
+  uploadIntents SpeakingUploadIntent[]
+  practiceSet   SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+  stimulus      SpeakingStimulus?      @relation(fields: [stimulusId], references: [id], onDelete: SetNull)
 
   @@unique([practiceSetId, order])
   @@index([practiceSetId])
-  @@index([categoryId])
   @@index([taskType])
   @@index([stimulusId])
 }
@@ -934,8 +913,6 @@ model SpeakingPracticeSet {
   id                String                @id
   title             String
   description       String
-  category          String
-  categoryId        Int
   level             String
   scope             SpeakingPracticeScope @default(SKILL_PRACTICE)
   publicationStatus QuizPublicationStatus @default(DRAFT)
@@ -944,10 +921,7 @@ model SpeakingPracticeSet {
 
   exercises            SpeakingExercise[]
   assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentSpeakingSource")
-  categoryTaxonomy     SpeakingCategory           @relation("SpeakingPracticeSetCategory", fields: [categoryId], references: [id], onDelete: Restrict)
   tracks               SpeakingSetTrack[]
-
-  @@index([categoryId])
 }
 
 enum SpeakingSubmissionStatus {

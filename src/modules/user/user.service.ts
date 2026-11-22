@@ -870,7 +870,6 @@ export class UserService {
             select: {
               id: true,
               title: true,
-              category: true,
               practiceSet: {
                 select: { id: true, title: true, description: true },
               },
@@ -880,8 +879,7 @@ export class UserService {
     const speakingRows = Array.isArray(speakingRowsRaw) ? speakingRowsRaw : [];
     const speakingSets = new Map<string, number[]>();
     for (const row of speakingRows) {
-      const set = row.practiceSet ?? resolveSpeakingPracticeSet(row);
-      const key = 'id' in set ? set.id : set.key;
+      const { key } = resolveSpeakingPracticeSet(row);
       speakingSets.set(key, [...(speakingSets.get(key) ?? []), row.id]);
     }
     const speakingCatalogCountRaw =

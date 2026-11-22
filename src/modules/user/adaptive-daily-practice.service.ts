@@ -462,7 +462,6 @@ export class AdaptiveDailyPracticeService {
         id: true,
         title: true,
         targetText: true,
-        category: true,
         isPremiumContent: true,
         taskType: true,
         practiceSet: { select: { scope: true, level: true } },

@@ -3702,7 +3702,6 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
         data: {
           title: exercise.title.trim(),
           targetText: exercise.targetText.trim(),
-          category: 'TOEIC',
           difficulty: 'INTERMEDIATE',
           taskType: exercise.taskType,
           imageUrl: image?.url,

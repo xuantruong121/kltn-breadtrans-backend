@@ -154,7 +154,6 @@ describe('speaking set list rules', () => {
     {
       id: 'a',
       title: 'Giới thiệu bản thân',
-      category: 'Daily',
       level: 'A1',
       publicationStatus: 'PUBLISHED',
       createdAt: '2026-10-01',
@@ -165,7 +164,6 @@ describe('speaking set list rules', () => {
     {
       id: 'b',
       title: 'Phỏng vấn xin việc',
-      category: 'Work',
       level: 'B2',
       publicationStatus: 'DRAFT',
       createdAt: '2026-10-20',
@@ -186,8 +184,7 @@ describe('speaking set list rules', () => {
     expect(filterSpeakingSets(sets, { q: 'phỏng' }).map((s) => s.id)).toEqual([
       'b',
     ]);
-    // Phân loại folded into Lĩnh vực: no category search or filter.
-    expect(filterSpeakingSets(sets, { q: 'work' })).toEqual([]);
+    // Phân loại folded into Lĩnh vực: an old category filter is ignored.
     expect(
       filterSpeakingSets(sets, { category: 'Work' }).map((s) => s.id),
     ).toEqual(['b', 'a']);

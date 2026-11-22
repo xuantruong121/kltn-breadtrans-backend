@@ -188,7 +188,6 @@ async function main() {
       {
         title: `${prefix}-set`,
         description: 'Bản nháp bộ luyện QA.',
-        category: 'GENERAL',
         level: 'A1-B1',
       },
     );

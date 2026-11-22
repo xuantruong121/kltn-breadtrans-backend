@@ -257,15 +257,6 @@ async function main() {
     summary.lrExamId = lrExam?.id ?? null;
 
     // ------------------------------------------------- shared prerequisites
-    const category = await prisma.speakingCategory.findFirst({
-      where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
-    });
-    if (!category)
-      throw new Error(
-        'No active SpeakingCategory taxonomy — run the seed first.',
-      );
-
     /** Builds (or reuses) an Exam + Assessment + Speaking/Writing sources. */
     async function ensureAssessmentExam(spec: {
       title: string;
@@ -312,8 +303,6 @@ async function main() {
             id: speakingId,
             title: `${spec.title} — Speaking`,
             description: 'Nguồn Speaking nội bộ của đề thi (BreadTrans).',
-            category: category!.code,
-            categoryId: category!.id,
             level: 'B1-C1',
             scope: SpeakingPracticeScope.EXAM_INTERNAL,
             publicationStatus: QuizPublicationStatus.DRAFT,
@@ -360,8 +349,6 @@ async function main() {
                 taskType,
                 order: index + 1,
                 practiceSetId: speaking.id,
-                categoryId: category!.id,
-                category: category!.code,
                 difficulty: 'INTERMEDIATE',
                 stimulusId: content.usesInformation ? stimulus.id : null,
                 publicationStatus: QuizPublicationStatus.DRAFT,

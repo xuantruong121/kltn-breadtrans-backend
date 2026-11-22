@@ -1,8 +1,7 @@
-import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -27,24 +26,13 @@ export class SpeakingCatalogController {
     summary:
       'Danh sách bài luyện nói đã xuất bản; khách xem được, đăng nhập để có tiến độ',
   })
-  @ApiQuery({
-    name: 'category',
-    required: false,
-    deprecated: true,
-    description:
-      'Deprecated (2026-11-21): Phân loại đã gộp vào Lĩnh vực; lọc theo practiceSet.tracks. Mã phân loại cũ vẫn được nhận.',
-  })
   @ApiResponse({
     status: 200,
     description:
       'Bài tập kèm bộ luyện và trạng thái khoá; practiceSet.tracks là [{ code, name, sortOrder }] các lĩnh vực đang bật của bộ',
   })
-  findAllExercises(
-    @Query('category') category: string,
-    @Request() req: { user?: { id?: number; role?: Role } },
-  ) {
+  findAllExercises(@Request() req: { user?: { id?: number; role?: Role } }) {
     return this.speakingService.findAllExercises(
-      category,
       req?.user?.id,
       req?.user?.role,
     );

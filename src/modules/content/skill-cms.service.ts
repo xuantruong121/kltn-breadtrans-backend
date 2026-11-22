@@ -38,7 +38,6 @@ import { QuizService } from '../quiz/quiz.service';
 import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authoring.service';
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
 import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
-import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 import { SpeakingService } from '../speaking/speaking.service';
@@ -97,9 +96,6 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
-/** The speaking category every new set gets (categoryId is NOT NULL). */
-const GENERAL_SPEAKING_CATEGORY = 'GENERAL';
-
 /** Tags in the order admins set for the tracks. */
 const TRACK_ORDER = [
   { trackRef: { sortOrder: 'asc' as const } },
@@ -114,8 +110,6 @@ export class SkillCmsService {
     private readonly listeningAudioAuthoring?: ListeningAudioAuthoringService,
     @Optional()
     private readonly quizService?: QuizService,
-    @Optional()
-    private readonly speakingCategoryService?: SpeakingCategoryService,
     @Optional()
     private readonly speakingService?: SpeakingService,
     @Optional()
@@ -229,12 +223,10 @@ export class SkillCmsService {
         exercises: {
           orderBy: [{ order: 'asc' as const }, { id: 'asc' as const }],
           include: {
-            categoryTaxonomy: true,
             stimulus: true,
             _count: { select: { submissions: true } },
           },
         },
-        categoryTaxonomy: true,
       };
       if (!wantsPage(query))
         return this.prisma.speakingPracticeSet.findMany({
@@ -412,10 +404,9 @@ export class SkillCmsService {
       const set = await this.prisma.speakingPracticeSet.findUnique({
         where: { id: rawId },
         include: {
-          categoryTaxonomy: true,
           exercises: {
             orderBy: [{ order: 'asc' }, { id: 'asc' }],
-            include: { categoryTaxonomy: true, stimulus: true },
+            include: { stimulus: true },
           },
           tracks: { orderBy: TRACK_ORDER, select: { track: true } },
         },
@@ -586,27 +577,15 @@ export class SkillCmsService {
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       this.assertSpeakingSetContract(dto);
-      // Phân loại folded into Lĩnh vực (2026-11-21): nobody picks a category
-      // any more, but categoryId is still required, so a new set gets GENERAL
-      // (even if it was switched off).
-      const category = await this.speakingCategoryService?.getByCode(
-        GENERAL_SPEAKING_CATEGORY,
-        'practiceSet',
-        { allowInactive: true },
-      );
-      const title = dto.title.trim();
-      const id = `speaking-${randomUUID()}`;
-      const data: any = {
-        id,
-        title,
-        description: dto.description?.trim() ?? '',
-        category: GENERAL_SPEAKING_CATEGORY,
-        level: dto.level?.trim() || 'A1-B1',
-        publicationStatus: QuizPublicationStatus.DRAFT,
-      };
-      if (category) data.categoryId = category.id;
+      // A set carries no category: Lĩnh vực tags it (PUT :domain/:id/tracks).
       return this.prisma.speakingPracticeSet.create({
-        data,
+        data: {
+          id: `speaking-${randomUUID()}`,
+          title: dto.title.trim(),
+          description: dto.description?.trim() ?? '',
+          level: dto.level?.trim() || 'A1-B1',
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        },
       });
     }
     const type = this.quizType(domain);
@@ -654,8 +633,6 @@ export class SkillCmsService {
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       await this.assertSpeakingEditable(rawId);
-      // The set keeps its category as it is: a save never checks it again
-      // (two seeded sets sat on categories closed to sets and got 400).
       return this.prisma.speakingPracticeSet.update({
         where: { id: rawId },
         data: {
@@ -919,13 +896,10 @@ export class SkillCmsService {
       stimulus,
     });
     if (semanticErrors.length) throw new BadRequestException(semanticErrors);
-    // An exercise takes its set's legacy category string and no category of
-    // its own: Lĩnh vực sits on the set.
+    // No category: Lĩnh vực sits on the set.
     const data: any = {
       title: dto.title.trim(),
       targetText: dto.targetText.trim(),
-      category: set.category,
-      categoryId: null,
       difficulty: dto.difficulty || set.level,
       imageUrl: dto.imageUrl,
       audioUrl: dto.audioUrl,
@@ -1358,7 +1332,7 @@ export class SkillCmsService {
           include: {
             exercises: {
               orderBy: [{ order: 'asc' }, { id: 'asc' }],
-              include: { categoryTaxonomy: true, stimulus: true },
+              include: { stimulus: true },
             },
           },
         });

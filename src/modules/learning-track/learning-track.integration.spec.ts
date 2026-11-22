@@ -26,16 +26,11 @@ describeWithIsolatedDatabase('learning tracks on the database', () => {
     tracks = new LearningTrackService(prisma);
     skills = new SkillCmsService(prisma);
     code = (await tracks.create({ name: `QA lĩnh vực ${suffix}` })).code;
-    const category = await prisma.speakingCategory.findUniqueOrThrow({
-      where: { code: 'GENERAL' },
-    });
     await prisma.speakingPracticeSet.create({
       data: {
         id: setId,
         title: `QA track set ${suffix}`,
         description: '',
-        category: 'GENERAL',
-        categoryId: category.id,
         level: 'B1',
         scope: 'SKILL_PRACTICE',
         publicationStatus: QuizPublicationStatus.DRAFT,

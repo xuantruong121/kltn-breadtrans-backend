@@ -21,9 +21,6 @@ describe('SpeakingService set summaries carry their tracks', () => {
     audioUrl: null,
     isPremiumContent: false,
     difficulty: 'BEGINNER',
-    category: 'GENERAL',
-    categoryId: null,
-    categoryTaxonomy: null,
     stimulus: null,
     order: id,
     practiceSetId: (practiceSet as { id?: string } | null)?.id ?? null,
@@ -33,10 +30,8 @@ describe('SpeakingService set summaries carry their tracks', () => {
     id: 'practice-question-response-b1-b2',
     title: 'Phản hồi câu hỏi',
     description: 'Học tập và công việc',
-    category: 'GENERAL',
     level: 'B1-B2',
     scope: 'SKILL_PRACTICE',
-    categoryTaxonomy: { code: 'GENERAL', name: 'Chung' },
     tracks: [
       track('HOSPITALITY_TOURISM', 'Nhà hàng – Khách sạn – Du lịch', 40, false),
       track('STUDENT_ACADEMIC', 'Sinh viên – Học thuật', 50),
@@ -59,11 +54,7 @@ describe('SpeakingService set summaries carry their tracks', () => {
   );
 
   it('lists active tracks only, in the admin order', async () => {
-    const [first, second] = await service.findAllExercises(
-      undefined,
-      7,
-      Role.STUDENT,
-    );
+    const [first, second] = await service.findAllExercises(7, Role.STUDENT);
     const expected = [
       {
         code: 'OFFICE_BUSINESS',
@@ -78,12 +69,23 @@ describe('SpeakingService set summaries carry their tracks', () => {
     ];
     expect(first.practiceSet.tracks).toEqual(expected);
     expect(second.practiceSet.tracks).toEqual(expected);
-    // The old label stays for now.
-    expect(first.practiceSet.categoryLabel).toBe('Chung');
+  });
+
+  it('names no category on an exercise or its set (columns dropped 2026-11-22)', async () => {
+    const [first] = await service.findAllExercises(7, Role.STUDENT);
+    for (const field of ['category', 'categoryLabel']) {
+      expect(first).not.toHaveProperty(field);
+      expect(first.practiceSet).not.toHaveProperty(field);
+    }
+    expect(first.practiceSet).toMatchObject({
+      key: 'practice-question-response-b1-b2',
+      title: 'Phản hồi câu hỏi',
+      exerciseIds: [1, 2],
+    });
   });
 
   it('reads the tags from the set itself', async () => {
-    await service.findAllExercises(undefined, 7, Role.STUDENT);
+    await service.findAllExercises(7, Role.STUDENT);
     const include = prisma.speakingExercise.findMany.mock.calls[0][0].include;
     expect(include.practiceSet.include.tracks).toEqual({
       select: {

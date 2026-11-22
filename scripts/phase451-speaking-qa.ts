@@ -63,7 +63,6 @@ async function main() {
     {
       title: `${prefix}-draft`,
       description: 'Draft fixture',
-      category: 'DAILY_LIFE',
       level: 'INTERMEDIATE',
     },
     token,
@@ -72,9 +71,8 @@ async function main() {
     `/admin/skill-content/speaking/${draft.id}/exercises`,
     'POST',
     {
-      title: 'Full category persistence',
+      title: 'Child override persistence',
       targetText: 'Please introduce yourself.',
-      category: 'BUSINESS',
       difficulty: 'INTERMEDIATE',
     },
     token,
@@ -85,12 +83,11 @@ async function main() {
     {
       title: 'Updated exercise',
       targetText: 'Please introduce yourself in a formal setting.',
-      category: 'ACADEMIC',
       difficulty: 'ADVANCED',
     },
     token,
   );
-  if (updated.category !== 'ACADEMIC' || updated.difficulty !== 'ADVANCED')
+  if (updated.difficulty !== 'ADVANCED')
     throw new Error('Child override did not persist');
 
   await request(
@@ -114,10 +111,7 @@ async function main() {
   const persisted = reloaded.exercises.find(
     (item: any) => item.id === exercise.id,
   );
-  if (
-    persisted?.category !== 'ACADEMIC' ||
-    persisted?.difficulty !== 'ADVANCED'
-  )
+  if (persisted?.difficulty !== 'ADVANCED')
     throw new Error('Reload lost child override');
 
   const list = await request<any[]>(

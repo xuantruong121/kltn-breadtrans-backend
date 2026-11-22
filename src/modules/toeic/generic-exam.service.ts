@@ -1108,22 +1108,12 @@ export class GenericExamService {
       }
 
       if (variantCode === 'TOEIC_SW' || variantCode === 'TOEIC_4_SKILLS') {
-        const category = await tx.speakingCategory.findFirst({
-          where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
-        });
-        if (!category)
-          throw new ConflictException(
-            'Chưa có taxonomy Speaking để tạo nguồn nội bộ',
-          );
         const speaking = await tx.speakingPracticeSet.create({
           data: {
             id: `exam-${exam.id}-speaking`,
             title: `${title} — Speaking`,
             description:
               'Nguồn Speaking nội bộ của đề thi; chưa có câu hỏi production.',
-            category: category.code,
-            categoryId: category.id,
             level: 'B1-C1',
             scope: SpeakingPracticeScope.EXAM_INTERNAL,
             publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1639,8 +1629,6 @@ export class GenericExamService {
                 id: `exam-${newExam.id}-speaking`,
                 title: `${source.title} — Bản mới`,
                 description: source.description,
-                category: source.category,
-                categoryId: source.categoryId,
                 level: source.level,
                 scope: source.scope,
                 publicationStatus: QuizPublicationStatus.DRAFT,
@@ -1655,9 +1643,7 @@ export class GenericExamService {
                   audioUrl: exercise.audioUrl,
                   isPremiumContent: exercise.isPremiumContent,
                   difficulty: exercise.difficulty,
-                  category: exercise.category,
                   taskType: exercise.taskType,
-                  categoryId: exercise.categoryId,
                   practiceSetId: newSpeaking.id,
                   order: exercise.order,
                   stimulusId: exercise.stimulusId,

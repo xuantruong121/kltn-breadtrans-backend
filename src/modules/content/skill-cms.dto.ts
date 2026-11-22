@@ -121,7 +121,7 @@ export class SkillContentDto {
 
   // Speaking set fields. Kept explicit so the admin UI never sends arbitrary JSON.
   // No category: Phân loại folded into Lĩnh vực (2026-11-21), set with PUT
-  // :domain/:id/tracks. A new set gets the GENERAL category silently.
+  // :domain/:id/tracks. Its table and columns were dropped (2026-11-22).
 
   @IsOptional()
   @IsString()

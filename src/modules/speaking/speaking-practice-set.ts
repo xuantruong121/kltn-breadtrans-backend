@@ -5,83 +5,31 @@ export interface SpeakingPracticeSetDefinition {
 }
 
 export interface SpeakingPracticeSetSource {
+  id: number;
   title: string;
-  category: string;
+  practiceSet?: { id: string; title: string; description: string } | null;
 }
 
 /**
- * The catalog grouping used by both the Speaking API and cross-skill progress.
- * Keep this based on structured title/category conventions until a dedicated
- * practice-set column is introduced by a separate content migration.
+ * The catalog grouping used by both the Speaking API and cross-skill progress:
+ * the practice set the exercise belongs to (practiceSetId). The old grouping
+ * by title and legacy category string was the stopgap until that column came;
+ * it went with the category columns (2026-11-22). Every write path puts an
+ * exercise in a set, so one without a set (an old row, or a set removed
+ * outside the CMS) stands alone under its own title.
  */
 export function resolveSpeakingPracticeSet(
-  item: SpeakingPracticeSetSource,
+  exercise: SpeakingPracticeSetSource,
 ): SpeakingPracticeSetDefinition {
-  const title = item.title.toLowerCase();
-  if (title.startsWith('read aloud')) {
-    return item.category.toUpperCase() === 'TOEIC'
-      ? {
-          key: 'read-aloud-toeic',
-          title: 'Đọc thành tiếng — Ngữ cảnh TOEIC',
-          description:
-            'Luyện đọc các thông báo và tình huống thường gặp trong môi trường công việc.',
-        }
-      : {
-          key: 'read-aloud-general',
-          title: 'Đọc thành tiếng — Giao tiếp hằng ngày',
-          description:
-            'Luyện đọc các câu tiếng Anh đời sống với nhịp điệu và phát âm rõ ràng.',
-        };
-  }
-  if (title.startsWith('pronunciation')) {
+  if (exercise.practiceSet)
     return {
-      key: 'pronunciation-foundations',
-      title: 'Nền tảng phát âm',
-      description:
-        'Củng cố âm cuối, trọng âm, nối âm và cách đọc số liệu trong câu thực tế.',
+      key: exercise.practiceSet.id,
+      title: exercise.practiceSet.title,
+      description: exercise.practiceSet.description,
     };
-  }
-  if (title.startsWith('question response')) {
-    return item.category.toUpperCase() === 'BUSINESS'
-      ? {
-          key: 'question-response-business',
-          title: 'Phản hồi câu hỏi — Công việc',
-          description:
-            'Luyện trả lời câu hỏi trong các tình huống họp, dịch vụ và giao tiếp công sở.',
-        }
-      : {
-          key: 'question-response-general',
-          title: 'Phản hồi câu hỏi — Đời sống',
-          description:
-            'Luyện phản xạ trả lời các câu hỏi quen thuộc bằng câu nói tự nhiên.',
-        };
-  }
-  if (title.startsWith('opinion')) {
-    return item.category.toUpperCase() === 'BUSINESS'
-      ? {
-          key: 'opinion-business',
-          title: 'Trình bày quan điểm — Công việc',
-          description:
-            'Trình bày ý kiến có lý do và ví dụ trong các chủ đề nghề nghiệp.',
-        }
-      : {
-          key: 'opinion-general',
-          title: 'Trình bày quan điểm — Hằng ngày',
-          description:
-            'Luyện diễn đạt quan điểm cá nhân mạch lạc, tự nhiên và có dẫn chứng.',
-        };
-  }
-  if (title.startsWith('toeic speaking')) {
-    return {
-      key: 'toeic-speaking-practice',
-      title: 'Luyện nhiệm vụ TOEIC Speaking',
-      description:
-        'Luyện theo nhóm nhiệm vụ đọc thành tiếng, mô tả và phản hồi trong TOEIC Speaking.',
-    };
-  }
   return {
-    key: `custom-${item.category.toLowerCase()}`,
-    title: `Luyện nói — ${item.category}`,
-    description: 'Một bộ câu luyện nói theo chủ đề.',
+    key: `exercise-${exercise.id}`,
+    title: exercise.title,
+    description: 'Bài luyện nói theo câu.',
   };
 }

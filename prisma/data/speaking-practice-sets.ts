@@ -16,7 +16,6 @@ export const SETS = [
     title: 'Đọc thành tiếng — Cơ bản',
     description:
       'Đọc to câu thông báo và tin nhắn đời thường với nhịp điệu rõ ràng.',
-    category: 'GENERAL',
     level: 'A1-A2',
     taskType: 'READ_ALOUD',
     tracks: ['GENERAL'],
@@ -27,7 +26,6 @@ export const SETS = [
     title: 'Đọc thành tiếng — Ngữ cảnh công việc',
     description:
       'Đọc thông báo công sở và dịch vụ có câu ghép, số liệu và từ chuyên ngành.',
-    category: 'BUSINESS',
     level: 'B1-B2',
     taskType: 'READ_ALOUD',
     tracks: ['OFFICE_BUSINESS'],
@@ -38,7 +36,6 @@ export const SETS = [
     title: 'Nền tảng phát âm — Trung cấp',
     description:
       'Âm cuối, đuôi -ed, trọng âm, số liệu và nối âm trong câu công việc.',
-    category: 'GENERAL',
     level: 'B1',
     taskType: 'PRONUNCIATION_DRILL',
     tracks: ['OFFICE_BUSINESS'],
@@ -49,7 +46,6 @@ export const SETS = [
     title: 'Mô tả tranh — Trung cấp',
     description:
       'Mô tả người, hành động và bối cảnh trong ảnh bằng câu hoàn chỉnh.',
-    category: 'TOEIC',
     level: 'B1',
     taskType: 'DESCRIBE_PICTURE',
     tracks: ['GENERAL'],
@@ -60,7 +56,6 @@ export const SETS = [
     title: 'Trả lời dựa trên thông tin — Trung cấp',
     description:
       'Đọc lịch, bảng giờ hoặc thông báo rồi trả lời câu hỏi bằng thông tin chính xác.',
-    category: 'TOEIC',
     level: 'B1-B2',
     taskType: 'RESPOND_USING_INFORMATION',
     tracks: ['OFFICE_BUSINESS'],
@@ -71,7 +66,6 @@ export const SETS = [
     title: 'Phản hồi câu hỏi — Đời sống (Cơ bản)',
     description:
       'Trả lời câu hỏi quen thuộc về sinh hoạt hằng ngày bằng câu ngắn, rõ ý.',
-    category: 'DAILY_LIFE',
     level: 'A2',
     taskType: 'RESPOND_TO_QUESTION',
     tracks: ['GENERAL'],
@@ -82,7 +76,6 @@ export const SETS = [
     title: 'Phản hồi câu hỏi — Học tập & Công việc',
     description:
       'Trả lời câu hỏi về học tập và công việc, có giải thích và ví dụ.',
-    category: 'GENERAL',
     level: 'B1-B2',
     taskType: 'RESPOND_TO_QUESTION',
     tracks: ['STUDENT_ACADEMIC', 'OFFICE_BUSINESS'],
@@ -93,7 +86,6 @@ export const SETS = [
     title: 'Trình bày quan điểm — Trung cấp',
     description:
       'Nêu ý kiến có lý do và ví dụ về chủ đề đời sống và công việc.',
-    category: 'GENERAL',
     level: 'B1-B2',
     taskType: 'EXPRESS_OPINION',
     tracks: ['GENERAL'],
@@ -104,7 +96,6 @@ export const SETS = [
     title: 'Trình bày quan điểm — Nâng cao',
     description:
       'Lập luận nhiều chiều, cân nhắc lợi hại và bảo vệ quan điểm về vấn đề xã hội, nghề nghiệp.',
-    category: 'ACADEMIC',
     level: 'C1',
     taskType: 'EXPRESS_OPINION',
     tracks: ['GENERAL'],
@@ -309,13 +300,6 @@ export const EXTRA = [
 /** Quiz whose title range overstated its demand (three A2 keyword sentences). */
 export const QUIZ_RETITLE: Record<number, [string, string]> = {
   3: ['Writing A2–B1 — Sentence Builder', 'Writing A2 — Sentence Builder'],
-};
-export const CATEGORY_IDS: Record<string, number> = {
-  GENERAL: 1,
-  TOEIC: 2,
-  BUSINESS: 3,
-  ACADEMIC: 4,
-  DAILY_LIFE: 5,
 };
 export const DIFFICULTY: Record<string, string> = {
   BASIC: 'BEGINNER',

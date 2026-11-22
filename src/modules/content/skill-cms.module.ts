@@ -5,14 +5,13 @@ import { SpeakingModule } from '../speaking/speaking.module';
 import { UploadModule } from '../upload/upload.module';
 import { SkillCmsController } from './skill-cms.controller';
 import { SkillCmsService } from './skill-cms.service';
-import { SpeakingCategoryService } from './speaking-category.service';
 
 @Module({
   imports: [PrismaModule, QuizModule, SpeakingModule, UploadModule],
-  // No SpeakingCategoryController: Phân loại folded into Lĩnh vực
-  // (2026-11-21). The service stays for the GENERAL lookup and old labels.
+  // No speaking category controller or service: Phân loại folded into Lĩnh
+  // vực (2026-11-21), and its table was dropped (2026-11-22).
   controllers: [SkillCmsController],
-  providers: [SkillCmsService, SpeakingCategoryService],
-  exports: [SkillCmsService, SpeakingCategoryService],
+  providers: [SkillCmsService],
+  exports: [SkillCmsService],
 })
 export class SkillCmsModule {}
