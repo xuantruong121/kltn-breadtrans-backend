@@ -23,8 +23,15 @@ export class CreateToeicAiExamDto {
   @IsIn(['TOEIC_LR', 'TOEIC_SW', 'TOEIC_4_SKILLS'])
   variantCode: 'TOEIC_LR' | 'TOEIC_SW' | 'TOEIC_4_SKILLS' = 'TOEIC_LR';
 
+  // Owner 2026-11-22: the AI drafts a whole exam only. It already works in
+  // checked batches of three groups, and a weak Part is redone in the draft
+  // (POST :id/ai/parts/:part/regenerate). 'PART' stays in the type for jobs
+  // stored before.
   @IsString()
-  @IsIn(['FULL_EXAM', 'PART'])
+  @IsIn(['FULL_EXAM'], {
+    message:
+      'AI chỉ soạn đề hoàn chỉnh; Part chưa tốt thì tạo lại ngay trong bản nháp.',
+  })
   mode: 'FULL_EXAM' | 'PART' = 'FULL_EXAM';
 
   @ValidateIf((value) => value.mode === 'PART')

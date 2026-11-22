@@ -161,6 +161,32 @@ export function templateTotalMinutes(template: ExamTemplate): number {
 }
 
 /**
+ * Owner 2026-11-22: a new exam is a full test. Learners practise by Part
+ * inside an L&R full test ("Chọn Part muốn luyện"), so no separate
+ * part-practice exam is made, by hand or by the AI.
+ */
+export const PART_PRACTICE_CLOSED =
+  'Đề mới luôn là Full Test: học viên luyện theo Part ngay trong đề Listening & Reading đầy đủ.';
+
+/**
+ * Why a draft's format cannot change to what was sent, or null. An exam may
+ * keep its format (the editor sends it on every save) or become a full test;
+ * an older part-practice exam therefore keeps working.
+ */
+export function examTypeChangeRefusal(
+  current: string | null | undefined,
+  requested: string | undefined,
+): string | null {
+  if (
+    requested === undefined ||
+    requested === current ||
+    requested === 'FULL_TEST'
+  )
+    return null;
+  return PART_PRACTICE_CLOSED;
+}
+
+/**
  * Length of the L&R paper an exam owns. A full test follows the ETS structure
  * (45 + 75 minutes, also the L&R section of the 4-skill exam) and ignores what
  * the form sends. Part practice exists for L&R only and keeps the requested
