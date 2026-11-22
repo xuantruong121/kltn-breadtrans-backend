@@ -49,6 +49,8 @@ import {
   firstImageByQuiz,
   quizListFacets,
   speakingSetFacets,
+  isTranscriptHolder,
+  storedWritingKind,
   taskTypesByQuiz,
   writingKindOf,
 } from './skill-cms-list';
@@ -97,6 +99,12 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
   reading: 'Reading',
   writing: 'Writing',
 };
+
+/** The publish check's line for a choice question, in the checklist's words. */
+const CHOICES_INCOMPLETE = 'chưa đủ phương án hoặc chưa chọn đáp án đúng';
+
+/** "Nghe chép" needs this many sentences to publish (the FE checklist agrees). */
+const DICTATION_MIN_SENTENCES = 20;
 
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
@@ -154,6 +162,25 @@ export class SkillCmsService {
         `Trình độ bộ luyện nói phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
       );
     }
+  }
+
+  /**
+   * The quiz's bilingualContent on a save. A Writing exercise keeps the kind
+   * the admin picked in it (writingKind), next to what it already holds;
+   * listening sends its own metadata object, reading its paragraphs.
+   */
+  private contentMetadata(
+    domain: Exclude<Domain, 'speaking'>,
+    dto: SkillContentDto,
+    previous?: unknown,
+  ): Prisma.InputJsonValue | undefined {
+    if (domain === 'writing' && dto.writingKind)
+      return asJson({
+        ...asRecord(previous),
+        ...asRecord(dto.bilingualContent),
+        writingKind: dto.writingKind,
+      });
+    return dto.bilingualContent ? asJson(dto.bilingualContent) : undefined;
   }
 
   private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
@@ -340,22 +367,38 @@ export class SkillCmsService {
         ? {
             writingKind: writingKindOf({
               type: quiz.type,
+              stored: storedWritingKind(quiz.bilingualContent),
               isTranslation:
                 !!translationTopic &&
                 quiz.practiceTopicId === translationTopic.id,
               taskTypes: taskTypes.get(quiz.id),
               hasImage: thumbnails.has(quiz.id),
+              questionCount: quiz._count?.questions,
             }),
           }
         : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
       return this.listPage(tagged, query, domain === 'writing');
+    // A hand-made dialogue keeps its turns in a DIALOGUE question; the card
+    // counts only the questions a learner answers, as for AI-made quizzes.
+    const holders = await this.prisma.question.groupBy({
+      by: ['quizId'],
+      where: {
+        quizId: { in: quizzes.map((quiz) => quiz.id) },
+        type: 'DIALOGUE',
+      },
+      _count: { _all: true },
+    });
+    const holderCounts = new Map(
+      holders.map((row) => [row.quizId, row._count._all]),
+    );
     // Comprehension and dictation play one clip per question: count them.
     const withAudio = await this.prisma.question.groupBy({
       by: ['quizId'],
       where: {
         quizId: { in: quizzes.map((quiz) => quiz.id) },
+        type: { not: 'DIALOGUE' },
         audioAssets: { some: { isActive: true } },
       },
       _count: { _all: true },
@@ -366,6 +409,11 @@ export class SkillCmsService {
     return this.listPage(
       tagged.map((quiz) => ({
         ...quiz,
+        _count: {
+          ...quiz._count,
+          questions:
+            (quiz._count?.questions ?? 0) - (holderCounts.get(quiz.id) ?? 0),
+        },
         questionsWithAudio: counts.get(quiz.id) ?? 0,
       })),
       query,
@@ -450,6 +498,8 @@ export class SkillCmsService {
         ? {
             writingKind: writingKindOf({
               type: quiz.type,
+              stored: storedWritingKind(quiz.bilingualContent),
+              questionCount: quiz.questions.length,
               isTranslation:
                 !!translationTopic &&
                 quiz.practiceTopicId === translationTopic.id,
@@ -613,9 +663,7 @@ export class SkillCmsService {
         title: titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
         description: dto.description?.trim(),
         theoryContent: dto.passage,
-        bilingualContent: dto.bilingualContent
-          ? asJson(dto.bilingualContent)
-          : undefined,
+        bilingualContent: this.contentMetadata(domain, dto),
         type: writingType,
         timeLimit: dto.timeLimit,
         isPremiumContent: dto.isPremiumContent ?? false,
@@ -681,9 +729,11 @@ export class SkillCmsService {
         title,
         description: dto.description?.trim(),
         theoryContent: dto.passage,
-        bilingualContent: dto.bilingualContent
-          ? asJson(dto.bilingualContent)
-          : undefined,
+        bilingualContent: this.contentMetadata(
+          domain,
+          dto,
+          quiz.bilingualContent,
+        ),
         timeLimit: dto.timeLimit,
         type,
         isPremiumContent: dto.isPremiumContent,
@@ -1509,18 +1559,34 @@ export class SkillCmsService {
       }>;
     };
     const errors: string[] = [];
+    // A hand-made dialogue keeps its turns in a DIALOGUE question: it is not
+    // a question a learner answers, so it is not counted or numbered.
+    const answered = quiz.questions.filter(
+      (question) => domain !== 'listening' || !isTranscriptHolder(question),
+    );
+    const labels = new Map<(typeof quiz.questions)[number], string>();
+    for (const question of quiz.questions)
+      labels.set(
+        question,
+        answered.includes(question)
+          ? `Câu ${answered.indexOf(question) + 1}`
+          : 'Lời thoại',
+      );
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
-    if (!quiz.questions.length) errors.push('Cần ít nhất một câu hỏi');
+    if (!answered.length) errors.push('Cần ít nhất một câu hỏi');
     if (!parseCefrRange(quiz.title) && !(await this.isExamTask(quiz.id)))
       errors.push('Chưa có trình độ: chọn trình độ rồi lưu lại');
     if (
       domain === 'listening' &&
-      quiz.questions.length &&
-      quiz.questions.every((q) => q.type === 'DICTATION') &&
-      quiz.questions.length < 20
+      answered.length &&
+      answered.every((q) => q.type === 'DICTATION') &&
+      answered.length < DICTATION_MIN_SENTENCES
     )
-      errors.push('Dictation cần ít nhất 20 câu');
-    for (const [index, question] of quiz.questions.entries()) {
+      errors.push(
+        `Bài nghe chép cần ít nhất ${DICTATION_MIN_SENTENCES} câu (đang có ${answered.length})`,
+      );
+    for (const question of quiz.questions) {
+      const label = labels.get(question);
       const content = asRecord(question.content);
       if (domain === 'reading') {
         const options = content.options;
@@ -1531,22 +1597,22 @@ export class SkillCmsService {
           correctIndex < 0 ||
           correctIndex >= options.length
         )
-          errors.push(`Câu ${index + 1}: options/correctIndex không hợp lệ`);
+          errors.push(`${label}: ${CHOICES_INCOMPLETE}`);
       }
       if (
         domain === 'writing' &&
         (typeof (content.prompt ?? content.text) !== 'string' ||
           !String(content.prompt ?? content.text).trim())
       )
-        errors.push(`Câu ${index + 1}: thiếu đề bài Writing`);
+        errors.push(`${label}: thiếu đề bài`);
       if (domain === 'writing' && question.type !== 'WRITING')
-        errors.push(`Câu ${index + 1}: loại câu phải là WRITING`);
+        errors.push(`${label}: không phải câu của bài viết`);
       if (
         domain === 'writing' &&
         quiz.type === QuizType.WRITING_EMAIL &&
         (typeof content.taskType !== 'string' || !content.taskType.trim())
       )
-        errors.push(`Câu ${index + 1}: Writing Email cần taskType`);
+        errors.push(`${label}: chưa chọn dạng đề`);
       if (
         domain === 'writing' &&
         quiz.type === QuizType.WRITING_PICTURE &&
@@ -1556,14 +1622,14 @@ export class SkillCmsService {
         ) &&
         !isAcceptedContentImageReference(content.imageUrl)
       )
-        errors.push(`Câu ${index + 1}: Picture task cần imageUrl`);
+        errors.push(`${label}: câu theo tranh chưa có ảnh`);
       if (
         domain === 'writing' &&
         typeof content.taskType === 'string' &&
         content.taskType.trim().toUpperCase() === SENTENCE_TRANSLATION
       )
         for (const issue of translationTaskIssues(content))
-          errors.push(`Câu ${index + 1}: ${issue}`);
+          errors.push(`${label}: ${issue}`);
       if (domain === 'writing' && content.wordRange !== undefined) {
         const range = content.wordRange;
         if (
@@ -1572,7 +1638,7 @@ export class SkillCmsService {
           !range.every((value) => Number.isInteger(value) && value > 0) ||
           range[0] > range[1]
         )
-          errors.push(`Câu ${index + 1}: wordRange không hợp lệ`);
+          errors.push(`${label}: số từ tối thiểu, tối đa không hợp lệ`);
       }
       if (
         domain === 'listening' &&
@@ -1584,7 +1650,7 @@ export class SkillCmsService {
           content.prompt,
         ].some((value) => typeof value === 'string' && value.trim())
       )
-        errors.push(`Câu ${index + 1}: Dictation cần target sentence`);
+        errors.push(`${label}: chưa có câu cần chép`);
       if (
         domain === 'listening' &&
         question.type === 'MULTIPLE_CHOICE' &&
@@ -1599,9 +1665,7 @@ export class SkillCmsService {
           );
         })()
       )
-        errors.push(
-          `Câu ${index + 1}: Listening options/correctIndex không hợp lệ`,
-        );
+        errors.push(`${label}: ${CHOICES_INCOMPLETE}`);
       if (
         domain === 'listening' &&
         question.type === 'DIALOGUE' &&
@@ -1613,9 +1677,7 @@ export class SkillCmsService {
             ),
           ).size < 2)
       )
-        errors.push(
-          `Câu ${index + 1}: Dialogue cần ít nhất 2 lượt lời hợp lệ của 2 người nói`,
-        );
+        errors.push(`${label}: cần ít nhất 2 lượt lời của 2 người nói`);
     }
     // A learner hears either the question's own clip or, for questions that
     // share the conversation, the quiz's published recording.
@@ -1625,7 +1687,7 @@ export class SkillCmsService {
             quiz.id,
           )
         : null;
-      for (const [index, question] of quiz.questions.entries()) {
+      for (const question of quiz.questions) {
         const content = asRecord(question.content);
         const ownClip = (question.audioAssets ?? []).some(
           (asset) => asset.isActive,
@@ -1636,7 +1698,7 @@ export class SkillCmsService {
             (Array.isArray(content.transcriptSegments) &&
               content.transcriptSegments.length > 0));
         if (!ownClip && !sharesRecording)
-          errors.push(`Câu ${index + 1}: chưa có audio cho học viên`);
+          errors.push(`${labels.get(question)}: chưa có audio cho học viên`);
       }
     }
     return { valid: errors.length === 0, errors, domain, quizId: quiz.id };

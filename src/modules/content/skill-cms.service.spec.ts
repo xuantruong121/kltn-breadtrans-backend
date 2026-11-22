@@ -61,7 +61,9 @@ describe('SkillCmsService', () => {
     const service = new SkillCmsService(prisma as any);
     const result = await service.validate('reading', '12', admin);
     expect(result.valid).toBe(false);
-    expect(result.errors[0]).toContain('options/correctIndex');
+    expect(result.errors[0]).toBe(
+      'Câu 1: chưa đủ phương án hoặc chưa chọn đáp án đúng',
+    );
   });
 
   describe('editing a Listening question', () => {
@@ -177,6 +179,89 @@ describe('SkillCmsService', () => {
         { id: 3, version: 1 },
       );
       expect(result.errors).toEqual(['Câu 2: chưa có audio cho học viên']);
+    });
+
+    // QA 2026-11-22: a hand-made dialogue keeps its turns in a DIALOGUE
+    // question; it is neither counted nor numbered as a question.
+    it('does not count the transcript holder as a question', async () => {
+      const holder = {
+        id: 1,
+        type: 'DIALOGUE',
+        content: { transcriptSegments: turns },
+        audioAssets: [],
+        order: 0,
+      };
+      const onlyTurns = await run([holder], { id: 3, version: 1 });
+      expect(onlyTurns.errors).toEqual(['Cần ít nhất một câu hỏi']);
+      const withQuestion = await run(
+        [holder, mcq(2, { transcriptSegments: turns, correctIndex: 9 })],
+        { id: 3, version: 1 },
+      );
+      expect(withQuestion.errors).toEqual([
+        'Câu 1: chưa đủ phương án hoặc chưa chọn đáp án đúng',
+      ]);
+      const badTurns = await run(
+        [
+          { ...holder, content: { transcriptSegments: [turns[0]] } },
+          mcq(2, { transcriptSegments: turns }),
+        ],
+        { id: 3, version: 1 },
+      );
+      expect(badTurns.errors).toContain(
+        'Lời thoại: cần ít nhất 2 lượt lời của 2 người nói',
+      );
+    });
+
+    it('lists a hand-made dialogue with its answered questions only', async () => {
+      const prisma = {
+        quiz: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 5,
+              title: 'Hội thoại B1 — At the clinic',
+              type: QuizType.LISTENING_PRACTICE,
+              bilingualContent: { mode: 'DIALOGUE' },
+              _count: { questions: 4, submissions: 0 },
+              listeningAudioArtifacts: [],
+            },
+          ]),
+        },
+        question: {
+          findMany: jest.fn().mockResolvedValue([]),
+          groupBy: jest.fn(({ where }: { where: { type?: unknown } }) =>
+            Promise.resolve(
+              where.type === 'DIALOGUE'
+                ? [{ quizId: 5, _count: { _all: 1 } }]
+                : [],
+            ),
+          ),
+        },
+        contentTrackTag: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const page: any = await new SkillCmsService(prisma as any).list(
+        'listening',
+        admin,
+        { page: '1' },
+      );
+      expect(page.items[0]._count.questions).toBe(3);
+    });
+
+    it('asks a dictation quiz for 20 sentences, in Vietnamese', async () => {
+      const sentence = (id: number) => ({
+        id,
+        type: 'DICTATION',
+        content: { correctAnswer: 'The bus leaves at nine.' },
+        audioAssets: [{ isActive: true }],
+        order: id,
+      });
+      const result = await run(
+        [sentence(1), sentence(2), { ...sentence(3), content: {} }],
+        null,
+      );
+      expect(result.errors).toEqual([
+        'Bài nghe chép cần ít nhất 20 câu (đang có 3)',
+        'Câu 3: chưa có câu cần chép',
+      ]);
     });
   });
 

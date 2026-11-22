@@ -39,25 +39,56 @@ export const WRITING_KINDS: WritingKind[] = [
 
 const PICTURE_TASK_TYPES = ['PICTURE_SENTENCE', 'DESCRIBE_PICTURE'];
 
+/** The kind the admin picked, as saved in bilingualContent.writingKind. */
+export function storedWritingKind(bilingualContent: unknown) {
+  const kind = (bilingualContent as { writingKind?: unknown } | null)
+    ?.writingKind;
+  return WRITING_KINDS.includes(kind as WritingKind)
+    ? (kind as WritingKind)
+    : undefined;
+}
+
 /**
  * "Dịch câu" is stored on WRITING_PICTURE under its own topic, so the quiz
  * type alone cannot tell it from a picture exercise: the filter "Viết theo
  * tranh" used to list 8 translation exercises among 11.
+ *
+ * The kind saved with the exercise comes first (QA 2026-11-22: an empty
+ * "Viết câu" reopened as "Viết theo tranh"), when it fits the quiz type.
+ * Without one, the kind is read from the tasks; an exercise with no task yet
+ * is a picture one, as the form treats it.
  */
 export function writingKindOf(row: {
   type?: string | null;
+  stored?: WritingKind;
   isTranslation?: boolean;
   taskTypes?: string[];
   hasImage?: boolean;
+  /** How many tasks the exercise has; 0 reads as a picture exercise. */
+  questionCount?: number;
 }): WritingKind {
+  const email = row.type === 'WRITING_EMAIL';
+  if (row.stored && (row.stored === 'EMAIL') === email) return row.stored;
   const taskTypes = (row.taskTypes ?? []).map((t) => t.toUpperCase());
   if (row.isTranslation || taskTypes.includes('SENTENCE_TRANSLATION'))
     return 'TRANSLATION';
-  if (row.type === 'WRITING_EMAIL') return 'EMAIL';
-  if (row.hasImage || taskTypes.some((t) => PICTURE_TASK_TYPES.includes(t)))
+  if (email) return 'EMAIL';
+  if (
+    row.hasImage ||
+    row.questionCount === 0 ||
+    taskTypes.some((t) => PICTURE_TASK_TYPES.includes(t))
+  )
     return 'PICTURE';
   return 'SENTENCE';
 }
+
+/**
+ * A hand-made "Hội thoại" quiz keeps its turns in one DIALOGUE question, a
+ * transcript holder, not a question a learner answers. AI-made dialogue
+ * quizzes have none; counts leave it out so both read the same.
+ */
+export const isTranscriptHolder = (question: { type?: string | null }) =>
+  question.type === 'DIALOGUE';
 
 /** Each quiz's task types, from its question rows. */
 export function taskTypesByQuiz(
