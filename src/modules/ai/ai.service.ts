@@ -44,6 +44,7 @@ import type {
   ContextualSpeakingExercisesSuggestion,
   ContextualSpeakingFullDraftSuggestion,
   ContextualListeningFullDraftSuggestion,
+  ListeningFullDraftMode,
   ContextualReadingFullDraftSuggestion,
   ContextualDictationSuggestion,
   ContextualVocabDecksSuggestion,
@@ -766,7 +767,7 @@ export class AiService {
     sourceText?: string;
     topic: string;
     level?: string;
-    mode: 'DIALOGUE' | 'DICTATION';
+    mode: ListeningFullDraftMode;
     count: number;
   }): Promise<ContextualListeningFullDraftSuggestion> {
     await this.checkAndIncrementDailyQuota();

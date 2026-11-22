@@ -372,7 +372,7 @@ export interface IAIEvaluator {
     sourceText?: string;
     topic: string;
     level?: string;
-    mode: 'DIALOGUE' | 'DICTATION';
+    mode: ListeningFullDraftMode;
     count: number;
   }): Promise<ContextualListeningFullDraftSuggestion>;
 
@@ -563,6 +563,11 @@ export interface ContextualListeningQuestionCandidate {
   explanation: string;
   /** The same explanation in English (owner 2026-10-30: bilingual). */
   explanationEn?: string;
+  /**
+   * "Nghe hiểu (câu ngắn)" full draft only: the sentence the learner hears
+   * for this question, saved as the question's own audioText.
+   */
+  audioText?: string;
 }
 
 export interface ContextualListeningQuestionsSuggestion {
@@ -635,11 +640,23 @@ export interface ToeicSpeakingWritingDraft {
   writing: ToeicWritingDraftTask[];
 }
 
+/**
+ * The listening forms a full draft can write. COMPREHENSION ("Nghe hiểu (câu
+ * ngắn)") has no shared transcript: each question carries its own audioText.
+ */
+export const LISTENING_FULL_DRAFT_MODES = [
+  'DIALOGUE',
+  'DICTATION',
+  'COMPREHENSION',
+] as const;
+export type ListeningFullDraftMode =
+  (typeof LISTENING_FULL_DRAFT_MODES)[number];
+
 export interface ContextualListeningFullDraftSuggestion {
   title: string;
   description: string;
   level?: string;
-  mode: 'DIALOGUE' | 'DICTATION';
+  mode: ListeningFullDraftMode;
   text?: string;
   turns?: ContextualListeningTurn[];
   questions: ContextualListeningQuestionCandidate[];

@@ -18,6 +18,10 @@ import {
   SPEAKING_TASK_TYPES,
 } from '../../speaking/speaking-contract';
 import type { SpeakingTaskType } from '../../speaking/speaking-contract';
+import {
+  LISTENING_FULL_DRAFT_MODES,
+  type ListeningFullDraftMode,
+} from '../strategies/ai-evaluator.interface';
 
 const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
 const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
@@ -370,8 +374,9 @@ export class SuggestListeningFullDraftDto {
   @IsIn(CONTENT_LEVELS, { message: 'Cấp độ phải thuộc A1, A2, B1, B2 hoặc C1' })
   level?: string;
 
-  @IsIn(['DIALOGUE', 'DICTATION'])
-  mode: 'DIALOGUE' | 'DICTATION';
+  /** COMPREHENSION drafts short items, each with its own sentence to hear. */
+  @IsIn([...LISTENING_FULL_DRAFT_MODES])
+  mode: ListeningFullDraftMode;
 
   @IsOptional()
   @IsInt()

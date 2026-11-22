@@ -18,6 +18,7 @@ import {
   SuggestWritingTaskDto,
   SuggestSpeakingPracticeSetDto,
   SuggestSpeakingExercisesDto,
+  SuggestListeningFullDraftDto,
 } from './dto/contextual-ai.dto';
 
 describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () => {
@@ -179,6 +180,57 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       expect(speakingExerciseErrors.some((e) => e.property === 'count')).toBe(
         true,
       );
+    });
+
+    it('lets a Listening full draft be written in all three forms, and no other', async () => {
+      for (const mode of ['DIALOGUE', 'DICTATION', 'COMPREHENSION']) {
+        const errors = await validate(
+          plainToInstance(SuggestListeningFullDraftDto, {
+            topic: 'Getting around town',
+            level: 'A2',
+            mode,
+            count: 10,
+          }),
+        );
+        expect(errors).toEqual([]);
+      }
+      const errors = await validate(
+        plainToInstance(SuggestListeningFullDraftDto, {
+          topic: 'Getting around town',
+          mode: 'VIDEO',
+          count: 11,
+        }),
+      );
+      expect(errors.some((e) => e.property === 'mode')).toBe(true);
+      expect(errors.some((e) => e.property === 'count')).toBe(true);
+    });
+
+    it('passes a COMPREHENSION full draft request through unchanged', async () => {
+      const draft = {
+        title: 'Getting around town',
+        description: 'Short sentences.',
+        level: 'A2',
+        mode: 'COMPREHENSION',
+        questions: [],
+      };
+      mockAiService.suggestListeningFullDraft = jest
+        .fn()
+        .mockResolvedValue(draft);
+      await expect(
+        controller.suggestListeningFullDraft({
+          topic: 'Getting around town',
+          level: 'A2',
+          mode: 'COMPREHENSION',
+          count: 3,
+        }),
+      ).resolves.toBe(draft);
+      expect(mockAiService.suggestListeningFullDraft).toHaveBeenCalledWith({
+        topic: 'Getting around town',
+        level: 'A2',
+        mode: 'COMPREHENSION',
+        count: 3,
+        sourceText: undefined,
+      });
     });
   });
 

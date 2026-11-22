@@ -397,7 +397,19 @@ export class AdminContextualAiController {
   }
 
   @Post('listening/ai/full-draft')
-  @ApiOperation({ summary: 'Soạn bài Listening gồm nội dung và câu hỏi nháp' })
+  @ApiOperation({
+    summary:
+      'Soạn bài Listening gồm nội dung và câu hỏi nháp; mode DIALOGUE, DICTATION hoặc COMPREHENSION',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      '{ title, description, level, mode, text? (DICTATION), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu) } }',
+  })
+  @ApiResponse({
+    status: 502,
+    description: 'AI không soạn được bản nháp hợp lệ',
+  })
   async suggestListeningFullDraft(@Body() dto: SuggestListeningFullDraftDto) {
     try {
       return await this.aiService.suggestListeningFullDraft({
