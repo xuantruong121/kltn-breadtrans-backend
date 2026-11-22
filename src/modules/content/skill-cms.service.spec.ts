@@ -246,6 +246,96 @@ describe('SkillCmsService', () => {
       expect(page.items[0]._count.questions).toBe(3);
     });
 
+    // Review 2026-11-22: a hand-made dialogue keeps its clip on the holder;
+    // the card read "Chưa có audio" with the audio there.
+    describe('the audio of a hand-made dialogue', () => {
+      const listWith = async (
+        artifacts: unknown[],
+        activeClips: Array<{ type: string; count: number }>,
+      ) => {
+        const prisma = {
+          quiz: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 5,
+                title: 'Hội thoại B1 — At the clinic',
+                type: QuizType.LISTENING_PRACTICE,
+                bilingualContent: { mode: 'DIALOGUE' },
+                _count: { questions: 4, submissions: 0 },
+                listeningAudioArtifacts: artifacts,
+              },
+            ]),
+          },
+          question: {
+            findMany: jest.fn().mockResolvedValue([]),
+            groupBy: jest.fn(
+              ({ by, where }: { by: string[]; where: { type?: unknown } }) =>
+                Promise.resolve(
+                  by.includes('type')
+                    ? activeClips.map((clip) => ({
+                        quizId: 5,
+                        type: clip.type,
+                        _count: { _all: clip.count },
+                      }))
+                    : where.type === 'DIALOGUE'
+                      ? [{ quizId: 5, _count: { _all: 1 } }]
+                      : [],
+                ),
+            ),
+          },
+          contentTrackTag: { findMany: jest.fn().mockResolvedValue([]) },
+        };
+        const service = new SkillCmsService(prisma as any);
+        const all: any = await service.list('listening', admin, { page: '1' });
+        const ready: any = await service.list('listening', admin, {
+          page: '1',
+          audio: 'ok',
+        });
+        return {
+          row: all.items[0],
+          readyIds: ready.items.map((r: any) => r.id),
+        };
+      };
+
+      it('reads as ready when the holder has an active clip', async () => {
+        const { row, readyIds } = await listWith(
+          [],
+          [{ type: 'DIALOGUE', count: 1 }],
+        );
+        expect(row).toMatchObject({
+          dialogueAudio: true,
+          questionsWithAudio: 0,
+          _count: { questions: 3 },
+        });
+        expect(readyIds).toEqual([5]);
+      });
+
+      it('reads as no audio when the holder has none', async () => {
+        const { row, readyIds } = await listWith([], []);
+        expect(row.dialogueAudio).toBe(false);
+        expect(readyIds).toEqual([]);
+      });
+
+      it('follows the shared recording when there is one', async () => {
+        const { readyIds } = await listWith(
+          [{ version: 1, status: 'PREVIEW_READY' }],
+          [{ type: 'DIALOGUE', count: 1 }],
+        );
+        expect(readyIds).toEqual([]);
+      });
+
+      it('counts question clips without the holder', async () => {
+        const { row } = await listWith(
+          [],
+          [
+            { type: 'DIALOGUE', count: 1 },
+            { type: 'MULTIPLE_CHOICE', count: 2 },
+          ],
+        );
+        expect(row.questionsWithAudio).toBe(2);
+      });
+    });
+
     it('asks a dictation quiz for 20 sentences, in Vietnamese', async () => {
       const sentence = (id: number) => ({
         id,

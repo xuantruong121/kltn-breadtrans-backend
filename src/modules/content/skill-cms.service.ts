@@ -393,19 +393,24 @@ export class SkillCmsService {
     const holderCounts = new Map(
       holders.map((row) => [row.quizId, row._count._all]),
     );
-    // Comprehension and dictation play one clip per question: count them.
+    // Questions with an active clip, by type. Comprehension and dictation
+    // play one clip per question: those are counted. A hand-made dialogue's
+    // holder may carry the conversation's clip instead of a shared recording.
     const withAudio = await this.prisma.question.groupBy({
-      by: ['quizId'],
+      by: ['quizId', 'type'],
       where: {
         quizId: { in: quizzes.map((quiz) => quiz.id) },
-        type: { not: 'DIALOGUE' },
         audioAssets: { some: { isActive: true } },
       },
       _count: { _all: true },
     });
-    const counts = new Map(
-      withAudio.map((row) => [row.quizId, row._count._all]),
-    );
+    const counts = new Map<number, number>();
+    const dialogueAudio = new Set<number>();
+    for (const row of withAudio) {
+      if (isTranscriptHolder(row)) dialogueAudio.add(row.quizId);
+      else
+        counts.set(row.quizId, (counts.get(row.quizId) ?? 0) + row._count._all);
+    }
     return this.listPage(
       tagged.map((quiz) => ({
         ...quiz,
@@ -415,6 +420,7 @@ export class SkillCmsService {
             (quiz._count?.questions ?? 0) - (holderCounts.get(quiz.id) ?? 0),
         },
         questionsWithAudio: counts.get(quiz.id) ?? 0,
+        dialogueAudio: dialogueAudio.has(quiz.id),
       })),
       query,
     );

@@ -61,6 +61,36 @@ describe('a dialogue with clips instead of one recording', () => {
     );
     expect(audioToneOf(quiz(3, dialogue))).toBe('none');
   });
+
+  // Review 2026-11-22: a hand-made dialogue keeps its clip on the holder.
+  it('is ready when its transcript holder has a clip and there is no recording', () => {
+    const dialogue = { bilingualContent: { mode: 'DIALOGUE' } };
+    expect(audioToneOf(quiz(1, { ...dialogue, dialogueAudio: true }))).toBe(
+      'ok',
+    );
+    expect(audioToneOf(quiz(2, { ...dialogue, dialogueAudio: false }))).toBe(
+      'none',
+    );
+    // A shared recording, when there is one, decides.
+    expect(
+      audioToneOf(
+        quiz(3, {
+          ...dialogue,
+          dialogueAudio: true,
+          listeningAudioArtifacts: [{ version: 2, status: 'FAILED' }],
+        }),
+      ),
+    ).toBe('error');
+    // Only a dialogue quiz reads its holder.
+    expect(
+      audioToneOf(
+        quiz(4, {
+          bilingualContent: { mode: 'COMPREHENSION' },
+          dialogueAudio: true,
+        }),
+      ),
+    ).toBe('none');
+  });
 });
 
 describe('skill CMS list rules', () => {

@@ -114,6 +114,8 @@ export type QuizListRow = {
   publicationStatus?: string | null;
   bilingualContent?: unknown;
   questionsWithAudio?: number;
+  /** A hand-made dialogue's transcript holder has an active clip. */
+  dialogueAudio?: boolean;
   _count?: { questions?: number };
   listeningAudioArtifacts?: Array<{ version: number; status: string }>;
   writingKind?: WritingKind;
@@ -136,6 +138,9 @@ export function audioToneOf(row: QuizListRow): AudioTone {
   const mode = (row.bilingualContent as { mode?: unknown } | null)?.mode;
   const withAudio = row.questionsWithAudio ?? 0;
   const latest = row.listeningAudioArtifacts?.[0];
+  // A hand-made dialogue plays the clip on its transcript holder when it has
+  // no shared recording (QA 2026-11-22: it read "none" with its audio there).
+  if (mode === 'DIALOGUE' && !latest && row.dialogueAudio) return 'ok';
   if (
     PER_QUESTION_MODES.includes(mode as ListeningMode) ||
     (!latest && withAudio > 0)
