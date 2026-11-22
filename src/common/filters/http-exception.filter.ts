@@ -2,6 +2,7 @@ import {
   ExceptionFilter,
   Catch,
   ArgumentsHost,
+  BadGatewayException,
   HttpException,
   HttpStatus,
   Logger,
@@ -38,6 +39,10 @@ const PRISMA_CLIENT_ERRORS: Record<
     message: 'Không tìm thấy dữ liệu. Có thể nó vừa bị xoá.',
   },
 };
+
+/** A letter only Vietnamese uses: the text was written for the user. */
+const VIETNAMESE_LETTER =
+  /[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i;
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -104,7 +109,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
-    if (status >= 500) {
+    // A 502 thrown on purpose names what failed (the admin AI drafts: "Không
+    // thể soạn bài nghe lúc này"), in a fixed Vietnamese sentence; it is kept.
+    // Every other 5xx text is replaced, so no internal detail goes out.
+    const namedGatewayFailure =
+      exception instanceof BadGatewayException &&
+      typeof message === 'string' &&
+      VIETNAMESE_LETTER.test(message);
+    if (status >= 500 && namedGatewayFailure) {
+      errorDetails = 'BAD_GATEWAY';
+    } else if (status >= 500) {
       message = 'Máy chủ gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.';
       errorDetails = 'INTERNAL_ERROR';
     }
