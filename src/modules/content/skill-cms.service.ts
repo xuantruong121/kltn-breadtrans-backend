@@ -151,7 +151,7 @@ export class SkillCmsService {
       !SPEAKING_SET_LEVELS.some((level) => level === dto.level)
     ) {
       throw new BadRequestException(
-        `SpeakingPracticeSet.level phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
+        `Trình độ bộ luyện nói phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
       );
     }
   }
@@ -879,13 +879,13 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
     });
     if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     if (!dto.taskType) {
-      throw new BadRequestException('Câu Speaking mới phải có loại bài');
+      throw new BadRequestException('Câu luyện nói mới phải có loại bài.');
     }
     const stimulus = dto.stimulusId
       ? await db.speakingStimulus.findUnique({
@@ -893,7 +893,7 @@ export class SkillCmsService {
         })
       : null;
     if (dto.stimulusId && !stimulus) {
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     }
     const semanticErrors = taskTypeValidationErrors({
       taskType: dto.taskType as any,
@@ -966,7 +966,7 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
@@ -982,7 +982,7 @@ export class SkillCmsService {
     const taskType = dto.taskType ?? exercise.taskType;
     if (hasHistory && taskType !== exercise.taskType)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; không thể đổi loại câu.',
+        'Bộ luyện nói đã có lịch sử làm bài; không thể đổi loại câu.',
       );
     const stimulus = dto.stimulusId
       ? await db.speakingStimulus.findUnique({
@@ -992,7 +992,7 @@ export class SkillCmsService {
         ? null
         : exercise.stimulus;
     if (dto.stimulusId && !stimulus) {
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     }
     const semanticErrors = taskType
       ? taskTypeValidationErrors({
@@ -1102,13 +1102,17 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (!dto.kind) {
-      throw new BadRequestException('Stimulus cần có kind hợp lệ');
+      throw new BadRequestException('Thông tin dùng chung cần có loại hợp lệ.');
     }
     if (dto.kind === 'INFORMATION' && !dto.content?.trim()) {
-      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng văn bản cần có nội dung.',
+      );
     }
     if (dto.kind === 'IMAGE' && !dto.imageUrl?.trim()) {
-      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng ảnh cần có ảnh.',
+      );
     }
     return db.speakingStimulus.create({
       data: {
@@ -1131,16 +1135,20 @@ export class SkillCmsService {
       where: { id },
     });
     if (!existing)
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     const kind = dto.kind ?? existing.kind;
     const content = dto.content === undefined ? existing.content : dto.content;
     const imageUrl =
       dto.imageUrl === undefined ? existing.imageUrl : dto.imageUrl;
     if (kind === 'INFORMATION' && !content?.trim()) {
-      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng văn bản cần có nội dung.',
+      );
     }
     if (kind === 'IMAGE' && !imageUrl?.trim()) {
-      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng ảnh cần có ảnh.',
+      );
     }
     return this.prisma.speakingStimulus.update({
       where: { id },
@@ -1301,7 +1309,7 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
@@ -1356,7 +1364,7 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
       select: { id: true, publicationStatus: true },
@@ -1856,10 +1864,10 @@ export class SkillCmsService {
     if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     const errors = [
       !set.title.trim() ? 'Thiếu tiêu đề' : null,
-      set.exercises.length === 0 ? 'Cần ít nhất một bài Speaking' : null,
+      set.exercises.length === 0 ? 'Cần ít nhất một câu luyện.' : null,
       ...set.exercises.map((exercise) =>
         !exercise.title.trim() || !exercise.targetText.trim()
-          ? `Exercise #${exercise.id}: thiếu tiêu đề hoặc prompt`
+          ? `Câu #${exercise.id}: thiếu tiêu đề hoặc câu mẫu.`
           : null,
       ),
       ...set.exercises.flatMap((exercise) =>
@@ -1869,7 +1877,7 @@ export class SkillCmsService {
           imageUrl: exercise.imageUrl,
           stimulusId: exercise.stimulusId,
           stimulus: exercise.stimulus,
-        }).map((error) => `Exercise #${exercise.id}: ${error}`),
+        }).map((error) => `Câu #${exercise.id}: ${error}`),
       ),
     ].filter((value): value is string => Boolean(value));
     if (set.scope === 'EXAM_INTERNAL') {
@@ -1901,7 +1909,7 @@ export class SkillCmsService {
     });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
+        'Bộ luyện nói đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
       );
   }
 

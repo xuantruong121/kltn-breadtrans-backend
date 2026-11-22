@@ -1,3 +1,4 @@
+import { SPEAKING_TASK_TYPE_LABELS } from './speaking-contract';
 import { taskTypeValidationErrors } from './speaking-task-validation';
 
 export const TOEIC_SPEAKING_TASK_SEQUENCE = [
@@ -51,10 +52,12 @@ export function toeicSpeakingContractErrors(source: {
   for (const [index, exercise] of exercises.entries()) {
     const expectedTaskType = TOEIC_SPEAKING_TASK_SEQUENCE[index];
     if (exercise.taskType !== expectedTaskType) {
-      errors.push(`Câu ${index + 1}: taskType phải là ${expectedTaskType}`);
+      errors.push(
+        `Câu ${index + 1}: loại bài phải là ${SPEAKING_TASK_TYPE_LABELS[expectedTaskType]}`,
+      );
     }
     if (!exercise.title?.trim() || !exercise.targetText?.trim()) {
-      errors.push(`Câu ${index + 1}: thiếu tiêu đề hoặc prompt`);
+      errors.push(`Câu ${index + 1}: thiếu tiêu đề hoặc đề bài`);
     }
     errors.push(
       ...taskTypeValidationErrors({
@@ -76,14 +79,14 @@ export function toeicSpeakingContractErrors(source: {
     !informationIds[0] ||
     informationIds.some((stimulusId) => stimulusId !== informationIds[0])
   ) {
-    errors.push('Câu 8–10 phải dùng cùng một stimulus INFORMATION');
+    errors.push('Câu 8–10 phải dùng cùng một thông tin dùng chung');
   }
   if (
     informationExercises.some(
       (exercise) => exercise.stimulus?.kind !== 'INFORMATION',
     )
   ) {
-    errors.push('Stimulus của câu 8–10 phải có kind INFORMATION');
+    errors.push('Thông tin dùng chung của câu 8–10 phải ở dạng văn bản');
   }
 
   return errors;
