@@ -1,8 +1,64 @@
+import 'reflect-metadata';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import {
   EXAM_TEMPLATES,
+  examTypeChangeRefusal,
   lrPaperSeconds,
+  PART_PRACTICE_CLOSED,
   templateTotalMinutes,
 } from './exam-template.registry';
+import { CreateGenericExamDto } from './generic-exam.dto';
+import { CreateToeicAiExamDto } from './toeic-ai-exam.dto';
+
+const messagesOf = async <T extends object>(cls: new () => T, body: object) =>
+  (await validate(plainToInstance(cls, body))).flatMap((error) =>
+    Object.values(error.constraints ?? {}),
+  );
+
+describe('a new exam is a full test (owner 2026-11-22)', () => {
+  it('the create form takes a full test or no type, never a part practice', async () => {
+    expect(
+      await messagesOf(CreateGenericExamDto, {
+        title: 'Đề',
+        type: 'FULL_TEST',
+      }),
+    ).toEqual([]);
+    expect(await messagesOf(CreateGenericExamDto, { title: 'Đề' })).toEqual([]);
+    expect(
+      await messagesOf(CreateGenericExamDto, {
+        title: 'Đề',
+        type: 'PRACTICE_BY_PART',
+      }),
+    ).toEqual([PART_PRACTICE_CLOSED]);
+  });
+
+  it('the AI drafts a whole exam only', async () => {
+    expect(
+      await messagesOf(CreateToeicAiExamDto, { variantCode: 'TOEIC_LR' }),
+    ).toEqual([]);
+    const refused = await messagesOf(CreateToeicAiExamDto, {
+      variantCode: 'TOEIC_LR',
+      mode: 'PART',
+      part: 5,
+    });
+    expect(refused).toContain(
+      'AI chỉ soạn đề hoàn chỉnh; Part chưa tốt thì tạo lại ngay trong bản nháp.',
+    );
+  });
+
+  it('a draft keeps its format or becomes a full test, never a part practice', () => {
+    expect(examTypeChangeRefusal('FULL_TEST', undefined)).toBeNull();
+    expect(examTypeChangeRefusal('FULL_TEST', 'FULL_TEST')).toBeNull();
+    expect(
+      examTypeChangeRefusal('PRACTICE_BY_PART', 'PRACTICE_BY_PART'),
+    ).toBeNull();
+    expect(examTypeChangeRefusal('PRACTICE_BY_PART', 'FULL_TEST')).toBeNull();
+    expect(examTypeChangeRefusal('FULL_TEST', 'PRACTICE_BY_PART')).toBe(
+      PART_PRACTICE_CLOSED,
+    );
+  });
+});
 
 const template = (variantCode: string) =>
   EXAM_TEMPLATES.find((candidate) => candidate.variantCode === variantCode)!;

@@ -1,4 +1,38 @@
-import { filterGrammarTopics } from './grammar-question.logic';
+import {
+  filterGrammarTopics,
+  grammarPublishProblems,
+} from './grammar-question.logic';
+
+describe('grammarPublishProblems: the checklist the editor shows', () => {
+  const valid = {
+    question: 'She ___ here.',
+    options: ['works', 'work', 'working', 'worked'],
+    correctIndex: 0,
+  };
+
+  it('names every required item that is missing, in the editor words', () => {
+    expect(
+      grammarPublishProblems({ title: ' ', description: '', questions: [] }),
+    ).toEqual(['có tên chủ đề', 'có phần lý thuyết', 'có ít nhất 1 câu hỏi']);
+    expect(
+      grammarPublishProblems({
+        title: 'Thì hiện tại đơn',
+        description: 'Thói quen.',
+        questions: [valid, { ...valid, options: ['a', 'a', 'b', 'c'] }],
+      }),
+    ).toEqual(['mỗi câu có 4 phương án khác nhau và đáp án đúng']);
+  });
+
+  it('passes a topic with a title, a theory and valid questions', () => {
+    expect(
+      grammarPublishProblems({
+        title: 'Thì hiện tại đơn',
+        description: 'Thói quen.',
+        questions: [valid],
+      }),
+    ).toEqual([]);
+  });
+});
 
 const topic = (id: number, extra: Record<string, unknown> = {}) => ({
   id,

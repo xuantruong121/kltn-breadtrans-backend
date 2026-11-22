@@ -7,14 +7,15 @@ import {
 import { PlanFeatureKey, PracticeLevel, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
-  advancedPracticePlan,
   cefrSpan,
   type CefrRange,
-  parseCefrRange,
   planSatisfies,
   type PracticePlan,
-  requiredPracticePlan,
 } from '../subscription/practice-level';
+import {
+  speakingCefrRange,
+  speakingRequiredPlan,
+} from './speaking-content-access.logic';
 import {
   LevelAccessService,
   type UnlockedLevels,
@@ -58,26 +59,16 @@ export class SpeakingContentAccessService {
   ) {}
 
   /**
-   * Lowest plan for this exercise. Standalone practice follows the owner
-   * matrix (A1/A2 free, B1+ PRO) from its practice set level, else from the
-   * CEFR tag of its title. TOEIC exam tasks and untagged items keep their
-   * stored flag, which then needs PRO.
+   * Lowest plan for this exercise (speaking-content-access.logic.ts): the
+   * CMS reads the same rule to store a reference clip privately or not.
    */
   requiredPlan(exercise: SpeakingContentAccessSubject): PracticePlan {
-    const range = this.cefrRange(exercise);
-    if (range) return requiredPracticePlan('SPEAKING', range);
-    return exercise.isPremiumContent
-      ? advancedPracticePlan('SPEAKING')
-      : 'FREE';
+    return speakingRequiredPlan(exercise);
   }
 
   /** Practice set level, else the title tag; null for TOEIC exam tasks. */
   cefrRange(exercise: SpeakingContentAccessSubject): CefrRange | null {
-    if (exercise.practiceSet?.scope === 'EXAM_INTERNAL') return null;
-    return (
-      parseCefrRange(exercise.practiceSet?.level) ??
-      parseCefrRange(exercise.title)
-    );
+    return speakingCefrRange(exercise);
   }
 
   isPremium(exercise: SpeakingContentAccessSubject): boolean {

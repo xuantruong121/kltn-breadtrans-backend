@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import {
+  BadGatewayException,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { HttpExceptionFilter } from './http-exception.filter';
 
@@ -96,6 +101,33 @@ describe('HttpExceptionFilter', () => {
       cancelToken: 'abc',
     });
     expect(pending).not.toHaveProperty('secret');
+  });
+
+  it('keeps the Vietnamese sentence of a 502 an AI draft throws (QA 2026-11-22)', () => {
+    const body = run(
+      new BadGatewayException(
+        'Không thể soạn bài nghe lúc này. Vui lòng thử lại sau.',
+      ),
+    );
+    expect(body).toMatchObject({
+      statusCode: 502,
+      message: 'Không thể soạn bài nghe lúc này. Vui lòng thử lại sau.',
+      error: 'BAD_GATEWAY',
+    });
+  });
+
+  it('still hides the text of any other 5xx, a 502 in English included', () => {
+    for (const exception of [
+      new BadGatewayException('upstream said: key AIza... invalid'),
+      new InternalServerErrorException('Không hoàn tất được bài nộp.'),
+      new Error('Cannot read properties of undefined'),
+    ]) {
+      const body = run(exception);
+      expect(body.message).toBe(
+        'Máy chủ gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.',
+      );
+      expect(body.error).toBe('INTERNAL_ERROR');
+    }
   });
 
   it('sends no code with a plain error', () => {

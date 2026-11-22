@@ -1305,6 +1305,57 @@ describe('QuizService', () => {
       expect(mockPrismaService.submission.create).not.toHaveBeenCalled();
     });
 
+    it('shows a comprehension exchange turn by turn once answered', async () => {
+      const exchange = {
+        options: ['On a train', 'In a café', 'At home', 'At work'],
+        correctIndex: 0,
+        audioText: 'Is this seat free? Yes, go ahead.',
+        transcriptSegments: [
+          { speaker: 'A', text: 'Is this seat free?', voiceKey: 'female-01' },
+          { speaker: 'B', text: 'Yes, go ahead.' },
+        ],
+      };
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 94,
+        quizId: 9,
+        type: 'MULTIPLE_CHOICE',
+        quiz: {
+          id: 9,
+          type: 'LISTENING_PRACTICE',
+          bilingualContent: { mode: 'COMPREHENSION' },
+        },
+        content: exchange,
+      });
+      const res = await service.checkPracticeQuestion(9, 94, {
+        answer: 'On a train',
+      });
+      expect(res).toMatchObject({
+        isCorrect: true,
+        transcriptSegments: [
+          { speaker: 'A', text: 'Is this seat free?' },
+          { speaker: 'B', text: 'Yes, go ahead.' },
+        ],
+      });
+      // Only what the learner reads: no voice keys.
+      expect(JSON.stringify(res)).not.toContain('voiceKey');
+
+      // A dialogue quiz keeps its transcript behind the reveal, as before.
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 95,
+        quizId: 9,
+        type: 'MULTIPLE_CHOICE',
+        quiz: {
+          id: 9,
+          type: 'LISTENING_PRACTICE',
+          bilingualContent: { mode: 'DIALOGUE' },
+        },
+        content: exchange,
+      });
+      expect(
+        await service.checkPracticeQuestion(9, 95, { answer: 'At home' }),
+      ).not.toHaveProperty('transcriptSegments');
+    });
+
     it('returns structured bilingual explanation object when present', async () => {
       const structuredExplanation = {
         vi: 'Người nói cho biết cửa hàng mở cửa lúc 9 giờ.',
@@ -1868,6 +1919,115 @@ describe('QuizService', () => {
         'chưa có câu để đọc',
       );
       expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+    });
+
+    const exchangeContent = {
+      audioText: 'Is this seat free? Yes, go ahead.',
+      options: ['a', 'b', 'c', 'd'],
+      correctIndex: 0,
+      transcriptSegments: [
+        { speaker: 'A', text: 'Is this seat free?' },
+        { speaker: 'B', text: 'Yes, go ahead.' },
+      ],
+    };
+
+    it('reads a comprehension exchange in one voice per speaker, as a dialogue', async () => {
+      mockSpeakingService.generateDialogueTts.mockResolvedValue(
+        Buffer.from('mp3'),
+      );
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 8,
+        type: 'MULTIPLE_CHOICE',
+        quiz: {
+          id: 1,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: false,
+          bilingualContent: { mode: 'COMPREHENSION' },
+        },
+        content: { ...exchangeContent, accent: 'UK' },
+      });
+      await service.generateQuestionAudioAsset(8);
+      expect(mockSpeakingService.generateDialogueTts).toHaveBeenCalledWith(
+        [
+          { speaker: 'A', text: 'Is this seat free?' },
+          { speaker: 'B', text: 'Yes, go ahead.' },
+        ],
+        'UK',
+        1,
+      );
+      expect(mockSpeakingService.generateTts).not.toHaveBeenCalled();
+      // One clip, in the comprehension folder; the stored content is untouched.
+      expect(mockUploadService.uploadRawBuffer).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        'audio/mpeg',
+        'catalog/listening/practice/audio/quiz-1/question-8/v1',
+        'audio.mp3',
+      );
+      expect(tx.question.update).not.toHaveBeenCalled();
+      expect(tx.quizAudioAsset.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps one voice when the turns come from one speaker', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValue({
+        id: 9,
+        type: 'MULTIPLE_CHOICE',
+        quiz: { id: 1, type: 'LISTENING_PRACTICE', isPremiumContent: false },
+        content: {
+          ...exchangeContent,
+          transcriptSegments: [
+            { speaker: 'A', text: 'Is this seat free?' },
+            { speaker: 'A', text: 'Yes, go ahead.' },
+          ],
+        },
+      });
+      await service.generateQuestionAudioAsset(9);
+      expect(mockSpeakingService.generateTts).toHaveBeenCalledWith(
+        'Is this seat free? Yes, go ahead.',
+        'US',
+        1,
+      );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
+    });
+
+    it('leaves a dialogue quiz question and a dictation item on their own paths', async () => {
+      mockPrismaService.question.findUnique.mockResolvedValueOnce({
+        id: 10,
+        type: 'MULTIPLE_CHOICE',
+        quiz: {
+          id: 2,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: false,
+          bilingualContent: { mode: 'DIALOGUE' },
+        },
+        content: exchangeContent,
+      });
+      await service.generateQuestionAudioAsset(10);
+      expect(mockSpeakingService.generateTts).toHaveBeenLastCalledWith(
+        'Is this seat free? Yes, go ahead.',
+        'US',
+        1,
+      );
+      mockPrismaService.question.findUnique.mockResolvedValueOnce({
+        id: 11,
+        type: 'DICTATION',
+        quiz: {
+          id: 3,
+          type: 'LISTENING_PRACTICE',
+          isPremiumContent: false,
+          bilingualContent: { mode: 'DICTATION' },
+        },
+        content: {
+          correctAnswer: 'Is this seat free?',
+          transcriptSegments: exchangeContent.transcriptSegments,
+        },
+      });
+      await service.generateQuestionAudioAsset(11);
+      expect(mockSpeakingService.generateTts).toHaveBeenLastCalledWith(
+        'Is this seat free?',
+        'US',
+        1,
+      );
+      expect(mockSpeakingService.generateDialogueTts).not.toHaveBeenCalled();
     });
   });
 

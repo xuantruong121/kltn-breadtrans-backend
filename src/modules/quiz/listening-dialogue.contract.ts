@@ -106,6 +106,33 @@ export function normalizeDialogueSegments(
 }
 
 /**
+ * The turns of a "Nghe hiểu (câu ngắn)" item written as a short exchange: a
+ * multiple-choice question of a comprehension quiz with two or more turns
+ * from at least two speakers. Such a clip is read like a dialogue, one voice
+ * per speaker; anything else (null) keeps the one-voice sentence. The mode is
+ * the quiz's bilingualContent.mode, and anything but DICTATION or DIALOGUE is
+ * a comprehension quiz, as the CMS list reads it.
+ */
+export function comprehensionExchangeSegments(
+  questionType: string,
+  listeningMode: unknown,
+  content: unknown,
+): NormalizedDialogueSegment[] | null {
+  if (questionType.toUpperCase() !== 'MULTIPLE_CHOICE') return null;
+  if (listeningMode === 'DICTATION' || listeningMode === 'DIALOGUE')
+    return null;
+  const segments = normalizeDialogueSegments(
+    content && typeof content === 'object'
+      ? (content as Record<string, unknown>).transcriptSegments
+      : undefined,
+  );
+  const speakers = new Set(
+    segments.map((segment) => segment.speakerId ?? segment.speaker),
+  );
+  return segments.length >= 2 && speakers.size >= 2 ? segments : null;
+}
+
+/**
  * Assign deterministic speaker-turn IDs to legacy content. Consecutive chunks
  * by one participant form one contribution; explicit IDs always win.
  */

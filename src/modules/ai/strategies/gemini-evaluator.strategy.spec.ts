@@ -359,7 +359,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
           JSON.stringify({
             practiceSet: {
               title: 'Hotel check-in',
-              description: 'Arriving at a hotel.',
+              description: 'Luyện nói khi nhận phòng khách sạn.',
               category: 'GENERAL',
               level: 'A1',
             },
@@ -399,7 +399,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
           JSON.stringify({
             practiceSet: {
               title: 'Hotel check-in',
-              description: 'Arriving at a hotel.',
+              description: 'Luyện nói khi nhận phòng khách sạn.',
               level: 'A1',
             },
             exercises: [
@@ -427,7 +427,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
     });
     expect(draft.practiceSet).toEqual({
       title: 'Hotel check-in',
-      description: 'Arriving at a hotel.',
+      description: 'Luyện nói khi nhận phòng khách sạn.',
       level: 'A1',
       track: 'HOSPITALITY_TOURISM',
     });
@@ -499,5 +499,386 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
       request.generationConfig.responseSchema.properties.questions.items
         .required,
     ).toContain('explanationEn');
+  });
+});
+
+describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () => {
+  const item = (
+    audioText: unknown,
+    prompt = 'Where is the speaker going?',
+  ) => ({
+    audioText,
+    prompt,
+    options: ['To the bank', 'To the station', 'To school', 'To work'],
+    correctIndex: 1,
+    explanation: 'Người nói nhắc tới "the station".',
+    explanationEn: 'The speaker mentions "the station".',
+  });
+  const strategyAnswering = (answer: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(answer) },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    return { strategy, generateContent };
+  };
+  const draftOf = (questions: unknown[], mode = 'COMPREHENSION') => ({
+    title: 'Getting around town',
+    description: 'Short sentences about places in a town.',
+    level: 'A2',
+    mode,
+    // A shared transcript has no place in this form; it must not leak.
+    text: 'must not leak',
+    turns: [
+      { speaker: 'A', text: 'must not' },
+      { speaker: 'B', text: 'leak' },
+    ],
+    questions,
+  });
+
+  it('gives every question its own sentence to hear and no shared transcript', async () => {
+    const { strategy, generateContent } = strategyAnswering(
+      draftOf([
+        item('  I am taking the train from the station at nine.  '),
+        item('The bank opens at eight thirty.', 'When does the bank open?'),
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'getting around town',
+      level: 'A2',
+      mode: 'COMPREHENSION',
+      count: 2,
+    });
+    expect(draft).toEqual({
+      title: 'Getting around town',
+      description: 'Short sentences about places in a town.',
+      level: 'A2',
+      mode: 'COMPREHENSION',
+      questions: [
+        {
+          audioText: 'I am taking the train from the station at nine.',
+          prompt: 'Where is the speaker going?',
+          options: ['To the bank', 'To the station', 'To school', 'To work'],
+          correctIndex: 1,
+          explanation: 'Người nói nhắc tới "the station".',
+          explanationEn: 'The speaker mentions "the station".',
+        },
+        expect.objectContaining({
+          audioText: 'The bank opens at eight thirty.',
+          prompt: 'When does the bank open?',
+        }),
+      ],
+    });
+    const request = generateContent.mock.calls[0][0];
+    const schema = request.generationConfig.responseSchema;
+    expect(schema.properties.mode.enum).toEqual(['COMPREHENSION']);
+    expect(schema.properties).not.toHaveProperty('text');
+    expect(schema.properties).not.toHaveProperty('turns');
+    expect(schema.properties.questions.items.required).toEqual(
+      expect.arrayContaining(['audioText', 'explanationEn']),
+    );
+    const prompt = request.contents[0].parts[0].text as string;
+    expect(prompt).toMatch(/exactly 2 separate short listening items/);
+    expect(prompt).toMatch(/answerable from its own audioText alone/);
+    expect(prompt).toMatch(/explanationEn in English/);
+  });
+
+  it('drops a question whose sentence is missing, blank or too long, and caps the count', async () => {
+    const { strategy } = strategyAnswering(
+      draftOf([
+        item(undefined),
+        item('   '),
+        item('word '.repeat(200)),
+        { ...item('Three options only.'), options: ['a', 'b', 'c'] },
+        { ...item('A wrong key.'), correctIndex: 4 },
+        item('The museum is closed on Mondays.'),
+        item('The bus leaves from platform two.'),
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'getting around town',
+      level: 'A2',
+      mode: 'COMPREHENSION',
+      count: 1,
+    });
+    expect(
+      draft.questions.map((q: { audioText: string }) => q.audioText),
+    ).toEqual(['The museum is closed on Mondays.']);
+  });
+
+  it('lets an item be a short exchange between A and B, read in two voices', async () => {
+    const { strategy, generateContent } = strategyAnswering(
+      draftOf([
+        {
+          ...item('Is this seat free? Yes, go ahead.', 'Where are they?'),
+          turns: [
+            { speaker: 'A', text: '  Is this seat free?  ' },
+            { speaker: 'b', text: 'Yes, go ahead.' },
+          ],
+        },
+        // Gemini may answer an optional list with []: still one sentence.
+        { ...item('The bank opens at eight thirty.'), turns: [] },
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'getting around town',
+      level: 'A2',
+      mode: 'COMPREHENSION',
+      count: 2,
+    });
+    expect(draft.questions[0]).toMatchObject({
+      audioText: 'Is this seat free? Yes, go ahead.',
+      turns: [
+        { speaker: 'A', text: 'Is this seat free?' },
+        { speaker: 'B', text: 'Yes, go ahead.' },
+      ],
+    });
+    expect(draft.questions[1].audioText).toBe(
+      'The bank opens at eight thirty.',
+    );
+    expect(draft.questions[1]).not.toHaveProperty('turns');
+    const request = generateContent.mock.calls[0][0];
+    const question = request.generationConfig.responseSchema.properties
+      .questions.items as {
+      properties: Record<string, any>;
+      required: string[];
+    };
+    expect(question.properties.turns.items.properties.speaker.enum).toEqual([
+      'A',
+      'B',
+    ]);
+    expect(question.required).not.toContain('turns');
+    expect(request.contents[0].parts[0].text).toMatch(/2 or 3 turns/);
+  });
+
+  it('drops an exchange that is not 2-3 non-empty turns by both A and B', async () => {
+    const exchange = (turns: unknown) => ({
+      ...item('Exchange text.'),
+      turns,
+    });
+    const { strategy } = strategyAnswering(
+      draftOf([
+        exchange([{ speaker: 'A', text: 'Only one turn.' }]),
+        exchange([
+          { speaker: 'A', text: 'One.' },
+          { speaker: 'B', text: 'Two.' },
+          { speaker: 'A', text: 'Three.' },
+          { speaker: 'B', text: 'Four.' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'A', text: 'Hello again.' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'B', text: '   ' },
+        ]),
+        exchange([
+          { speaker: 'A', text: 'Hello.' },
+          { speaker: 'C', text: 'Hi.' },
+        ]),
+        exchange('A: Hello. B: Hi.'),
+        exchange([
+          { speaker: 'B', text: 'Are you ready?' },
+          { speaker: 'A', text: 'Almost.' },
+          { speaker: 'B', text: 'Hurry up.' },
+        ]),
+      ]),
+    );
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'town',
+      mode: 'COMPREHENSION',
+      count: 7,
+    });
+    expect(draft.questions).toHaveLength(1);
+    expect(draft.questions[0].audioText).toBe(
+      'Are you ready? Almost. Hurry up.',
+    );
+    expect(draft.questions[0].turns).toHaveLength(3);
+  });
+
+  it('fails closed when no question carries a sentence, or the mode differs', async () => {
+    await expect(
+      strategyAnswering(
+        draftOf([item(''), item(undefined)]),
+      ).strategy.suggestListeningFullDraft({
+        topic: 'town',
+        mode: 'COMPREHENSION',
+        count: 2,
+      }),
+    ).rejects.toThrow('AI không thể tạo full draft Listening hợp lệ');
+    await expect(
+      strategyAnswering(
+        draftOf([item('The bank opens at eight.')], 'DICTATION'),
+      ).strategy.suggestListeningFullDraft({
+        topic: 'town',
+        mode: 'COMPREHENSION',
+        count: 1,
+      }),
+    ).rejects.toThrow('AI không thể tạo full draft Listening hợp lệ');
+  });
+
+  it('keeps DIALOGUE questions free of a per-question sentence', async () => {
+    const { strategy, generateContent } = strategyAnswering({
+      ...draftOf(
+        [
+          {
+            ...item('should be ignored'),
+            turns: [
+              { speaker: 'A', text: 'ignored' },
+              { speaker: 'B', text: 'too' },
+            ],
+          },
+        ],
+        'DIALOGUE',
+      ),
+      text: undefined,
+    });
+    const draft = await strategy.suggestListeningFullDraft({
+      topic: 'town',
+      mode: 'DIALOGUE',
+      count: 1,
+    });
+    expect(draft.questions[0]).not.toHaveProperty('audioText');
+    expect(draft.turns).toHaveLength(2);
+    const schema =
+      generateContent.mock.calls[0][0].generationConfig.responseSchema;
+    expect(schema.properties.questions.items.properties).not.toHaveProperty(
+      'audioText',
+    );
+    expect(schema.properties.questions.items.properties).not.toHaveProperty(
+      'turns',
+    );
+    expect(draft.questions[0]).not.toHaveProperty('turns');
+  });
+});
+
+describe('GeminiEvaluatorStrategy Reading drafts store the question type in upper case', () => {
+  const answering = (answer: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(answer) },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    return { strategy, generateContent };
+  };
+  const question = (questionType: unknown, prompt = 'What is it about?') => ({
+    prompt,
+    options: ['Work', 'Food', 'Travel', 'Sport'],
+    correctIndex: 0,
+    explanation: 'Đoạn văn nói về công việc.',
+    questionType,
+  });
+
+  // QA 2026-11-22: the full draft stored "detail".
+  it('normalises each full-draft question type and keeps it with its question', async () => {
+    const { strategy, generateContent } = answering({
+      title: 'Remote work',
+      description: 'Bài đọc về làm việc từ xa.',
+      level: 'B1',
+      passage: 'Many people work from home now.',
+      questions: [
+        question('detail', 'Q1'),
+        // Dropped: three options. Its type must not shift onto the next one.
+        { ...question('PURPOSE', 'Q2'), options: ['a', 'b', 'c'] },
+        question('Main idea', 'Q3'),
+        question('opinion', 'Q4'),
+        question(undefined, 'Q5'),
+      ],
+    });
+    const draft = await strategy.suggestReadingFullDraft({
+      topic: 'Remote work',
+      level: 'B1',
+      count: 5,
+    });
+    expect(draft.questions.map((q: any) => [q.prompt, q.questionType])).toEqual(
+      [
+        ['Q1', 'DETAIL'],
+        ['Q3', 'MAIN_IDEA'],
+        ['Q4', 'DETAIL'],
+        ['Q5', 'DETAIL'],
+      ],
+    );
+    const schema =
+      generateContent.mock.calls[0][0].generationConfig.responseSchema;
+    expect(
+      schema.properties.questions.items.properties.questionType.enum,
+    ).toContain('VOCAB_IN_CONTEXT');
+  });
+
+  it('uses the same rule for the question suggestions', async () => {
+    const { strategy } = answering({
+      candidates: [question('inference'), question('Vocab-in-context', 'Q2')],
+    });
+    const result = await strategy.suggestReadingQuestions({
+      passage: 'Text',
+      count: 2,
+    });
+    expect(result.candidates.map((c: any) => c.questionType)).toEqual([
+      'INFERENCE',
+      'VOCAB_IN_CONTEXT',
+    ]);
+  });
+});
+
+describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
+  const answering = (answer: unknown) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: { text: () => JSON.stringify(answer) },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    return { strategy, generateContent };
+  };
+
+  // QA 2026-11-22: a Vietnamese topic came back as Vietnamese sentences.
+  it('asks for English at the chosen level whatever the topic language', async () => {
+    const { strategy, generateContent } = answering({
+      title: 'Lịch hẹn',
+      description: 'Nghe chép',
+      sentences: ['I would like to book an appointment.'],
+    });
+    await strategy.suggestDictationLines({
+      topic: 'đặt lịch hẹn',
+      level: 'B1',
+      count: 20,
+    });
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toMatch(/CEFR level B1/);
+    expect(text).toMatch(/Every sentence is in English, whatever language/);
+  });
+
+  it('gives one English sentence for a single dictation item, never Vietnamese', async () => {
+    const english = answering({
+      mode: 'DICTATION',
+      text: '1. Please close the door when you leave.',
+    });
+    await expect(
+      english.strategy.suggestListeningContent({
+        mode: 'DICTATION',
+        level: 'A2',
+        topic: 'nhà',
+      }),
+    ).resolves.toEqual({
+      mode: 'DICTATION',
+      text: 'Please close the door when you leave.',
+    });
+    const vietnamese = answering({
+      mode: 'DICTATION',
+      text: 'Hãy đóng cửa khi bạn ra ngoài.',
+    });
+    await expect(
+      vietnamese.strategy.suggestListeningContent({ mode: 'DICTATION' }),
+    ).rejects.toThrow('AI không thể tạo câu nghe chép hợp lệ');
   });
 });

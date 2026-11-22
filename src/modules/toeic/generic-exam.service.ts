@@ -31,6 +31,7 @@ import {
 import {
   EXAM_TEMPLATES,
   ExamTemplate,
+  examTypeChangeRefusal,
   PRACTICE_DISCLAIMER,
   lrPaperSeconds,
   resolveExamTemplate,
@@ -975,7 +976,7 @@ export class GenericExamService {
   ) {
     await this.assertDraftExamById(id);
     const { setId } = await this.speakingContext(id);
-    return this.inDraftSpeaking(id, (tx) =>
+    const deleted = await this.inDraftSpeaking(id, (tx) =>
       this.skillCms.deleteSpeakingExercise(
         'speaking',
         setId,
@@ -984,6 +985,9 @@ export class GenericExamService {
         tx,
       ),
     );
+    // Committed: its reference audio can go now (bug 2026-11-22).
+    await this.skillCms.removeSpeakingExerciseFiles([deleted]);
+    return deleted;
   }
 
   async publishSpeakingSource(id: number, user: { id: number; role: any }) {
@@ -1071,6 +1075,10 @@ export class GenericExamService {
     const template = resolveExamTemplate(familyCode, variantCode);
     const title = dto.title.trim();
     const description = dto.description?.trim() || PRACTICE_DISCLAIMER;
+    // The HTTP form only takes FULL_TEST (CreateGenericExamDto); part practice
+    // here comes from an AI job stored before 2026-11-22.
+    const lrType =
+      dto.type === 'PRACTICE_BY_PART' ? 'PRACTICE_BY_PART' : 'FULL_TEST';
 
     return this.prisma.$transaction(async (tx) => {
       const exam = await tx.exam.create({
@@ -1093,11 +1101,12 @@ export class GenericExamService {
           data: {
             title,
             description,
-            type: dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
+            // No type means a full test (it used to mean part practice).
+            type: lrType,
             difficulty: dto.difficulty ?? 'medium',
             durationSeconds: lrPaperSeconds(
               variantCode,
-              dto.type === 'FULL_TEST' ? 'FULL_TEST' : 'PRACTICE_BY_PART',
+              lrType,
               dto.durationSeconds,
             ),
             createdBy,
@@ -1191,6 +1200,8 @@ export class GenericExamService {
     const exam = await this.findExam(id);
     this.assertDraftExam(exam);
     const child = exam.toeicExamSet;
+    const typeRefusal = examTypeChangeRefusal(child?.type, dto.type);
+    if (typeRefusal) throw new BadRequestException(typeRefusal);
     // A full test keeps the ETS length; only part practice takes a new one.
     const durationSeconds =
       child && (dto.type !== undefined || dto.durationSeconds !== undefined)

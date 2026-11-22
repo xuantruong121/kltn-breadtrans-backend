@@ -1,5 +1,10 @@
 import { SpeakingStimulusKind } from '@prisma/client';
-import { taskTypeValidationErrors } from './speaking-task-validation';
+import {
+  SPEAKING_TASK_ERRORS,
+  taskTypeValidationErrors,
+} from './speaking-task-validation';
+
+const VIETNAMESE_LETTER = /[À-ỹĐđ]/;
 
 describe('Speaking task semantic validation', () => {
   it('requires real learner-visible media for Describe a Picture', () => {
@@ -9,7 +14,7 @@ describe('Speaking task semantic validation', () => {
         targetText: 'Describe the office scene.',
         imageUrl: null,
       }),
-    ).toContain('DESCRIBE_PICTURE cần ảnh raster đã xác thực cho learner');
+    ).toEqual(['Câu mô tả tranh cần ảnh đã được kiểm duyệt.']);
 
     expect(
       taskTypeValidationErrors({
@@ -26,7 +31,7 @@ describe('Speaking task semantic validation', () => {
         targetText: 'Describe the office scene.',
         imageUrl: 'data:image/svg+xml,<svg/>',
       }),
-    ).toContain('DESCRIBE_PICTURE cần ảnh raster đã xác thực cho learner');
+    ).toContain(SPEAKING_TASK_ERRORS.pictureNeedsImage);
   });
 
   it('requires one reusable INFORMATION stimulus for Respond Using Information', () => {
@@ -37,7 +42,7 @@ describe('Speaking task semantic validation', () => {
         stimulusId: null,
         stimulus: null,
       }),
-    ).toContain('RESPOND_USING_INFORMATION cần stimulus');
+    ).toEqual([SPEAKING_TASK_ERRORS.informationNeedsStimulus]);
 
     expect(
       taskTypeValidationErrors({
@@ -46,7 +51,16 @@ describe('Speaking task semantic validation', () => {
         stimulusId: 4,
         stimulus: { kind: SpeakingStimulusKind.IMAGE },
       }),
-    ).toContain('Stimulus của RESPOND_USING_INFORMATION phải là INFORMATION');
+    ).toEqual([SPEAKING_TASK_ERRORS.informationNeedsText]);
+
+    expect(
+      taskTypeValidationErrors({
+        taskType: 'RESPOND_USING_INFORMATION',
+        targetText: 'Explain the afternoon schedule.',
+        stimulusId: 4,
+        stimulus: { kind: SpeakingStimulusKind.INFORMATION },
+      }),
+    ).toEqual([]);
   });
 
   it('does not infer a semantic task type from the title', () => {
@@ -55,6 +69,15 @@ describe('Speaking task semantic validation', () => {
         taskType: null,
         targetText: 'Read this sentence aloud.',
       }),
-    ).toContain('Thiếu loại bài Speaking');
+    ).toEqual([SPEAKING_TASK_ERRORS.missingTaskType]);
+  });
+
+  it('writes every reason in Vietnamese, with no task type code in it', () => {
+    for (const message of Object.values(SPEAKING_TASK_ERRORS)) {
+      expect(message).toMatch(VIETNAMESE_LETTER);
+      expect(message).not.toMatch(
+        /[A-Z]{2,}_[A-Z_]+|\b(stimulus|prompt|learner|raster)\b/i,
+      );
+    }
   });
 });

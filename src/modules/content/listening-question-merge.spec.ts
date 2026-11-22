@@ -63,6 +63,29 @@ describe('mergeListeningContent', () => {
     ]);
   });
 
+  it('an empty turn list clears the turns: an exchange edited back into one sentence', () => {
+    const merged = mergeListeningContent(
+      {
+        audioText: 'Is this seat free? Yes, go ahead.',
+        options: ['a', 'b', 'c', 'd'],
+        transcriptSegments: [
+          { speaker: 'A', text: 'Is this seat free?' },
+          { speaker: 'B', text: 'Yes, go ahead.' },
+        ],
+      },
+      { audioText: 'The seat is free.', transcriptSegments: [] },
+    );
+    expect(merged).not.toHaveProperty('transcriptSegments');
+    expect(merged).toMatchObject({
+      audioText: 'The seat is free.',
+      options: ['a', 'b', 'c', 'd'],
+    });
+    // Sending no turns at all still keeps them, as before.
+    expect(
+      mergeListeningContent(published, { audioText: 'x' }).transcriptSegments,
+    ).toEqual(published.transcriptSegments);
+  });
+
   it('an undefined field never erases the stored one', () => {
     expect(
       mergeListeningContent(published, { explanation: undefined }).explanation,

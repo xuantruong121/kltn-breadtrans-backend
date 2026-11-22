@@ -6,6 +6,11 @@ import {
   spokenTextChanged,
 } from './listening-question-merge';
 import {
+  dialogueQuizIssues,
+  hasDraftTranscript,
+  withoutDraftTranscript,
+} from './listening-dialogue-conversation';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -39,6 +44,7 @@ import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authorin
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
 import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
+import { isPremiumSpeaking } from '../speaking/speaking-content-access.logic';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 import { SpeakingService } from '../speaking/speaking.service';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
@@ -48,11 +54,17 @@ import {
   firstImageByQuiz,
   quizListFacets,
   speakingSetFacets,
+  isTranscriptHolder,
+  storedWritingKind,
   taskTypesByQuiz,
   writingKindOf,
 } from './skill-cms-list';
 import { writingQuestionContent } from './writing-question-content.logic';
 import { UploadService } from '../upload/upload.service';
+import {
+  ContentFilesService,
+  type ContentFile,
+} from '../upload/content-files.service';
 import { unavailableTracks } from '../learning-track/learning-track.logic';
 import {
   SENTENCE_TRANSLATION,
@@ -93,6 +105,12 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
   writing: 'Writing',
 };
 
+/** The publish check's line for a choice question, in the checklist's words. */
+const CHOICES_INCOMPLETE = 'chưa đủ phương án hoặc chưa chọn đáp án đúng';
+
+/** "Nghe chép" needs this many sentences to publish (the FE checklist agrees). */
+const DICTATION_MIN_SENTENCES = 20;
+
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
@@ -114,6 +132,8 @@ export class SkillCmsService {
     private readonly speakingService?: SpeakingService,
     @Optional()
     private readonly uploadService?: UploadService,
+    @Optional()
+    private readonly contentFiles?: ContentFilesService,
   ) {}
 
   private admin(user: Admin) {
@@ -144,9 +164,28 @@ export class SkillCmsService {
       !SPEAKING_SET_LEVELS.some((level) => level === dto.level)
     ) {
       throw new BadRequestException(
-        `SpeakingPracticeSet.level phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
+        `Trình độ bộ luyện nói phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
       );
     }
+  }
+
+  /**
+   * The quiz's bilingualContent on a save. A Writing exercise keeps the kind
+   * the admin picked in it (writingKind), next to what it already holds;
+   * listening sends its own metadata object, reading its paragraphs.
+   */
+  private contentMetadata(
+    domain: Exclude<Domain, 'speaking'>,
+    dto: SkillContentDto,
+    previous?: unknown,
+  ): Prisma.InputJsonValue | undefined {
+    if (domain === 'writing' && dto.writingKind)
+      return asJson({
+        ...asRecord(previous),
+        ...asRecord(dto.bilingualContent),
+        writingKind: dto.writingKind,
+      });
+    return dto.bilingualContent ? asJson(dto.bilingualContent) : undefined;
   }
 
   private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
@@ -333,33 +372,60 @@ export class SkillCmsService {
         ? {
             writingKind: writingKindOf({
               type: quiz.type,
+              stored: storedWritingKind(quiz.bilingualContent),
               isTranslation:
                 !!translationTopic &&
                 quiz.practiceTopicId === translationTopic.id,
               taskTypes: taskTypes.get(quiz.id),
               hasImage: thumbnails.has(quiz.id),
+              questionCount: quiz._count?.questions,
             }),
           }
         : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
       return this.listPage(tagged, query, domain === 'writing');
-    // Comprehension and dictation play one clip per question: count them.
-    const withAudio = await this.prisma.question.groupBy({
+    // A hand-made dialogue keeps its turns in a DIALOGUE question; the card
+    // counts only the questions a learner answers, as for AI-made quizzes.
+    const holders = await this.prisma.question.groupBy({
       by: ['quizId'],
+      where: {
+        quizId: { in: quizzes.map((quiz) => quiz.id) },
+        type: 'DIALOGUE',
+      },
+      _count: { _all: true },
+    });
+    const holderCounts = new Map(
+      holders.map((row) => [row.quizId, row._count._all]),
+    );
+    // Questions with an active clip, by type. Comprehension and dictation
+    // play one clip per question: those are counted. A hand-made dialogue's
+    // holder may carry the conversation's clip instead of a shared recording.
+    const withAudio = await this.prisma.question.groupBy({
+      by: ['quizId', 'type'],
       where: {
         quizId: { in: quizzes.map((quiz) => quiz.id) },
         audioAssets: { some: { isActive: true } },
       },
       _count: { _all: true },
     });
-    const counts = new Map(
-      withAudio.map((row) => [row.quizId, row._count._all]),
-    );
+    const counts = new Map<number, number>();
+    const dialogueAudio = new Set<number>();
+    for (const row of withAudio) {
+      if (isTranscriptHolder(row)) dialogueAudio.add(row.quizId);
+      else
+        counts.set(row.quizId, (counts.get(row.quizId) ?? 0) + row._count._all);
+    }
     return this.listPage(
       tagged.map((quiz) => ({
         ...quiz,
+        _count: {
+          ...quiz._count,
+          questions:
+            (quiz._count?.questions ?? 0) - (holderCounts.get(quiz.id) ?? 0),
+        },
         questionsWithAudio: counts.get(quiz.id) ?? 0,
+        dialogueAudio: dialogueAudio.has(quiz.id),
       })),
       query,
     );
@@ -443,6 +509,8 @@ export class SkillCmsService {
         ? {
             writingKind: writingKindOf({
               type: quiz.type,
+              stored: storedWritingKind(quiz.bilingualContent),
+              questionCount: quiz.questions.length,
               isTranslation:
                 !!translationTopic &&
                 quiz.practiceTopicId === translationTopic.id,
@@ -606,9 +674,7 @@ export class SkillCmsService {
         title: titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
         description: dto.description?.trim(),
         theoryContent: dto.passage,
-        bilingualContent: dto.bilingualContent
-          ? asJson(dto.bilingualContent)
-          : undefined,
+        bilingualContent: this.contentMetadata(domain, dto),
         type: writingType,
         timeLimit: dto.timeLimit,
         isPremiumContent: dto.isPremiumContent ?? false,
@@ -668,15 +734,19 @@ export class SkillCmsService {
             SKILL_TITLE_LABEL[domain],
           )
         : dto.title?.trim();
+    const metadata = this.contentMetadata(domain, dto, quiz.bilingualContent);
     return this.prisma.quiz.update({
       where: { id },
       data: {
         title,
         description: dto.description?.trim(),
         theoryContent: dto.passage,
-        bilingualContent: dto.bilingualContent
-          ? asJson(dto.bilingualContent)
-          : undefined,
+        // Learners read a published quiz's metadata: no draft conversation.
+        bilingualContent:
+          domain === 'listening' &&
+          quiz.publicationStatus === QuizPublicationStatus.PUBLISHED
+            ? withoutDraftTranscript(metadata)
+            : metadata,
         timeLimit: dto.timeLimit,
         type,
         isPremiumContent: dto.isPremiumContent,
@@ -872,13 +942,13 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
     });
     if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     if (!dto.taskType) {
-      throw new BadRequestException('Câu Speaking mới phải có loại bài');
+      throw new BadRequestException('Câu luyện nói mới phải có loại bài.');
     }
     const stimulus = dto.stimulusId
       ? await db.speakingStimulus.findUnique({
@@ -886,7 +956,7 @@ export class SkillCmsService {
         })
       : null;
     if (dto.stimulusId && !stimulus) {
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     }
     const semanticErrors = taskTypeValidationErrors({
       taskType: dto.taskType as any,
@@ -959,7 +1029,7 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
@@ -975,7 +1045,7 @@ export class SkillCmsService {
     const taskType = dto.taskType ?? exercise.taskType;
     if (hasHistory && taskType !== exercise.taskType)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; không thể đổi loại câu.',
+        'Bộ luyện nói đã có lịch sử làm bài; không thể đổi loại câu.',
       );
     const stimulus = dto.stimulusId
       ? await db.speakingStimulus.findUnique({
@@ -985,7 +1055,7 @@ export class SkillCmsService {
         ? null
         : exercise.stimulus;
     if (dto.stimulusId && !stimulus) {
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     }
     const semanticErrors = taskType
       ? taskTypeValidationErrors({
@@ -1039,21 +1109,23 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await this.prisma.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
+      include: { practiceSet: { select: { scope: true, level: true } } },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     const text = exercise.targetText.trim();
     if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
-    if (
-      exercise.isPremiumContent &&
-      !this.uploadService.isPrivateStorageConfigured()
-    )
+    // The learner endpoint drops a public URL on paid content, and paid is
+    // decided from the set level (B1+), not from the stored flag (QA
+    // 2026-11-22: a B1-B2 clip saved public never played). Same rule here.
+    const premium = isPremiumSpeaking(exercise);
+    if (premium && !this.uploadService.isPrivateStorageConfigured())
       throw new ServiceUnavailableException(
         'Kho lưu trữ âm thanh Nói chưa được cấu hình.',
       );
     const audio = await this.speakingService.generateTts(text, 'US', 1);
     const file = `${exerciseId}.r${Date.now()}.mp3`;
     let audioUrl: string;
-    if (exercise.isPremiumContent) {
+    if (premium) {
       audioUrl = `premium/speaking/reference/${file}`;
       await this.uploadService.putPrivateObjectAtKey(
         audioUrl,
@@ -1093,13 +1165,17 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (!dto.kind) {
-      throw new BadRequestException('Stimulus cần có kind hợp lệ');
+      throw new BadRequestException('Thông tin dùng chung cần có loại hợp lệ.');
     }
     if (dto.kind === 'INFORMATION' && !dto.content?.trim()) {
-      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng văn bản cần có nội dung.',
+      );
     }
     if (dto.kind === 'IMAGE' && !dto.imageUrl?.trim()) {
-      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng ảnh cần có ảnh.',
+      );
     }
     return db.speakingStimulus.create({
       data: {
@@ -1122,16 +1198,20 @@ export class SkillCmsService {
       where: { id },
     });
     if (!existing)
-      throw new NotFoundException('Không tìm thấy Speaking stimulus');
+      throw new NotFoundException('Không tìm thấy thông tin dùng chung.');
     const kind = dto.kind ?? existing.kind;
     const content = dto.content === undefined ? existing.content : dto.content;
     const imageUrl =
       dto.imageUrl === undefined ? existing.imageUrl : dto.imageUrl;
     if (kind === 'INFORMATION' && !content?.trim()) {
-      throw new BadRequestException('INFORMATION stimulus cần nội dung');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng văn bản cần có nội dung.',
+      );
     }
     if (kind === 'IMAGE' && !imageUrl?.trim()) {
-      throw new BadRequestException('IMAGE stimulus cần imageUrl');
+      throw new BadRequestException(
+        'Thông tin dùng chung dạng ảnh cần có ảnh.',
+      );
     }
     return this.prisma.speakingStimulus.update({
       where: { id },
@@ -1157,8 +1237,10 @@ export class SkillCmsService {
     // 2026-11-18): that insert either committed before the lock and is
     // counted, or it waits and then fails on the deleted row. Before, one
     // saved between the count and the delete went with the content.
+    // Its own R2 files go after the commit (bug 2026-11-22).
     if (domain === 'speaking') {
-      return this.prisma.$transaction(async (tx) => {
+      let exercises: Array<{ id: number; audioUrl: string | null }> = [];
+      const result = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "SpeakingPracticeSet" WHERE id = ${rawId} FOR UPDATE`;
         await tx.$queryRaw`SELECT id FROM "SpeakingExercise" WHERE "practiceSetId" = ${rawId} FOR UPDATE`;
         const set = await tx.speakingPracticeSet.findUnique({
@@ -1176,6 +1258,10 @@ export class SkillCmsService {
           examInternal: set.scope === 'EXAM_INTERNAL',
         });
         if (refusal) throw new ConflictException(refusal);
+        exercises = await tx.speakingExercise.findMany({
+          where: { practiceSetId: set.id },
+          select: { id: true, audioUrl: true },
+        });
         // practiceSet on SpeakingExercise is SetNull: delete the exercises
         // first so none is left behind without a set.
         await tx.speakingExercise.deleteMany({
@@ -1184,9 +1270,12 @@ export class SkillCmsService {
         await tx.speakingPracticeSet.delete({ where: { id: set.id } });
         return { id: set.id, deleted: true };
       });
+      await this.removeSpeakingExerciseFiles(exercises);
+      return result;
     }
     const id = this.id(rawId);
-    return this.prisma.$transaction(async (tx) => {
+    let files: ContentFile[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Quiz" WHERE id = ${id} FOR UPDATE`;
       const quiz = await tx.quiz.findFirst({
         where: { id, ...this.contentTypeWhere(domain) },
@@ -1203,6 +1292,8 @@ export class SkillCmsService {
         examInternal: await this.isExamTask(id),
       });
       if (refusal) throw new ConflictException(refusal);
+      // Read before the delete: the asset and artifact rows cascade with it.
+      if (domain === 'listening') files = await this.listeningQuizFiles(tx, id);
       try {
         await tx.quiz.delete({ where: { id } });
       } catch (error) {
@@ -1219,6 +1310,54 @@ export class SkillCmsService {
       });
       return { id, deleted: true };
     });
+    await this.removeFiles(files);
+    return result;
+  }
+
+  /**
+   * The audio a listening quiz owns: every version of every question clip,
+   * and every whole-quiz artifact. Each key is checked against the quiz's own
+   * prefix before any delete (ownedContentKey).
+   */
+  private async listeningQuizFiles(
+    db: Prisma.TransactionClient,
+    quizId: number,
+  ): Promise<ContentFile[]> {
+    const owner = { kind: 'listening-quiz', quizId } as const;
+    const assets = await db.quizAudioAsset.findMany({
+      where: { question: { quizId } },
+      select: { key: true },
+    });
+    const artifacts = await db.listeningAudioArtifact.findMany({
+      where: { quizId },
+      select: { r2Key: true },
+    });
+    return [
+      ...assets.map((a) => ({ owner, stored: a.key })),
+      ...artifacts.map((a) => ({ owner, stored: a.r2Key })),
+    ];
+  }
+
+  /**
+   * After the delete has committed: the reference audio the server made for
+   * these exercises. An exam deletes its exercise in its own transaction and
+   * calls this after it commits.
+   */
+  async removeSpeakingExerciseFiles(
+    exercises: Array<{ id: number; audioUrl: string | null }>,
+  ) {
+    await this.removeFiles(
+      exercises.map((e) => ({
+        owner: { kind: 'speaking-exercise', exerciseId: e.id } as const,
+        stored: e.audioUrl,
+      })),
+    );
+  }
+
+  /** Best effort: a file that cannot go never fails the delete. */
+  private async removeFiles(files: ContentFile[]) {
+    if (!files.length || !this.contentFiles) return;
+    await this.contentFiles.removeFiles(files).catch(() => undefined);
   }
 
   async deleteSpeakingExercise(
@@ -1233,14 +1372,14 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     await this.assertNoSpeakingHistory(rawSetId, db);
-    return this.inTransaction(
+    const removed = await this.inTransaction(
       client,
       async (tx) => {
         // Counted again with the exercise row locked (audit A5 follow-up,
@@ -1271,6 +1410,9 @@ export class SkillCmsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    // An exam's transaction has not committed yet: the exam removes the file.
+    if (!client) await this.removeSpeakingExerciseFiles([removed]);
+    return removed;
   }
 
   async reorderSpeakingExercises(
@@ -1285,7 +1427,7 @@ export class SkillCmsService {
     // lock (inDraftExam); the skill practice CMS passes none.
     const db: Prisma.TransactionClient = client ?? this.prisma;
     if (this.domain(rawDomain) !== 'speaking')
-      throw new BadRequestException('Exercises chỉ dùng cho Speaking');
+      throw new BadRequestException('Câu luyện chỉ dùng cho kỹ năng Nói.');
     const set = await db.speakingPracticeSet.findUnique({
       where: { id: rawSetId },
       select: { id: true, publicationStatus: true },
@@ -1396,7 +1538,23 @@ export class SkillCmsService {
     if (!question)
       throw new NotFoundException('Câu hỏi không thuộc nội dung kỹ năng này.');
     await this.assertNoHistory(quizId);
-    return this.prisma.question.delete({ where: { id: questionId } });
+    // Read before the delete: the clip rows cascade with the question. Its
+    // reading or writing images are generic uploads and stay.
+    const owner = { kind: 'listening-question', quizId, questionId } as const;
+    const files: ContentFile[] =
+      domain === 'listening'
+        ? (
+            await this.prisma.quizAudioAsset.findMany({
+              where: { questionId },
+              select: { key: true },
+            })
+          ).map((a) => ({ owner, stored: a.key }))
+        : [];
+    const deleted = await this.prisma.question.delete({
+      where: { id: questionId },
+    });
+    await this.removeFiles(files);
+    return deleted;
   }
 
   async validate(rawDomain: string, rawId: string, user: Admin) {
@@ -1407,6 +1565,7 @@ export class SkillCmsService {
       id: number;
       type?: QuizType;
       title?: string;
+      bilingualContent?: unknown;
       questions: Array<{
         type: string;
         content: unknown;
@@ -1414,18 +1573,34 @@ export class SkillCmsService {
       }>;
     };
     const errors: string[] = [];
+    // A hand-made dialogue keeps its turns in a DIALOGUE question: it is not
+    // a question a learner answers, so it is not counted or numbered.
+    const answered = quiz.questions.filter(
+      (question) => domain !== 'listening' || !isTranscriptHolder(question),
+    );
+    const labels = new Map<(typeof quiz.questions)[number], string>();
+    for (const question of quiz.questions)
+      labels.set(
+        question,
+        answered.includes(question)
+          ? `Câu ${answered.indexOf(question) + 1}`
+          : 'Lời thoại',
+      );
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
-    if (!quiz.questions.length) errors.push('Cần ít nhất một câu hỏi');
+    if (!answered.length) errors.push('Cần ít nhất một câu hỏi');
     if (!parseCefrRange(quiz.title) && !(await this.isExamTask(quiz.id)))
       errors.push('Chưa có trình độ: chọn trình độ rồi lưu lại');
     if (
       domain === 'listening' &&
-      quiz.questions.length &&
-      quiz.questions.every((q) => q.type === 'DICTATION') &&
-      quiz.questions.length < 20
+      answered.length &&
+      answered.every((q) => q.type === 'DICTATION') &&
+      answered.length < DICTATION_MIN_SENTENCES
     )
-      errors.push('Dictation cần ít nhất 20 câu');
-    for (const [index, question] of quiz.questions.entries()) {
+      errors.push(
+        `Bài nghe chép cần ít nhất ${DICTATION_MIN_SENTENCES} câu (đang có ${answered.length})`,
+      );
+    for (const question of quiz.questions) {
+      const label = labels.get(question);
       const content = asRecord(question.content);
       if (domain === 'reading') {
         const options = content.options;
@@ -1436,22 +1611,22 @@ export class SkillCmsService {
           correctIndex < 0 ||
           correctIndex >= options.length
         )
-          errors.push(`Câu ${index + 1}: options/correctIndex không hợp lệ`);
+          errors.push(`${label}: ${CHOICES_INCOMPLETE}`);
       }
       if (
         domain === 'writing' &&
         (typeof (content.prompt ?? content.text) !== 'string' ||
           !String(content.prompt ?? content.text).trim())
       )
-        errors.push(`Câu ${index + 1}: thiếu đề bài Writing`);
+        errors.push(`${label}: thiếu đề bài`);
       if (domain === 'writing' && question.type !== 'WRITING')
-        errors.push(`Câu ${index + 1}: loại câu phải là WRITING`);
+        errors.push(`${label}: không phải câu của bài viết`);
       if (
         domain === 'writing' &&
         quiz.type === QuizType.WRITING_EMAIL &&
         (typeof content.taskType !== 'string' || !content.taskType.trim())
       )
-        errors.push(`Câu ${index + 1}: Writing Email cần taskType`);
+        errors.push(`${label}: chưa chọn dạng đề`);
       if (
         domain === 'writing' &&
         quiz.type === QuizType.WRITING_PICTURE &&
@@ -1461,14 +1636,14 @@ export class SkillCmsService {
         ) &&
         !isAcceptedContentImageReference(content.imageUrl)
       )
-        errors.push(`Câu ${index + 1}: Picture task cần imageUrl`);
+        errors.push(`${label}: câu theo tranh chưa có ảnh`);
       if (
         domain === 'writing' &&
         typeof content.taskType === 'string' &&
         content.taskType.trim().toUpperCase() === SENTENCE_TRANSLATION
       )
         for (const issue of translationTaskIssues(content))
-          errors.push(`Câu ${index + 1}: ${issue}`);
+          errors.push(`${label}: ${issue}`);
       if (domain === 'writing' && content.wordRange !== undefined) {
         const range = content.wordRange;
         if (
@@ -1477,7 +1652,7 @@ export class SkillCmsService {
           !range.every((value) => Number.isInteger(value) && value > 0) ||
           range[0] > range[1]
         )
-          errors.push(`Câu ${index + 1}: wordRange không hợp lệ`);
+          errors.push(`${label}: số từ tối thiểu, tối đa không hợp lệ`);
       }
       if (
         domain === 'listening' &&
@@ -1489,7 +1664,7 @@ export class SkillCmsService {
           content.prompt,
         ].some((value) => typeof value === 'string' && value.trim())
       )
-        errors.push(`Câu ${index + 1}: Dictation cần target sentence`);
+        errors.push(`${label}: chưa có câu cần chép`);
       if (
         domain === 'listening' &&
         question.type === 'MULTIPLE_CHOICE' &&
@@ -1504,9 +1679,7 @@ export class SkillCmsService {
           );
         })()
       )
-        errors.push(
-          `Câu ${index + 1}: Listening options/correctIndex không hợp lệ`,
-        );
+        errors.push(`${label}: ${CHOICES_INCOMPLETE}`);
       if (
         domain === 'listening' &&
         question.type === 'DIALOGUE' &&
@@ -1518,10 +1691,17 @@ export class SkillCmsService {
             ),
           ).size < 2)
       )
-        errors.push(
-          `Câu ${index + 1}: Dialogue cần ít nhất 2 lượt lời hợp lệ của 2 người nói`,
-        );
+        errors.push(`${label}: cần ít nhất 2 lượt lời của 2 người nói`);
     }
+    // "Hội thoại": one conversation, carried by the questions, and a choice
+    // question to answer about it (the editor checklist lists the same).
+    if (domain === 'listening')
+      errors.push(
+        ...dialogueQuizIssues(
+          asRecord(quiz.bilingualContent).mode,
+          quiz.questions,
+        ),
+      );
     // A learner hears either the question's own clip or, for questions that
     // share the conversation, the quiz's published recording.
     if (domain === 'listening' && quiz.questions.length) {
@@ -1530,7 +1710,7 @@ export class SkillCmsService {
             quiz.id,
           )
         : null;
-      for (const [index, question] of quiz.questions.entries()) {
+      for (const question of quiz.questions) {
         const content = asRecord(question.content);
         const ownClip = (question.audioAssets ?? []).some(
           (asset) => asset.isActive,
@@ -1541,7 +1721,7 @@ export class SkillCmsService {
             (Array.isArray(content.transcriptSegments) &&
               content.transcriptSegments.length > 0));
         if (!ownClip && !sharesRecording)
-          errors.push(`Câu ${index + 1}: chưa có audio cho học viên`);
+          errors.push(`${labels.get(question)}: chưa có audio cho học viên`);
       }
     }
     return { valid: errors.length === 0, errors, domain, quizId: quiz.id };
@@ -1578,12 +1758,28 @@ export class SkillCmsService {
       });
     }
     const id = this.id(rawId);
+    // The editor's draft conversation stays off a published quiz: learners
+    // read its metadata, and the transcript stays behind the reveal.
+    const stored =
+      domain === 'listening' && status === QuizPublicationStatus.PUBLISHED
+        ? await this.prisma.quiz.findUnique({
+            where: { id },
+            select: { bilingualContent: true },
+          })
+        : null;
     return this.prisma.quiz.update({
       where: { id },
       data: {
         publicationStatus: status,
         publishedAt:
           status === QuizPublicationStatus.PUBLISHED ? new Date() : undefined,
+        ...(hasDraftTranscript(stored?.bilingualContent)
+          ? {
+              bilingualContent: asJson(
+                withoutDraftTranscript(stored?.bilingualContent),
+              ),
+            }
+          : {}),
       },
     });
   }
@@ -1769,10 +1965,10 @@ export class SkillCmsService {
     if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
     const errors = [
       !set.title.trim() ? 'Thiếu tiêu đề' : null,
-      set.exercises.length === 0 ? 'Cần ít nhất một bài Speaking' : null,
+      set.exercises.length === 0 ? 'Cần ít nhất một câu luyện.' : null,
       ...set.exercises.map((exercise) =>
         !exercise.title.trim() || !exercise.targetText.trim()
-          ? `Exercise #${exercise.id}: thiếu tiêu đề hoặc prompt`
+          ? `Câu #${exercise.id}: thiếu tiêu đề hoặc câu mẫu.`
           : null,
       ),
       ...set.exercises.flatMap((exercise) =>
@@ -1782,7 +1978,7 @@ export class SkillCmsService {
           imageUrl: exercise.imageUrl,
           stimulusId: exercise.stimulusId,
           stimulus: exercise.stimulus,
-        }).map((error) => `Exercise #${exercise.id}: ${error}`),
+        }).map((error) => `Câu #${exercise.id}: ${error}`),
       ),
     ].filter((value): value is string => Boolean(value));
     if (set.scope === 'EXAM_INTERNAL') {
@@ -1814,7 +2010,7 @@ export class SkillCmsService {
     });
     if (count > 0)
       throw new ConflictException(
-        'Nội dung Speaking đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
+        'Bộ luyện nói đã có lịch sử làm bài; không thể xoá hoặc sắp xếp lại câu.',
       );
   }
 

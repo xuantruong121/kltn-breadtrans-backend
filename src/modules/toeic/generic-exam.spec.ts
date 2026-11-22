@@ -636,6 +636,7 @@ describe('Speaking edits of an exam run under the exam lock (2026-11-18)', () =>
       updateSpeakingExercise: jest.fn().mockResolvedValue('ok'),
       reorderSpeakingExercises: jest.fn().mockResolvedValue('ok'),
       deleteSpeakingExercise: jest.fn().mockResolvedValue('ok'),
+      removeSpeakingExerciseFiles: jest.fn().mockResolvedValue(undefined),
     };
     return { service, tx };
   };
@@ -671,4 +672,32 @@ describe('Speaking edits of an exam run under the exam lock (2026-11-18)', () =>
       expect(args[args.length - 1]).toBe(tx);
     },
   );
+
+  it("deleting an exercise removes its reference audio once the exam's transaction commits (bug 2026-11-22)", async () => {
+    const { service } = build(QuizPublicationStatus.DRAFT);
+    const deleted = { id: 1, audioUrl: 'premium/speaking/reference/1.r1.mp3' };
+    service.skillCms.deleteSpeakingExercise.mockResolvedValue(deleted);
+
+    await expect(service.deleteSpeakingExercise(5, 1, user)).resolves.toBe(
+      deleted,
+    );
+
+    expect(service.skillCms.removeSpeakingExerciseFiles).toHaveBeenCalledWith([
+      deleted,
+    ]);
+    expect(
+      service.prisma.$transaction.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      service.skillCms.removeSpeakingExerciseFiles.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('a refused exercise delete removes no file', async () => {
+    const { service } = build(QuizPublicationStatus.PUBLISHED);
+
+    await expect(service.deleteSpeakingExercise(5, 1, user)).rejects.toThrow(
+      'bản nháp',
+    );
+    expect(service.skillCms.removeSpeakingExerciseFiles).not.toHaveBeenCalled();
+  });
 });

@@ -26,6 +26,7 @@ import {
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
 } from '../speaking/speaking-contract';
+import { WRITING_KINDS, type WritingKind } from './skill-cms-list';
 
 /** Accepts a string or a plain JSON object (never an array). */
 function IsStringOrPlainObject(options?: ValidationOptions) {
@@ -106,10 +107,14 @@ export class SkillContentDto {
   @IsString()
   type?: string;
 
-  /** Writing: TRANSLATION creates a "Dịch câu" exercise (WRITING_PICTURE, its own topic). */
+  /**
+   * Writing: the kind the admin picked, kept in bilingualContent.writingKind
+   * so an empty "Viết câu" or "Viết theo tranh" exercise reopens as itself.
+   * TRANSLATION also creates the exercise in the "Dịch câu" topic.
+   */
   @IsOptional()
-  @IsIn(['TRANSLATION'])
-  writingKind?: 'TRANSLATION';
+  @IsIn(WRITING_KINDS)
+  writingKind?: WritingKind;
 
   @IsOptional()
   @IsBoolean()

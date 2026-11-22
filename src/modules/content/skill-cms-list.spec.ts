@@ -6,6 +6,8 @@ import {
   quizListFacets,
   speakingSetFacets,
   firstImageByQuiz,
+  isTranscriptHolder,
+  storedWritingKind,
   taskTypesByQuiz,
   writingKindOf,
 } from './skill-cms-list';
@@ -58,6 +60,36 @@ describe('a dialogue with clips instead of one recording', () => {
       'pending',
     );
     expect(audioToneOf(quiz(3, dialogue))).toBe('none');
+  });
+
+  // Review 2026-11-22: a hand-made dialogue keeps its clip on the holder.
+  it('is ready when its transcript holder has a clip and there is no recording', () => {
+    const dialogue = { bilingualContent: { mode: 'DIALOGUE' } };
+    expect(audioToneOf(quiz(1, { ...dialogue, dialogueAudio: true }))).toBe(
+      'ok',
+    );
+    expect(audioToneOf(quiz(2, { ...dialogue, dialogueAudio: false }))).toBe(
+      'none',
+    );
+    // A shared recording, when there is one, decides.
+    expect(
+      audioToneOf(
+        quiz(3, {
+          ...dialogue,
+          dialogueAudio: true,
+          listeningAudioArtifacts: [{ version: 2, status: 'FAILED' }],
+        }),
+      ),
+    ).toBe('error');
+    // Only a dialogue quiz reads its holder.
+    expect(
+      audioToneOf(
+        quiz(4, {
+          bilingualContent: { mode: 'COMPREHENSION' },
+          dialogueAudio: true,
+        }),
+      ),
+    ).toBe('none');
   });
 });
 
@@ -311,6 +343,55 @@ describe('writing kind filter', () => {
     expect(writingKindOf({ type: 'WRITING_PICTURE', hasImage: true })).toBe(
       'PICTURE',
     );
+  });
+
+  it('uses the kind saved with the exercise first (QA 2026-11-22)', () => {
+    // An empty "Viết câu" reopened as "Viết theo tranh": its kind is now saved.
+    expect(
+      writingKindOf({
+        type: 'WRITING_PICTURE',
+        stored: storedWritingKind({ writingKind: 'SENTENCE' }),
+        questionCount: 0,
+      }),
+    ).toBe('SENTENCE');
+    // The saved kind wins over what the tasks suggest.
+    expect(
+      writingKindOf({
+        type: 'WRITING_PICTURE',
+        stored: 'PICTURE',
+        taskTypes: ['SENTENCE'],
+      }),
+    ).toBe('PICTURE');
+    // A saved kind that does not fit the quiz type is ignored.
+    expect(
+      writingKindOf({
+        type: 'WRITING_PICTURE',
+        stored: 'EMAIL',
+        taskTypes: ['SENTENCE'],
+      }),
+    ).toBe('SENTENCE');
+    expect(writingKindOf({ type: 'WRITING_EMAIL', stored: 'SENTENCE' })).toBe(
+      'EMAIL',
+    );
+  });
+
+  it('reads an empty picture exercise with no saved kind as PICTURE, not SENTENCE', () => {
+    expect(
+      writingKindOf({
+        type: 'WRITING_PICTURE',
+        taskTypes: [],
+        questionCount: 0,
+      }),
+    ).toBe('PICTURE');
+    expect(storedWritingKind({ writingKind: 'VIDEO' })).toBeUndefined();
+    expect(storedWritingKind(null)).toBeUndefined();
+    expect(storedWritingKind([{ en: 'x' }])).toBeUndefined();
+  });
+
+  it('treats a DIALOGUE question as the transcript holder, not a question', () => {
+    expect(isTranscriptHolder({ type: 'DIALOGUE' })).toBe(true);
+    expect(isTranscriptHolder({ type: 'MULTIPLE_CHOICE' })).toBe(false);
+    expect(isTranscriptHolder({ type: 'DICTATION' })).toBe(false);
   });
 
   it('collects task types per quiz and skips rows without one', () => {

@@ -97,8 +97,11 @@ const RECORDING_PREFIXES = [
   'speaking/pending/',
 ] as const;
 
-/** A plain object key: no scheme, no leading slash, no `..` or backslash. */
-function plainKey(value: string | null | undefined): string | null {
+/**
+ * A plain object key: no scheme, no leading slash, no `..` or backslash.
+ * Also used by the content file delete (upload/content-files.logic.ts).
+ */
+export function plainKey(value: string | null | undefined): string | null {
   const key = (value ?? '').trim();
   if (!key || key.startsWith('/') || key.includes('://')) return null;
   if (key.includes('\\') || key.split('/').includes('..')) return null;

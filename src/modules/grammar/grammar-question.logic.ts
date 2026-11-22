@@ -48,6 +48,32 @@ export function questionProblems(input: GrammarQuestionInput): string[] {
   return problems;
 }
 
+export type GrammarPublishInput = {
+  title?: string | null;
+  description?: string | null;
+  questions: GrammarQuestionInput[];
+};
+
+/**
+ * What still blocks publishing, in the words of the editor's checklist
+ * ("Trước khi xuất bản"): its required items, lower case. The list icon, the
+ * editor and the server read the same rule (QA 2026-11-22: the server only
+ * counted questions, and the list icon published a topic with no theory).
+ * Empty = ready. The explanations are advice only and never block.
+ */
+export function grammarPublishProblems(topic: GrammarPublishInput): string[] {
+  const missing: string[] = [];
+  if (!String(topic.title ?? '').trim()) missing.push('có tên chủ đề');
+  if (!String(topic.description ?? '').trim())
+    missing.push('có phần lý thuyết');
+  if (!topic.questions.length) missing.push('có ít nhất 1 câu hỏi');
+  else if (
+    topic.questions.some((question) => questionProblems(question).length)
+  )
+    missing.push('mỗi câu có 4 phương án khác nhau và đáp án đúng');
+  return missing;
+}
+
 /**
  * Why-wrong notes stored aligned with the options: trimmed, blank -> null,
  * nothing at the correct answer. All empty -> null (no column value).

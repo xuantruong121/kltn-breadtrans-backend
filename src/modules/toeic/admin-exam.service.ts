@@ -21,6 +21,10 @@ import {
   toeicListeningAudioFingerprint,
 } from './toeic-listening-audio';
 import { inDraftSet } from './draft-set-lock';
+import {
+  addQuestionRefusal,
+  examQuestionProblems,
+} from './exam-question.logic';
 
 @Injectable()
 export class AdminExamService {
@@ -157,26 +161,16 @@ export class AdminExamService {
       );
     }
 
+    // One rule with the exam page's readiness: a full test against the
+    // 200-question structure, a part practice against its own Parts.
     const validation = validateToeicExam(exam);
-    if (exam.type === 'FULL_TEST' && !validation.learnerReady) {
+    if (!validation.learnerReady) {
       throw new BadRequestException({
         message:
-          'Đề Full Test chưa đủ điều kiện xuất bản (cần 200 câu theo chuẩn cấu trúc TOEIC)',
+          exam.type === 'FULL_TEST'
+            ? 'Đề Full Test chưa đủ điều kiện xuất bản (cần 200 câu theo chuẩn cấu trúc TOEIC)'
+            : 'Đề luyện tập theo Part chưa đủ điều kiện xuất bản cho học viên',
         issues: validation.issues,
-      });
-    }
-
-    const blockingIssues =
-      exam.type === 'FULL_TEST'
-        ? validation.issues
-        : validation.issues.filter(
-            (issue) => issue.code !== 'INCOMPLETE_TEMPLATE',
-          );
-
-    if (blockingIssues.length > 0) {
-      throw new BadRequestException({
-        message: 'Đề thi chưa đủ điều kiện xuất bản cho học viên',
-        issues: blockingIssues,
       });
     }
 
@@ -504,6 +498,7 @@ export class AdminExamService {
     return inDraftSet(this.prisma, examId, async (tx) => {
       const group = await tx.toeicQuestionGroup.findUnique({
         where: { id: groupId },
+        include: { _count: { select: { questions: true } } },
       });
       if (!group || group.examId !== examId) {
         throw new NotFoundException(
@@ -521,18 +516,14 @@ export class AdminExamService {
         );
       }
 
-      const expectedOptions = group.part === 2 ? 3 : 4;
-      if (!Array.isArray(dto.options) || dto.options.length < expectedOptions) {
-        throw new BadRequestException(
-          `Part ${group.part} yêu cầu ít nhất ${expectedOptions} đáp án lựa chọn`,
-        );
-      }
-
-      if (dto.correctIndex < 0 || dto.correctIndex >= dto.options.length) {
-        throw new BadRequestException(
-          'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-        );
-      }
+      // The readiness rules, so a question that saves is one they accept.
+      const refusal = addQuestionRefusal(
+        group.part,
+        group._count?.questions ?? 0,
+      );
+      if (refusal) throw new BadRequestException(refusal);
+      const problems = examQuestionProblems(group.part, dto);
+      if (problems.length) throw new BadRequestException(problems.join(' '));
 
       const created = await tx.toeicQuestion.create({
         data: {
@@ -597,15 +588,14 @@ export class AdminExamService {
         );
       }
 
-      const finalOptions = dto.options ?? (question.options as string[]);
-      const finalCorrectIndex = dto.correctIndex ?? question.correctIndex;
-      if (
-        Array.isArray(finalOptions) &&
-        (finalCorrectIndex < 0 || finalCorrectIndex >= finalOptions.length)
-      ) {
-        throw new BadRequestException(
-          'Chỉ số đáp án đúng (correctIndex) nằm ngoài danh sách đáp án',
-        );
+      // Only what this edit changes is checked: an older AI question with
+      // another shape can still get its explanation fixed.
+      if (dto.options !== undefined || dto.correctIndex !== undefined) {
+        const problems = examQuestionProblems(question.group.part, {
+          options: dto.options ?? question.options,
+          correctIndex: dto.correctIndex ?? question.correctIndex,
+        });
+        if (problems.length) throw new BadRequestException(problems.join(' '));
       }
 
       const updated = await tx.toeicQuestion.update({

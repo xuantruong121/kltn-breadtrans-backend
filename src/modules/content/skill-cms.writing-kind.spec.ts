@@ -60,6 +60,64 @@ describe('SkillCmsService.get writing kind', () => {
     );
     expect(email.writingKind).toBe('EMAIL');
   });
+
+  // QA 2026-11-22: "Viết câu" saved with Lưu reopened as "Viết theo tranh",
+  // and an empty picture exercise came back as SENTENCE.
+  it('reads the kind saved with the exercise before guessing from its tasks', async () => {
+    const sentence: any = await build(
+      quiz({ bilingualContent: { writingKind: 'SENTENCE' } }),
+    ).get('writing', '5', admin);
+    expect(sentence.writingKind).toBe('SENTENCE');
+    const picture: any = await build(quiz({})).get('writing', '5', admin);
+    expect(picture.writingKind).toBe('PICTURE');
+  });
+
+  it('saves the picked kind in bilingualContent on create and on update', async () => {
+    const prisma = {
+      quiz: {
+        create: jest.fn().mockResolvedValue({ id: 9 }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 9,
+          title: 'Writing A2 — Câu',
+          type: QuizType.WRITING_PICTURE,
+          bilingualContent: { note: 'kept' },
+        }),
+        update: jest.fn().mockResolvedValue({ id: 9 }),
+      },
+      submission: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new SkillCmsService(prisma as any);
+    await service.create(
+      'writing',
+      { title: 'Câu', type: 'WRITING_PICTURE', writingKind: 'SENTENCE' },
+      admin,
+    );
+    expect(prisma.quiz.create.mock.calls[0][0].data.bilingualContent).toEqual({
+      writingKind: 'SENTENCE',
+    });
+    await service.update(
+      'writing',
+      '9',
+      { title: 'Câu', type: 'WRITING_PICTURE', writingKind: 'PICTURE' },
+      admin,
+    );
+    expect(prisma.quiz.update.mock.calls[0][0].data.bilingualContent).toEqual({
+      note: 'kept',
+      writingKind: 'PICTURE',
+    });
+  });
+
+  it('leaves bilingualContent alone when no kind is sent', async () => {
+    const prisma = { quiz: { create: jest.fn().mockResolvedValue({ id: 9 }) } };
+    await new SkillCmsService(prisma as any).create(
+      'writing',
+      { title: 'Email', type: 'WRITING_EMAIL' },
+      admin,
+    );
+    expect(
+      prisma.quiz.create.mock.calls[0][0].data.bilingualContent,
+    ).toBeUndefined();
+  });
 });
 
 describe('SkillCmsService.list writing kind counts', () => {

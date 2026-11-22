@@ -55,6 +55,7 @@ import {
   normalizeDictationSentences,
   normalizeVocabDecks,
 } from './document-import.logic';
+import { GrammarDraftRejected } from '../grammar/grammar-full-draft.logic';
 
 @ApiTags('Admin Contextual AI')
 @Controller('admin')
@@ -212,7 +213,7 @@ export class AdminContextualAiController {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Listening Content failed: ${error?.message || ''}`);
       throw new BadGatewayException(
-        'Không thể gợi ý nội dung nghe từ AI lúc này. Vui lòng thử lại sau.',
+        'Không thể gợi ý lời thoại từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
@@ -267,7 +268,9 @@ export class AdminContextualAiController {
       )
         throw error;
       this.logger.warn(`AI Writing full draft failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn bài Writing lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài viết lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -288,7 +291,7 @@ export class AdminContextualAiController {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Writing Task failed: ${error?.message || ''}`);
       throw new BadGatewayException(
-        'Không thể gợi ý đề bài Writing từ AI lúc này. Vui lòng thử lại sau.',
+        'Không thể gợi ý đề bài viết từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
@@ -362,7 +365,7 @@ export class AdminContextualAiController {
   @Post('speaking/ai/full-draft')
   @ApiOperation({
     summary:
-      'Soạn bộ luyện Speaking cùng các câu luyện nháp; track (tuỳ chọn) là mã lĩnh vực đang bật',
+      'Soạn bộ luyện nói cùng các câu luyện nháp, chỉ loại bài không cần ảnh hay thông tin dùng chung; track (tuỳ chọn) là mã lĩnh vực đang bật',
   })
   @ApiResponse({
     status: 201,
@@ -371,7 +374,8 @@ export class AdminContextualAiController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Lĩnh vực không tồn tại hoặc đã tắt',
+    description:
+      'Lĩnh vực không tồn tại hoặc đã tắt; hoặc taskType là DESCRIBE_PICTURE / RESPOND_USING_INFORMATION',
   })
   async suggestSpeakingFullDraft(@Body() dto: SuggestSpeakingFullDraftDto) {
     try {
@@ -391,13 +395,25 @@ export class AdminContextualAiController {
         `AI Speaking full draft failed: ${error?.message || ''}`,
       );
       throw new BadGatewayException(
-        'Không thể soạn bộ luyện Speaking lúc này.',
+        'Không thể soạn bộ luyện nói từ AI lúc này. Vui lòng thử lại sau.',
       );
     }
   }
 
   @Post('listening/ai/full-draft')
-  @ApiOperation({ summary: 'Soạn bài Listening gồm nội dung và câu hỏi nháp' })
+  @ApiOperation({
+    summary:
+      'Soạn bài Listening gồm nội dung và câu hỏi nháp; mode DIALOGUE, DICTATION hoặc COMPREHENSION',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      '{ title, description, level, mode, sentences[]? (DICTATION: 20-30 câu tiếng Anh, questions rỗng), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
+  })
+  @ApiResponse({
+    status: 502,
+    description: 'AI không soạn được bản nháp hợp lệ',
+  })
   async suggestListeningFullDraft(@Body() dto: SuggestListeningFullDraftDto) {
     try {
       return await this.aiService.suggestListeningFullDraft({
@@ -412,7 +428,9 @@ export class AdminContextualAiController {
       this.logger.warn(
         `AI Listening full draft failed: ${error?.message || ''}`,
       );
-      throw new BadGatewayException('Không thể soạn bài Listening lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài nghe lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -431,7 +449,9 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Reading full draft failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn bài Reading lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn bài đọc lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -508,7 +528,9 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI dictation failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn câu nghe chép lúc này.');
+      throw new BadGatewayException(
+        'Không thể soạn câu nghe chép lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 
@@ -534,7 +556,12 @@ export class AdminContextualAiController {
   }
 
   @Post('grammar/ai/full-draft')
-  @ApiOperation({ summary: 'Soạn bài Grammar cùng câu hỏi nháp' })
+  @ApiOperation({ summary: 'Soạn chủ đề ngữ pháp cùng câu hỏi nháp' })
+  @ApiResponse({
+    status: 502,
+    description:
+      'AI không trả lời, hoặc trả bản nháp thiếu lý thuyết hay viết tiếng Việt không dấu.',
+  })
   async suggestGrammarFullDraft(@Body() dto: SuggestGrammarFullDraftDto) {
     try {
       return await this.aiService.suggestGrammarFullDraft({
@@ -547,7 +574,12 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Grammar full draft failed: ${error?.message || ''}`);
-      throw new BadGatewayException('Không thể soạn bài Grammar lúc này.');
+      // The model answered, but with a draft the editor cannot use: say why.
+      if (error instanceof GrammarDraftRejected)
+        throw new BadGatewayException(error.message);
+      throw new BadGatewayException(
+        'Không thể soạn chủ đề ngữ pháp lúc này. Vui lòng thử lại sau.',
+      );
     }
   }
 }

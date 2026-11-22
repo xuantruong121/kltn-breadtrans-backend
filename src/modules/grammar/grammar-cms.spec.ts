@@ -81,10 +81,35 @@ describe('AdminGrammarCMS (Phase 4)', () => {
       );
     });
 
-    it('publishes a grammar topic with valid questions', async () => {
+    // QA 2026-11-22: the server only counted questions, so the list icon
+    // published a topic the editor's checklist still blocked.
+    it('rejects a topic without theory, as the editor checklist does', async () => {
+      prisma.grammarTopic.findUnique.mockResolvedValue({
+        id: 201,
+        title: 'No theory yet',
+        description: '  ',
+        questions: [
+          {
+            id: 1,
+            question: 'She has worked here ___ 2018.',
+            options: ['since', 'for', 'in', 'at'],
+            correctIndex: 0,
+            order: 0,
+          },
+        ],
+      });
+
+      await expect(grammarService.publishTopic(201)).rejects.toThrow(
+        'Còn thiếu: có phần lý thuyết.',
+      );
+      expect(prisma.grammarTopic.update).not.toHaveBeenCalled();
+    });
+
+    it('publishes a grammar topic with theory and valid questions', async () => {
       prisma.grammarTopic.findUnique.mockResolvedValue({
         id: 201,
         title: 'Valid Topic',
+        description: 'Hành động bắt đầu trong quá khứ, còn kéo dài.',
         questions: [
           {
             id: 1,
@@ -491,6 +516,7 @@ describe('AdminGrammarCMS (Phase 4)', () => {
       prisma.grammarAttempt.groupBy = jest
         .fn()
         .mockResolvedValue([{ topicId: 2, _count: { _all: 3 } }]);
+      prisma.grammarQuestion.findMany.mockResolvedValue([]);
       const all = (await grammarService.getAdminTopics()) as any[];
       expect(all.map((t) => [t.id, t.learnerAttemptCount])).toEqual([
         [2, 3],
@@ -502,6 +528,51 @@ describe('AdminGrammarCMS (Phase 4)', () => {
       })) as any;
       expect(page.items.map((t: any) => t.id)).toEqual([1]);
       expect(page.facets).toEqual({ total: 2, published: 1, locked: 1 });
+    });
+
+    it('tells the list what blocks each draft, with the publish rule', async () => {
+      prisma.grammarTopic.findMany.mockResolvedValue([
+        {
+          id: 3,
+          title: 'Ready',
+          description: 'Lý thuyết đủ.',
+          publicationStatus: 'DRAFT',
+          _count: { questions: 1 },
+        },
+        {
+          id: 2,
+          title: 'No theory',
+          description: null,
+          publicationStatus: 'DRAFT',
+          _count: { questions: 1 },
+        },
+        {
+          id: 1,
+          title: 'Live',
+          description: null,
+          publicationStatus: 'PUBLISHED',
+          _count: { questions: 0 },
+        },
+      ]);
+      prisma.grammarAttempt.groupBy = jest.fn().mockResolvedValue([]);
+      const valid = {
+        question: 'She ___ here.',
+        options: ['works', 'work', 'working', 'worked'],
+        correctIndex: 0,
+      };
+      prisma.grammarQuestion.findMany.mockResolvedValue([
+        { topicId: 3, ...valid },
+        { topicId: 2, ...valid },
+      ]);
+      const page = (await grammarService.getAdminTopics({ page: '1' })) as any;
+      expect(page.items.map((t: any) => [t.id, t.publishProblems])).toEqual([
+        [3, []],
+        [2, ['có phần lý thuyết']],
+        [1, []],
+      ]);
+      expect(prisma.grammarQuestion.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { topicId: { in: [3, 2] } } }),
+      );
     });
   });
 });

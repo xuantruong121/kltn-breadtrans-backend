@@ -18,6 +18,7 @@ import {
   SuggestWritingTaskDto,
   SuggestSpeakingPracticeSetDto,
   SuggestSpeakingExercisesDto,
+  SuggestListeningFullDraftDto,
 } from './dto/contextual-ai.dto';
 
 describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () => {
@@ -180,6 +181,58 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         true,
       );
     });
+
+    it('lets a Listening full draft be written in all three forms, and no other', async () => {
+      for (const mode of ['DIALOGUE', 'DICTATION', 'COMPREHENSION']) {
+        const errors = await validate(
+          plainToInstance(SuggestListeningFullDraftDto, {
+            topic: 'Getting around town',
+            level: 'A2',
+            mode,
+            count: 10,
+          }),
+        );
+        expect(errors).toEqual([]);
+      }
+      const errors = await validate(
+        plainToInstance(SuggestListeningFullDraftDto, {
+          topic: 'Getting around town',
+          mode: 'VIDEO',
+          // Up to 30: "Nghe chép" asks for 20-30 sentences.
+          count: 31,
+        }),
+      );
+      expect(errors.some((e) => e.property === 'mode')).toBe(true);
+      expect(errors.some((e) => e.property === 'count')).toBe(true);
+    });
+
+    it('passes a COMPREHENSION full draft request through unchanged', async () => {
+      const draft = {
+        title: 'Getting around town',
+        description: 'Short sentences.',
+        level: 'A2',
+        mode: 'COMPREHENSION',
+        questions: [],
+      };
+      mockAiService.suggestListeningFullDraft = jest
+        .fn()
+        .mockResolvedValue(draft);
+      await expect(
+        controller.suggestListeningFullDraft({
+          topic: 'Getting around town',
+          level: 'A2',
+          mode: 'COMPREHENSION',
+          count: 3,
+        }),
+      ).resolves.toBe(draft);
+      expect(mockAiService.suggestListeningFullDraft).toHaveBeenCalledWith({
+        topic: 'Getting around town',
+        level: 'A2',
+        mode: 'COMPREHENSION',
+        count: 3,
+        sourceText: undefined,
+      });
+    });
   });
 
   describe('3. No Direct Database Mutation Invariant', () => {
@@ -233,6 +286,27 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestVocabWord({ word: 'resilience' }),
       ).rejects.toThrow(BadGatewayException);
+    });
+
+    it('a failed grammar full draft says so in Vietnamese, with no English word', async () => {
+      mockAiService.suggestGrammarFullDraft = jest
+        .fn()
+        .mockRejectedValue(new Error('503 Service Unavailable'));
+
+      const failure = controller
+        .suggestGrammarFullDraft({
+          topicTitle: 'Câu điều kiện',
+          level: 'INTERMEDIATE',
+          count: 2,
+        })
+        .catch((error: unknown) => error);
+      const error = (await failure) as BadGatewayException;
+
+      expect(error).toBeInstanceOf(BadGatewayException);
+      expect(error.message).toBe(
+        'Không thể soạn chủ đề ngữ pháp lúc này. Vui lòng thử lại sau.',
+      );
+      expect(error.message).not.toMatch(/Grammar/);
     });
 
     it('preserves BadRequestException when daily quota limit is reached', async () => {
@@ -634,6 +708,121 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(controller.suggestToeicPart5({ count: 2 })).rejects.toThrow(
         BadGatewayException,
       );
+    });
+
+    // QA 2026-11-22: one "Nghe chép" draft answered a plain 500. Every
+    // failure of the Nghe, Đọc and Viết drafts must be a 502 (or the 400 it
+    // already was) with a Vietnamese sentence naming what failed.
+    const draftCalls: Array<
+      [string, keyof AiService, () => Promise<unknown>, string]
+    > = [
+      [
+        'listening full draft',
+        'suggestListeningFullDraft',
+        () =>
+          controller.suggestListeningFullDraft({
+            topic: 'đặt lịch hẹn',
+            mode: 'DICTATION',
+            count: 20,
+          }),
+        'Không thể soạn bài nghe lúc này. Vui lòng thử lại sau.',
+      ],
+      [
+        'reading full draft',
+        'suggestReadingFullDraft',
+        () =>
+          controller.suggestReadingFullDraft({
+            topic: 'Remote work',
+            level: 'B1',
+            count: 3,
+          }),
+        'Không thể soạn bài đọc lúc này. Vui lòng thử lại sau.',
+      ],
+      [
+        'writing full draft',
+        'suggestWritingFullDraft',
+        () =>
+          controller.suggestWritingFullDraft({
+            topic: 'Email',
+            level: 'B1',
+            kind: 'EMAIL',
+            count: 3,
+          }),
+        'Không thể soạn bài viết lúc này. Vui lòng thử lại sau.',
+      ],
+      [
+        'dictation lines',
+        'suggestDictationLines',
+        () => controller.suggestDictationLines({ topic: 't', count: 20 }),
+        'Không thể soạn câu nghe chép lúc này. Vui lòng thử lại sau.',
+      ],
+      [
+        'listening content',
+        'suggestListeningContent',
+        () => controller.suggestListeningContent({ mode: 'DICTATION' }),
+        'Không thể gợi ý lời thoại từ AI lúc này. Vui lòng thử lại sau.',
+      ],
+      [
+        'writing task',
+        'suggestWritingTask',
+        () => controller.suggestWritingTask({ taskType: 'EMAIL' }),
+        'Không thể gợi ý đề bài viết từ AI lúc này. Vui lòng thử lại sau.',
+      ],
+    ];
+    const failures: Array<[string, Error]> = [
+      ['a JSON parse error', new SyntaxError('Unexpected end of JSON input')],
+      [
+        'a type error',
+        new TypeError("Cannot read properties of undefined (reading 'map')"),
+      ],
+      ['a timeout', new Error('Gemini provider request timed out')],
+    ];
+
+    it.each(
+      draftCalls.flatMap(([name, method, call, message]) =>
+        failures.map(
+          ([kind, error]) =>
+            [name, kind, method, call, message, error] as const,
+        ),
+      ),
+    )(
+      'the %s answers 502 with a Vietnamese message on %s',
+      async (_name, _kind, method, call, message, error) => {
+        mockAiService[method] = jest.fn().mockRejectedValue(error);
+        const thrown = await call().catch((caught: unknown) => caught);
+        expect(thrown).toBeInstanceOf(BadGatewayException);
+        expect((thrown as BadGatewayException).message).toBe(message);
+      },
+    );
+
+    it('keeps a 400 a 400 (daily AI quota)', async () => {
+      mockAiService.suggestListeningFullDraft = jest
+        .fn()
+        .mockRejectedValue(new BadRequestException('Đã vượt quá hạn mức'));
+      await expect(
+        controller.suggestListeningFullDraft({
+          topic: 't',
+          mode: 'DIALOGUE',
+          count: 3,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('drops Vietnamese dictation lines before they reach the editor', async () => {
+      mockAiService.suggestDictationLines = jest.fn().mockResolvedValue({
+        title: 'Lịch hẹn',
+        sentences: [
+          'Tôi muốn đặt lịch hẹn vào thứ Hai.',
+          'I would like to book an appointment on Monday.',
+        ],
+      });
+      const draft = await controller.suggestDictationLines({
+        topic: 'đặt lịch hẹn',
+        count: 20,
+      });
+      expect(draft.sentences).toEqual([
+        'I would like to book an appointment on Monday.',
+      ]);
     });
 
     it.each([

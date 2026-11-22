@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from './r2.service';
+import { ContentFilesService } from './content-files.service';
 
 @Injectable()
 export class R2CleanupService {
@@ -9,6 +10,8 @@ export class R2CleanupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly r2Service: R2Service,
+    // Absent in the speaking worker, which never deletes content.
+    @Optional() private readonly contentFiles?: ContentFilesService,
   ) {}
 
   /**
@@ -37,6 +40,10 @@ export class R2CleanupService {
    */
   async runCleanup() {
     this.logger.log('Starting queued R2 audio TTL cleanup job...');
+
+    // Files of deleted content whose delete failed (bug 2026-11-22). First,
+    // so the early return below never skips them; it never fails the job.
+    await this.contentFiles?.retryFailed().catch(() => undefined);
 
     const retentionDays = 90;
     const thresholdDate = new Date();

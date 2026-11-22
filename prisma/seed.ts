@@ -5405,6 +5405,16 @@ async function main() {
       update: { name, description, criteria },
       create: { id, name, description, criteria },
     });
+  // The badges above keep fixed IDs; move the serial sequence past them so the
+  // shop badges below get a fresh ID (seed rehearsal 2026-11-22 failed with
+  // P2002 on Badge.id: the sequence still stood at 1 on an empty database).
+  await prisma.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('"Badge"', 'id'),
+      COALESCE((SELECT MAX("id") FROM "Badge"), 1),
+      true
+    )
+  `;
   // Shop badges (owner 2026-11-19), matched by name, never a fixed id: the
   // purchase creates the same row on first sale (market.service createOrder).
   for (const [slug, name] of [
@@ -10714,72 +10724,8 @@ async function main() {
     toeicGroupId += 1;
   }
 
-  const toeicPartPractice = await prisma.toeicExamSet.upsert({
-    where: { id: 2 },
-    update: {
-      title: 'TOEIC Practice by Part — Part 1–7',
-      description:
-        'Ngân hàng luyện theo Part dùng các nhóm đại diện từ đề thi chuẩn để luyện dạng bài.',
-      type: ExamType.PRACTICE_BY_PART,
-      difficulty: 'medium',
-      createdBy: admin.id,
-    },
-    create: {
-      id: 2,
-      title: 'TOEIC Practice by Part — Part 1–7',
-      description:
-        'Ngân hàng luyện theo Part dùng các nhóm đại diện từ đề thi chuẩn để luyện dạng bài.',
-      type: ExamType.PRACTICE_BY_PART,
-      difficulty: 'medium',
-      createdBy: admin.id,
-    },
-  });
-  await prisma.toeicQuestionGroup.deleteMany({
-    where: { examId: toeicPartPractice.id },
-  });
-  const representativeGroups = [
-    toeicFullMockGroups.find((g) => g.part === 1)!,
-    toeicFullMockGroups.find((g) => g.part === 2)!,
-    toeicFullMockGroups.find((g) => g.part === 3)!,
-    toeicFullMockGroups.find((g) => g.part === 4)!,
-    toeicFullMockGroups.find((g) => g.part === 5)!,
-    toeicFullMockGroups.find((g) => g.part === 6)!,
-    toeicFullMockGroups.find((g) => g.part === 7)!,
-  ];
-  let practiceGroupId = 1001;
-  let practiceQuestionId = 1001;
-  for (const sourceGroup of representativeGroups) {
-    const group = await prisma.toeicQuestionGroup.create({
-      data: {
-        id: practiceGroupId,
-        examId: toeicPartPractice.id,
-        part: sourceGroup.part,
-        passageText: sourceGroup.passageText,
-        audioUrl: sourceGroup.audioUrl,
-        imageUrl: sourceGroup.imageUrl,
-        groupOrder: sourceGroup.part,
-      },
-    });
-    const sourceQuestions =
-      sourceGroup.part === 5
-        ? sourceGroup.questions.slice(0, 10)
-        : sourceGroup.questions;
-    for (const item of sourceQuestions) {
-      await prisma.toeicQuestion.create({
-        data: {
-          id: practiceQuestionId,
-          groupId: group.id,
-          questionNumber: practiceQuestionId,
-          text: item.text,
-          options: item.options,
-          correctIndex: item.correctIndex,
-          explanation: item.explanation,
-        },
-      });
-      practiceQuestionId += 1;
-    }
-    practiceGroupId += 1;
-  }
+  // No separate "Practice by Part" set: learners practise by Part inside the
+  // L&R full test above (owner 2026-11-22). The old set 2 was deleted.
 
   // Seed one internally consistent completed L&R attempt. A perfect raw response can safely use
   // the official maximum section scales (495 + 495 = 990); we intentionally avoid inventing

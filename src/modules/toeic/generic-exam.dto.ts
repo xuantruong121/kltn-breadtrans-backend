@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -7,6 +8,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { PART_PRACTICE_CLOSED } from './exam-template.registry';
 
 export class CreateGenericExamDto {
   @IsString()
@@ -33,8 +35,10 @@ export class CreateGenericExamDto {
   @IsOptional()
   variant?: string;
 
-  // Legacy TOEIC L&R form compatibility during the transition.
+  // Legacy TOEIC L&R form compatibility during the transition. A new exam is a
+  // full test (owner 2026-11-22): part practice lives inside an L&R full test.
   @IsString()
+  @IsIn(['FULL_TEST'], { message: PART_PRACTICE_CLOSED })
   @IsOptional()
   type?: string;
 
