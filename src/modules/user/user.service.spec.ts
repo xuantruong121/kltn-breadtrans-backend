@@ -463,13 +463,16 @@ describe('UserService', () => {
   describe('getSkillProgressSummary', () => {
     it('uses visible Speaking practice sets as the primary completion unit', async () => {
       mockPrismaService.submission.findMany.mockResolvedValue([]);
+      // Grouped by the set each exercise belongs to (practiceSetId).
+      const daily = { id: 'set-daily', title: 'Read Aloud', description: '' };
+      const work = { id: 'set-work', title: 'Question', description: '' };
       mockPrismaService.speakingExercise.findMany.mockResolvedValue([
-        { id: 1, title: 'Read Aloud — Daily 1', category: 'GENERAL' },
-        { id: 2, title: 'Read Aloud — Daily 2', category: 'GENERAL' },
-        { id: 3, title: 'Read Aloud — Daily 3', category: 'GENERAL' },
-        { id: 4, title: 'Read Aloud — Daily 4', category: 'GENERAL' },
-        { id: 5, title: 'Question Response — Work 1', category: 'BUSINESS' },
-        { id: 6, title: 'Question Response — Work 2', category: 'BUSINESS' },
+        { id: 1, title: 'Read Aloud — Daily 1', practiceSet: daily },
+        { id: 2, title: 'Read Aloud — Daily 2', practiceSet: daily },
+        { id: 3, title: 'Read Aloud — Daily 3', practiceSet: daily },
+        { id: 4, title: 'Read Aloud — Daily 4', practiceSet: daily },
+        { id: 5, title: 'Question Response — Work 1', practiceSet: work },
+        { id: 6, title: 'Question Response — Work 2', practiceSet: work },
       ]);
       mockPrismaService.speakingSubmission.findMany.mockResolvedValue([
         ...[1, 1, 1, 2, 3].map((exerciseId, index) => ({

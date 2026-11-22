@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as webpush from 'web-push';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubscribeDto, SendPushPayload } from './dto/push-subscription.dto';
+import { ACTIVE_ACCOUNT } from '../account/account-deletion.logic';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -88,15 +89,17 @@ export class NotificationsService implements OnModuleInit {
 
   async sendPushToUser(userId: number, payload: SendPushPayload) {
     try {
+      // An account waiting for deletion gets no push (owner 2026-11-21). Its
+      // subscriptions stay, so push comes back once the deletion is cancelled.
       const subscriptions = await (
         this.prisma as any
       ).pushSubscription.findMany({
-        where: { userId },
+        where: { userId, user: ACTIVE_ACCOUNT },
       });
 
       if (!subscriptions || subscriptions.length === 0) {
         this.logger.debug(
-          `User #${userId} has no registered push subscriptions.`,
+          `User #${userId} has no push subscription to send to.`,
         );
         return { sent: 0, failed: 0 };
       }

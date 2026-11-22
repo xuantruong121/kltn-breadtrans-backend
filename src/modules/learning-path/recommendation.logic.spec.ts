@@ -37,6 +37,7 @@ const item = (
 });
 const learner = (extra: Partial<LearnerState> = {}): LearnerState => ({
   track: 'GENERAL',
+  trackName: 'Chung',
   goal: 'GENERAL',
   skills: {
     LISTENING: { level: 'BASIC', unlockedLevel: 'BASIC', ability: -0.9 },
@@ -89,10 +90,14 @@ describe('recommend', () => {
   it('boosts the career track and the weakest skill', () => {
     const it1 = item('READING', 'BASIC', { tracks: ['IT_SOFTWARE'] });
     const plain = item('READING', 'BASIC');
-    const r = recommend([plain, it1], learner({ track: 'IT_SOFTWARE' }), {
-      limit: 2,
-      skill: 'READING',
-    });
+    const r = recommend(
+      [plain, it1],
+      learner({ track: 'IT_SOFTWARE', trackName: 'Công nghệ thông tin' }),
+      {
+        limit: 2,
+        skill: 'READING',
+      },
+    );
     expect(r[0].candidate).toBe(it1);
     expect(r[0].reasons).toContain('Chủ đề Công nghệ thông tin');
     const mixed = recommend(
@@ -102,6 +107,24 @@ describe('recommend', () => {
     );
     expect(mixed[0].candidate.skill).toBe('LISTENING');
     expect(mixed[0].reasons).toContain('Kỹ năng cần cải thiện: Nghe');
+  });
+
+  it('names the track as admins named it, and gives GENERAL no boost', () => {
+    const tagged = item('READING', 'BASIC', { tracks: ['Y_TE'] });
+    const [renamed] = recommend(
+      [tagged],
+      learner({ track: 'Y_TE', trackName: 'Y tế – Điều dưỡng' }),
+      { limit: 1, skill: 'READING' },
+    );
+    expect(renamed.reasons).toContain('Chủ đề Y tế – Điều dưỡng');
+    const general = item('READING', 'BASIC', { tracks: ['GENERAL'] });
+    const [plain] = recommend([general], learner(), {
+      limit: 1,
+      skill: 'READING',
+    });
+    expect(plain.reasons.some((reason) => reason.startsWith('Chủ đề'))).toBe(
+      false,
+    );
   });
 
   it('sinks mastered items and brings back low scores after two days', () => {

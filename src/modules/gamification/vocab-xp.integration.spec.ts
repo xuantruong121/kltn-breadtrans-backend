@@ -59,17 +59,26 @@ describeWithIsolatedDatabase('GamificationService.awardVocabWordXp', () => {
     expect(await prisma.banhTransaction.count({ where: { userId } })).toBe(0);
   });
 
-  it('80 words, 8 at a time, stop at the 150 XP daily cap', async () => {
-    const userId = await learner('cap');
+  // 80 awards run one after another on the learner's lock: about 2 s alone,
+  // 2.5 s with four copies at once, but the suite took 16 s in a full run on
+  // 2026-11-21 and failed on jest's default 5 s (then passed alone).
+  const CAP_TEST_TIMEOUT_MS = 60_000;
 
-    // Eight at once: more would wait on the connection pool, not the lock.
-    for (let start = 0; start < 80; start += 8)
-      await Promise.all(
-        Array.from({ length: 8 }, (_, i) =>
-          service.awardVocabWordXp(userId, 1000 + start + i),
-        ),
-      );
+  it(
+    '80 words, 8 at a time, stop at the 150 XP daily cap',
+    async () => {
+      const userId = await learner('cap');
 
-    expect(await flashcardXp(userId)).toBe(VOCAB_XP_DAILY_CAP);
-  });
+      // Eight at once: more would wait on the connection pool, not the lock.
+      for (let start = 0; start < 80; start += 8)
+        await Promise.all(
+          Array.from({ length: 8 }, (_, i) =>
+            service.awardVocabWordXp(userId, 1000 + start + i),
+          ),
+        );
+
+      expect(await flashcardXp(userId)).toBe(VOCAB_XP_DAILY_CAP);
+    },
+    CAP_TEST_TIMEOUT_MS,
+  );
 });

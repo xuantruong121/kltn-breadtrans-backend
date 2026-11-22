@@ -90,7 +90,6 @@ async function main() {
     {
       title: `${prefix}-set`,
       description: 'Cross-role lifecycle fixture',
-      category: 'DAILY_LIFE',
       level: 'BEGINNER',
     },
     adminToken,
@@ -101,7 +100,6 @@ async function main() {
     {
       title: `${prefix}-first`,
       targetText: 'Please introduce yourself.',
-      category: 'DAILY_LIFE',
       difficulty: 'BEGINNER',
     },
     adminToken,
@@ -128,7 +126,6 @@ async function main() {
     {
       title: `${prefix}-second`,
       targetText: 'Tell me about your daily routine.',
-      category: 'DAILY_LIFE',
       difficulty: 'BEGINNER',
     },
     adminToken,

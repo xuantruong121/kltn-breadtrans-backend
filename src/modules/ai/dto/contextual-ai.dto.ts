@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   ArrayMaxSize,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -245,8 +246,14 @@ export class SuggestSpeakingPracticeSetDto {
   @IsIn(SPEAKING_LEVELS)
   level: string;
 
+  /**
+   * Lĩnh vực the draft is written for: an active track code. Empty for a
+   * general draft. Replaces the required speaking category (2026-11-21).
+   */
+  @IsOptional()
   @IsString()
-  category: string;
+  @Matches(/^[A-Z0-9_]{1,40}$/)
+  track?: string;
 
   @IsOptional()
   @IsString()
@@ -273,8 +280,14 @@ export class SuggestSpeakingExercisesDto {
   @IsIn(SPEAKING_LEVELS)
   level: string;
 
+  /**
+   * Lĩnh vực the draft is written for: an active track code. Empty for a
+   * general draft. Replaces the required speaking category (2026-11-21).
+   */
+  @IsOptional()
   @IsString()
-  category: string;
+  @Matches(/^[A-Z0-9_]{1,40}$/)
+  track?: string;
 
   @IsOptional()
   @IsString()
@@ -318,8 +331,14 @@ export class SuggestSpeakingFullDraftDto {
   @IsIn(SPEAKING_LEVELS)
   level: string;
 
+  /**
+   * Lĩnh vực the draft is written for: an active track code. Empty for a
+   * general draft. Replaces the required speaking category (2026-11-21).
+   */
+  @IsOptional()
   @IsString()
-  category: string;
+  @Matches(/^[A-Z0-9_]{1,40}$/)
+  track?: string;
 
   @IsOptional()
   @IsString()

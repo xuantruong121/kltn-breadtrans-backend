@@ -54,6 +54,7 @@ import { Prisma, Role } from '@prisma/client';
 import { GoogleProfile } from './strategies/google.strategy';
 import { OAuth2Client } from 'google-auth-library';
 import { EmailService } from '../../common/email/email.service';
+import { passwordChangedEmail } from '../../common/email/email-templates';
 
 /**
  * Two sign-ups with one e-mail at once (a double submit, two tabs) both pass
@@ -181,9 +182,10 @@ export class AuthService {
     }
 
     const password = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { password, mustChangePassword: false },
+      select: { email: true },
     });
     forgetAuthUser(userId);
     await this.redis.del(userTokenKey);
@@ -192,8 +194,32 @@ export class AuthService {
     await this.sessions.markPasswordChanged(userId);
     // Every device, and every access token it still holds.
     await this.sessions.revokeAll(userId);
+    void this.noticePasswordChanged(updated?.email, 'all');
 
     return { message: 'Đặt lại mật khẩu thành công.' };
+  }
+
+  /**
+   * Security notice after a password change (owner 2026-11-21). Sent in the
+   * background: a mail failure never fails the change.
+   */
+  private async noticePasswordChanged(
+    to: string | undefined,
+    signedOut: 'all' | 'others',
+  ) {
+    if (!to) return;
+    try {
+      await this.emailService.sendPasswordChanged(
+        to,
+        passwordChangedEmail({
+          changedAt: new Date(),
+          signedOut,
+          appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        }),
+      );
+    } catch (error) {
+      this.logger.warn(`password_changed_email_failed: ${String(error)}`);
+    }
   }
   async login(loginDto: LoginDto, deviceId: string, meta: DeviceMeta = {}) {
     const { email, password } = loginDto;
@@ -396,6 +422,10 @@ export class AuthService {
     await this.sessions.markPasswordChanged(userId);
     // Someone holding another session must not keep it (owner 2026-11-14).
     const signedOut = await this.sessions.revokeAll(userId, currentDeviceId);
+    void this.noticePasswordChanged(
+      user.email,
+      currentDeviceId ? 'others' : 'all',
+    );
     return { message: 'Đổi mật khẩu thành công.', signedOutDevices: signedOut };
   }
 

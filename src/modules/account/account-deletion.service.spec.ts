@@ -48,7 +48,7 @@ describe('AccountDeletionService (owner 2026-11-16)', () => {
   });
 
   describe('request', () => {
-    it('locks the account for 7 days after the right password', async () => {
+    it('locks the account for at least 7 full days after the right password', async () => {
       prisma.user.findUnique.mockResolvedValue(learner());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -59,11 +59,16 @@ describe('AccountDeletionService (owner 2026-11-16)', () => {
       expect(update.where).toEqual({ id: 5 });
       expect(update.data.deletionRequestedAt).toBeInstanceOf(Date);
       const days = (new Date(scheduledAt).getTime() - before) / 86_400_000;
-      expect(days).toBeGreaterThan(6.99);
-      expect(days).toBeLessThan(7.01);
+      expect(days).toBeGreaterThanOrEqual(7);
+      expect(days).toBeLessThan(8);
+      // 00:00 in Vietnam (17:00Z), the day the 00:02 purge runs (owner 2026-11-21).
+      expect(scheduledAt).toMatch(/T17:00:00\.000Z$/);
       expect(email.sendAccountDeletionScheduled).toHaveBeenCalledWith(
         'learner@example.com',
-        expect.stringContaining('Huỷ yêu cầu xoá'),
+        expect.objectContaining({
+          subject: 'Yêu cầu xoá tài khoản BreadTrans đã được ghi nhận',
+          html: expect.stringContaining('Huỷ yêu cầu xoá'),
+        }),
       );
     });
 

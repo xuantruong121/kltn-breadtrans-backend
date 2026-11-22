@@ -21,6 +21,7 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
     smembers: jest.fn().mockResolvedValue([]),
     srem: jest.fn().mockResolvedValue(1),
   };
+  const email = { sendAccountDeleted: jest.fn().mockResolvedValue(undefined) };
   const suffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
   const createdUserIds: number[] = [];
 
@@ -72,7 +73,12 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    service = new AccountPurgeService(prisma, r2 as never, redis as never);
+    service = new AccountPurgeService(
+      prisma,
+      r2 as never,
+      redis as never,
+      email as never,
+    );
   });
 
   afterAll(async () => {
@@ -216,6 +222,28 @@ describeWithIsolatedDatabase('AccountPurgeService PostgreSQL', () => {
       { id: `purge-published-${suffix}`, status: 'PUBLISHED' },
       { id: `purge-queued-${suffix}`, status: 'CANCELLED' },
     ]);
+  });
+
+  it('mails a learner who asked once the account is gone, never on a plain admin delete (owner 2026-11-21)', async () => {
+    const asked = await makeUser('notice', new Date(Date.now() - 1000));
+    await expect(service.purgeUser(asked.id)).resolves.toBe('DELETED');
+    expect(email.sendAccountDeleted).toHaveBeenCalledWith(
+      asked.email,
+      expect.objectContaining({ subject: 'Tài khoản BreadTrans đã được xoá' }),
+    );
+
+    email.sendAccountDeleted.mockClear();
+    const notAsked = await makeUser('notice-admin', null);
+    await expect(service.purgeUser(notAsked.id)).resolves.toBe('DELETED');
+    expect(email.sendAccountDeleted).not.toHaveBeenCalled();
+
+    // A failing mail neither fails nor undoes the purge.
+    email.sendAccountDeleted.mockRejectedValueOnce(new Error('SMTP down'));
+    const failing = await makeUser('notice-fail', new Date(Date.now() - 1000));
+    await expect(service.purgeUser(failing.id)).resolves.toBe('DELETED');
+    expect(
+      await prisma.user.findUnique({ where: { id: failing.id } }),
+    ).toBeNull();
   });
 
   it('the database refuses to delete a user who still has an order', async () => {

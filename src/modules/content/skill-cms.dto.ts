@@ -14,13 +14,14 @@ import {
   MaxLength,
   ArrayMaxSize,
   ArrayMinSize,
+  Matches,
   ValidateNested,
   registerDecorator,
   type ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { LearningTrack, QuizPublicationStatus } from '@prisma/client';
+import { QuizPublicationStatus } from '@prisma/client';
 import {
   SPEAKING_EXERCISE_DIFFICULTIES,
   SPEAKING_TASK_TYPES,
@@ -119,9 +120,8 @@ export class SkillContentDto {
   publicationStatus?: QuizPublicationStatus;
 
   // Speaking set fields. Kept explicit so the admin UI never sends arbitrary JSON.
-  @IsOptional()
-  @IsString()
-  category?: string;
+  // No category: Phân loại folded into Lĩnh vực (2026-11-21), set with PUT
+  // :domain/:id/tracks. Its table and columns were dropped (2026-11-22).
 
   @IsOptional()
   @IsString()
@@ -346,14 +346,17 @@ export class WritingQuestionDto {
 
 export class SkillTracksDto {
   @ApiProperty({
-    enum: LearningTrack,
-    isArray: true,
-    description: 'Toàn bộ lĩnh vực của nội dung; thay thế danh sách cũ',
+    type: [String],
+    example: ['IT_SOFTWARE'],
+    description:
+      'Mã lĩnh vực của nội dung; thay thế danh sách cũ. Chỉ thêm được lĩnh vực đang bật; lĩnh vực đã tắt mà nội dung đang có thì giữ được.',
   })
   @IsArray()
   @ArrayUnique()
-  @IsEnum(LearningTrack, { each: true })
-  tracks!: LearningTrack[];
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @Matches(/^[A-Z0-9_]{1,40}$/, { each: true })
+  tracks!: string[];
 }
 
 export class SkillPublishDto {
@@ -373,10 +376,6 @@ export class SpeakingExerciseDto {
   @IsString()
   @IsNotEmpty()
   targetText!: string;
-
-  @IsOptional()
-  @IsString()
-  category?: string;
 
   @IsOptional()
   @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])

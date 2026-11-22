@@ -857,23 +857,6 @@ model LearnerEvent {
 }
 
 // Speaking Practice Models
-model SpeakingCategory {
-  id               Int      @id @default(autoincrement())
-  code             String   @unique
-  name             String
-  nameNormalized   String   @unique
-  description      String?  @db.Text
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  allowPracticeSet Boolean  @default(false)
-  allowExercise    Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  practiceSets SpeakingPracticeSet[] @relation("SpeakingPracticeSetCategory")
-  exercises    SpeakingExercise[]    @relation("SpeakingExerciseCategory")
-}
-
 enum SpeakingExerciseTaskType {
   READ_ALOUD
   DESCRIBE_PICTURE
@@ -908,24 +891,20 @@ model SpeakingExercise {
   audioUrl          String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
   isPremiumContent  Boolean                   @default(false)
   difficulty        String                    @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
-  category          String                    @default("TOEIC") // IELTS, TOEIC, GENERAL
   taskType          SpeakingExerciseTaskType?
-  categoryId        Int?
   practiceSetId     String?
   order             Int?
   stimulusId        Int?
   publicationStatus QuizPublicationStatus     @default(DRAFT)
   createdAt         DateTime                  @default(now())
 
-  submissions      SpeakingSubmission[]
-  uploadIntents    SpeakingUploadIntent[]
-  practiceSet      SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
-  categoryTaxonomy SpeakingCategory?      @relation("SpeakingExerciseCategory", fields: [categoryId], references: [id], onDelete: Restrict)
-  stimulus         SpeakingStimulus?      @relation(fields: [stimulusId], references: [id], onDelete: SetNull)
+  submissions   SpeakingSubmission[]
+  uploadIntents SpeakingUploadIntent[]
+  practiceSet   SpeakingPracticeSet?   @relation(fields: [practiceSetId], references: [id], onDelete: SetNull)
+  stimulus      SpeakingStimulus?      @relation(fields: [stimulusId], references: [id], onDelete: SetNull)
 
   @@unique([practiceSetId, order])
   @@index([practiceSetId])
-  @@index([categoryId])
   @@index([taskType])
   @@index([stimulusId])
 }
@@ -934,8 +913,6 @@ model SpeakingPracticeSet {
   id                String                @id
   title             String
   description       String
-  category          String
-  categoryId        Int
   level             String
   scope             SpeakingPracticeScope @default(SKILL_PRACTICE)
   publicationStatus QuizPublicationStatus @default(DRAFT)
@@ -944,9 +921,7 @@ model SpeakingPracticeSet {
 
   exercises            SpeakingExercise[]
   assessmentComponents ToeicAssessmentComponent[] @relation("ToeicAssessmentSpeakingSource")
-  categoryTaxonomy     SpeakingCategory           @relation("SpeakingPracticeSetCategory", fields: [categoryId], references: [id], onDelete: Restrict)
-
-  @@index([categoryId])
+  tracks               SpeakingSetTrack[]
 }
 
 enum SpeakingSubmissionStatus {
@@ -2570,14 +2545,26 @@ model UserVocabMasteryReward {
 // xuất". They are not CEFR levels and not a certificate.
 // ---------------------------------------------------------------------------
 
-/// Career or study direction the learner chose; drives content matching.
-enum LearningTrack {
-  GENERAL
-  IT_SOFTWARE
-  OFFICE_BUSINESS
-  SALES_CUSTOMER_SERVICE
-  HOSPITALITY_TOURISM
-  STUDENT_ACADEMIC
+/// Career or study direction ("Lĩnh vực") a learner chooses and content is
+/// tagged with; drives content matching. Admins manage the list (owner
+/// 2026-11-21). The code is the key and never changes. GENERAL is the
+/// default every learner starts on: it can be renamed, never deactivated or
+/// deleted. A deactivated track is not offered for new choices or tags; the
+/// choices and tags already made stay.
+model LearningTrack {
+  code           String   @id
+  name           String
+  /// No diacritics, lower case, single spaces: blocks duplicate names.
+  nameNormalized String   @unique
+  description    String?  @db.Text
+  sortOrder      Int      @default(100)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  learners     LearnerProfile[]
+  contentTags  ContentTrackTag[]
+  speakingSets SpeakingSetTrack[]
 }
 
 /// Internal practice level: Mất gốc / Cơ bản / Trung cấp / Nâng cao.
@@ -2635,7 +2622,8 @@ enum LearningPlanItemStatus {
 model LearnerProfile {
   userId             Int             @id
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track              LearningTrack   @default(GENERAL)
+  track              String          @default("GENERAL")
+  trackRef           LearningTrack   @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
   goal               LearningGoal    @default(GENERAL)
   minutesPerDay      Int             @default(15)
   targetDate         DateTime?
@@ -2647,6 +2635,8 @@ model LearnerProfile {
   onboardedAt        DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
+
+  @@index([track])
 }
 
 /// The learner's current level and ability per skill.
@@ -2732,15 +2722,32 @@ model GateAttempt {
   @@index([userId, skill, level, createdAt])
 }
 
-/// Track tags on existing content; no change to the content tables.
+/// Track tags on existing content; no change to the content tables. Quizzes
+/// only: a speaking set keeps its tags in SpeakingSetTrack (2026-11-21).
 model ContentTrackTag {
   contentType LearningContentType
   contentId   Int
-  track       LearningTrack
+  track       String
+  trackRef    LearningTrack       @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
   createdById Int?
   createdAt   DateTime            @default(now())
 
   @@id([contentType, contentId, track])
+  @@index([track])
+}
+
+/// Track tags of a speaking set, on the set itself (2026-11-21). They used to
+/// sit on the set's first exercise in ContentTrackTag: deleting that exercise
+/// dropped the tags, and a set without exercises could not be tagged.
+model SpeakingSetTrack {
+  setId       String
+  set         SpeakingPracticeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  track       String
+  trackRef    LearningTrack       @relation(fields: [track], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  createdById Int?
+  createdAt   DateTime            @default(now())
+
+  @@id([setId, track])
   @@index([track])
 }
 

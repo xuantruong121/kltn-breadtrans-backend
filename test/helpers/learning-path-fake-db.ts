@@ -5,13 +5,38 @@ export function fakeDb() {
   const levels = new Map<string, any>();
   const unlocks = new Map<string, any>();
   const progressEvents: Array<{ userId: number; skill: string }> = [];
+  /** Two of the Lĩnh vực rows the 2026-11-21 migration seeds. */
+  const tracks = new Map<
+    string,
+    { code: string; name: string; isActive: boolean }
+  >([
+    ['GENERAL', { code: 'GENERAL', name: 'Chung', isActive: true }],
+    [
+      'IT_SOFTWARE',
+      { code: 'IT_SOFTWARE', name: 'Công nghệ thông tin', isActive: true },
+    ],
+  ]);
   const key = (w: any) => `${w.userId_skill.userId}:${w.userId_skill.skill}`;
   return {
     profiles,
     levels,
     unlocks,
+    tracks,
     /** Graded attempts by skill: only applySelfLevel reads this. */
     progressEvents,
+    learningTrack: {
+      findUnique: ({ where }: any) =>
+        Promise.resolve(tracks.get(where.code) ?? null),
+      findFirst: ({ where }: any) => {
+        const row = tracks.get(where.code);
+        return Promise.resolve(
+          row &&
+            (where.isActive === undefined || row.isActive === where.isActive)
+            ? row
+            : null,
+        );
+      },
+    },
     learnerProgressEvent: {
       count: ({ where }: any) =>
         Promise.resolve(

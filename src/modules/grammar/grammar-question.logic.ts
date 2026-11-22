@@ -95,6 +95,7 @@ export function filterGrammarTopics<T extends GrammarTopicListRow>(
   );
   const order: Record<string, (a: T, b: T) => number> = {
     NEWEST: (a, b) => b.id - a.id,
+    OLDEST: (a, b) => a.id - b.id,
     TITLE: (a, b) => a.title.localeCompare(b.title, 'vi'),
     LEVEL: (a, b) =>
       (LEVEL_RANK[a.level] ?? 9) - (LEVEL_RANK[b.level] ?? 9) || b.id - a.id,

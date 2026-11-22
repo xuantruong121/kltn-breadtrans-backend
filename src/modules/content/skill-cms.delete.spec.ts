@@ -59,6 +59,9 @@ describe('SkillCmsService.deleteContent', () => {
       toeicWritingSetItem: {
         count: jest.fn().mockResolvedValue(over.examItems ?? 0),
       },
+      contentTrackTag: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       // The row locks of the delete paths (audit A5): SELECT ... FOR UPDATE.
       $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
@@ -134,6 +137,10 @@ describe('SkillCmsService.deleteContent', () => {
     const prisma = quizPrisma();
     await new SkillCmsService(prisma).deleteContent('listening', '31', admin);
     expect(prisma.quiz.delete).toHaveBeenCalledWith({ where: { id: 31 } });
+    // Its tags go too: they have no foreign key to the quiz.
+    expect(prisma.contentTrackTag.deleteMany).toHaveBeenCalledWith({
+      where: { contentType: 'QUIZ', contentId: 31 },
+    });
   });
 
   it('refuses a published quiz, a quiz with submissions, and a TOEIC writing task', async () => {
@@ -146,6 +153,7 @@ describe('SkillCmsService.deleteContent', () => {
         new SkillCmsService(prisma).deleteContent('writing', '31', admin),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.quiz.delete).not.toHaveBeenCalled();
+      expect(prisma.contentTrackTag.deleteMany).not.toHaveBeenCalled();
     }
   });
 

@@ -25,8 +25,8 @@ describe('SystemJobsScheduler', () => {
     expect(cronOf('enqueuePendingDatabaseBackupR2Sync')).toBe('20 * * * *');
   });
 
-  it('purges accounts past their deletion date daily at 02:30', () => {
-    expect(cronOf('enqueueAccountPurge')).toBe('30 2 * * *');
+  it('purges accounts past their deletion date daily at 00:02 (owner 2026-11-21)', () => {
+    expect(cronOf('enqueueAccountPurge')).toBe('2 0 * * *');
   });
 
   describe('startup catch-up', () => {
@@ -64,7 +64,7 @@ describe('SystemJobsScheduler', () => {
       expect(fake.enqueueDaily).not.toHaveBeenCalled();
       expect(fake.enqueueWeekly).not.toHaveBeenCalled();
       expect(fake.enqueueDatabaseBackupR2Sync).toHaveBeenCalled();
-      // Purge catch-up on its own key, so the 02:30 run still happens.
+      // Purge catch-up on its own key, so the 00:02 run still happens.
       expect(fake.enqueueAccountPurge).toHaveBeenCalledWith('start-2026-11-09');
     });
 

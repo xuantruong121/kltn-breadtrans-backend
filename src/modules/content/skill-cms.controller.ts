@@ -80,7 +80,6 @@ export class SkillCmsController {
     enum: ['COMPREHENSION', 'DICTATION', 'DIALOGUE'],
   })
   @ApiQuery({ name: 'type', required: false })
-  @ApiQuery({ name: 'category', required: false })
   @ApiQuery({
     name: 'track',
     required: false,

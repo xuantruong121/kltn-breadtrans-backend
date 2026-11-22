@@ -44,7 +44,7 @@ import {
   levelLabel,
   parseCefrRange,
 } from '../subscription/practice-level';
-import { SpeakingCategoryService } from '../content/speaking-category.service';
+import { activeTrackChips } from '../learning-track/learning-track.logic';
 import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
 import {
   aiQuotaExhausted,
@@ -82,13 +82,10 @@ export interface DialogueTtsSegment {
   text: string;
 }
 
-type SpeakingTaxonomyRef = { code: string; name: string };
 type SpeakingExerciseProjectionInput = {
   id: number;
   title: string;
   difficulty: string;
-  category: string;
-  categoryId?: number | null;
   imageUrl: string | null;
   audioUrl: string | null;
   isPremiumContent: boolean;
@@ -102,14 +99,11 @@ type SpeakingExerciseProjectionInput = {
     content: string | null;
     imageUrl: string | null;
   } | null;
-  categoryTaxonomy?: SpeakingTaxonomyRef | null;
   practiceSet?: {
     id: string;
     scope?: string | null;
     title: string;
     description: string;
-    category: string;
-    categoryTaxonomy?: SpeakingTaxonomyRef | null;
   } | null;
   [key: string]: unknown;
 };
@@ -398,9 +392,8 @@ export class SpeakingService {
     const exercise = await this.prisma.speakingExercise.findUnique({
       where: { id },
       include: {
-        categoryTaxonomy: true,
         stimulus: true,
-        practiceSet: { include: { categoryTaxonomy: true } },
+        practiceSet: true,
       },
     });
     if (!exercise) {
@@ -462,17 +455,6 @@ export class SpeakingService {
       cefrLevel?: string | null;
     },
   ) {
-    const taxonomy =
-      exercise.categoryTaxonomy ?? exercise.practiceSet?.categoryTaxonomy;
-    const effectiveCategory =
-      taxonomy?.code ||
-      (exercise.categoryId == null
-        ? exercise.practiceSet?.category
-        : exercise.category) ||
-      exercise.category;
-    const effectiveCategoryLabel =
-      taxonomy?.name ||
-      SpeakingCategoryService.labelForLegacyCode(effectiveCategory);
     const safeMetadata = {
       timing: timingOf(exercise),
       id: exercise.id,
@@ -480,8 +462,6 @@ export class SpeakingService {
       difficulty: exercise.difficulty,
       order: exercise.order,
       taskType: exercise.taskType,
-      category: effectiveCategory,
-      categoryLabel: effectiveCategoryLabel,
       imageUrl: exercise.imageUrl,
       stimulusId: exercise.stimulusId,
       isPremiumContent: access.isPremiumContent,
@@ -512,8 +492,6 @@ export class SpeakingService {
       timing: timingOf(exercise),
       audioUrl,
       audioUrlUk,
-      category: effectiveCategory,
-      categoryLabel: effectiveCategoryLabel,
       isPremiumContent: access.isPremiumContent,
       isLocked: false,
       requiredPlan: access.requiredPlan ?? 'FREE',
@@ -531,29 +509,7 @@ export class SpeakingService {
     }
   }
 
-  async findAllExercises(
-    category: string | undefined,
-    userId?: number,
-    role?: Role,
-  ) {
-    const normalizedCategory = category?.trim().toUpperCase();
-    const categoryFilter: Prisma.SpeakingExerciseWhereInput = normalizedCategory
-      ? {
-          OR: [
-            { categoryTaxonomy: { code: normalizedCategory } },
-            { categoryTaxonomy: null, category: normalizedCategory },
-            {
-              categoryTaxonomy: null,
-              practiceSet: {
-                OR: [
-                  { categoryTaxonomy: { code: normalizedCategory } },
-                  { category: normalizedCategory },
-                ],
-              },
-            },
-          ],
-        }
-      : {};
+  async findAllExercises(userId?: number, role?: Role) {
     const skillScopeFilter: Prisma.SpeakingExerciseWhereInput = {
       OR: [
         { practiceSetId: null },
@@ -563,10 +519,9 @@ export class SpeakingService {
     const exercises = await this.prisma.speakingExercise.findMany({
       where:
         role === Role.ADMIN
-          ? { AND: [categoryFilter, skillScopeFilter] }
+          ? skillScopeFilter
           : {
               AND: [
-                categoryFilter,
                 skillScopeFilter,
                 { publicationStatus: QuizPublicationStatus.PUBLISHED },
                 {
@@ -583,9 +538,23 @@ export class SpeakingService {
             },
       orderBy: [{ practiceSetId: 'asc' }, { order: 'asc' }, { id: 'asc' }],
       include: {
-        categoryTaxonomy: true,
         stimulus: true,
-        practiceSet: { include: { categoryTaxonomy: true } },
+        practiceSet: {
+          include: {
+            tracks: {
+              select: {
+                trackRef: {
+                  select: {
+                    code: true,
+                    name: true,
+                    sortOrder: true,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -616,17 +585,9 @@ export class SpeakingService {
       userSubmissions.map((s) => s.exerciseId),
     );
 
-    const setFor = (exercise: (typeof exercises)[number]) =>
-      exercise.practiceSet
-        ? {
-            key: exercise.practiceSet.id,
-            title: exercise.practiceSet.title,
-            description: exercise.practiceSet.description,
-          }
-        : resolveSpeakingPracticeSet(exercise);
     const grouped = new Map<string, Array<(typeof exercises)[number]>>();
     for (const exercise of exercises) {
-      const set = setFor(exercise);
+      const set = resolveSpeakingPracticeSet(exercise);
       const current = grouped.get(set.key) ?? [];
       current.push(exercise);
       grouped.set(set.key, current);
@@ -638,8 +599,8 @@ export class SpeakingService {
         key: string;
         title: string;
         description: string;
-        category: string;
-        categoryLabel: string;
+        /** The set's Lĩnh vực, active ones only, in the admin order. */
+        tracks: Array<{ code: string; name: string; sortOrder: number }>;
         exerciseCount: number;
         completedCount: number;
         exerciseIds: number[];
@@ -651,17 +612,12 @@ export class SpeakingService {
     >();
 
     for (const [key, items] of grouped.entries()) {
-      const set = setFor(items[0]);
-      const taxonomy =
-        items[0].practiceSet?.categoryTaxonomy ?? items[0].categoryTaxonomy;
-      const effectiveCategory =
-        taxonomy?.code || items[0].practiceSet?.category || items[0].category;
+      const set = resolveSpeakingPracticeSet(items[0]);
       setSummaries.set(key, {
         ...set,
-        category: effectiveCategory,
-        categoryLabel:
-          taxonomy?.name ||
-          SpeakingCategoryService.labelForLegacyCode(effectiveCategory),
+        tracks: activeTrackChips(
+          (items[0].practiceSet?.tracks ?? []).map((tag) => tag.trackRef),
+        ),
         exerciseCount: items.length,
         completedCount: items.filter((item) =>
           completedExerciseIds.has(item.id),
@@ -690,7 +646,7 @@ export class SpeakingService {
     const positions = new Map<string, number>();
     return Promise.all(
       exercises.map(async (exercise) => {
-        const set = setSummaries.get(setFor(exercise).key)!;
+        const set = setSummaries.get(resolveSpeakingPracticeSet(exercise).key)!;
         const setKey = set.key;
         const fallbackPosition = (positions.get(setKey) ?? 0) + 1;
         positions.set(setKey, fallbackPosition);
@@ -1728,8 +1684,7 @@ export class SpeakingService {
       include: {
         exercise: {
           include: {
-            categoryTaxonomy: true,
-            practiceSet: { include: { categoryTaxonomy: true } },
+            practiceSet: true,
           },
         },
       },

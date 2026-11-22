@@ -52,6 +52,7 @@ import {
   WINBACK_VALID_DAYS,
   winbackCode,
 } from '../subscription/promo.logic';
+import { ACTIVE_ACCOUNT } from '../account/account-deletion.logic';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -99,6 +100,7 @@ export class NotificationsCronService {
     const candidates = await this.prisma.userStats.findMany({
       where: {
         user: {
+          ...ACTIVE_ACCOUNT,
           role: Role.STUDENT,
           notifications: {
             none: {
@@ -210,6 +212,8 @@ export class NotificationsCronService {
         startsAt: { lte: now },
         endsAt: { gt: now, lt: windowEnd },
         planVersion: { plan: { code: { not: 'FREE' } } },
+        // Not an account waiting for deletion, nor its anonymous shell.
+        user: ACTIVE_ACCOUNT,
       },
       include: {
         planVersion: { include: { plan: true } },
@@ -260,6 +264,7 @@ export class NotificationsCronService {
         practicedCount: quizzes + speaking,
         streak: stats?.streakCount ?? 0,
         learnerName: plan.user.profile?.fullName,
+        appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       });
       await this.notificationsService.createNotification({
         userId: plan.userId,
@@ -312,6 +317,7 @@ export class NotificationsCronService {
     });
     const learners = await this.prisma.user.findMany({
       where: {
+        ...ACTIVE_ACCOUNT,
         id: { in: active.map((a) => a.userId) },
         role: Role.STUDENT,
         notifications: { none: { type } },
@@ -423,6 +429,9 @@ export class NotificationsCronService {
           lt: new Date(dayStart.getTime() - (WINBACK_AFTER_DAYS - 1) * DAY_MS),
         },
         planVersion: { plan: { code: { not: 'FREE' } } },
+        // No offer, and no promo code, for an account waiting for deletion
+        // or the anonymous shell that keeps its orders.
+        user: ACTIVE_ACCOUNT,
       },
       include: {
         planVersion: { include: { plan: true } },
@@ -470,6 +479,7 @@ export class NotificationsCronService {
         percentOff: promo.percentOff,
         validTo,
         learnerName: sub.user.profile?.fullName,
+        appUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
       });
       await this.notificationsService.createNotification({
         userId: sub.userId,
@@ -566,6 +576,7 @@ export class NotificationsCronService {
         where: {
           streakCount: { gt: 0 },
           OR: [{ lastStreakUpdate: null }, { lastStreakUpdate: { lt: today } }],
+          user: ACTIVE_ACCOUNT,
         },
         select: {
           userId: true,
@@ -634,6 +645,9 @@ export class NotificationsCronService {
         where: {
           nextReviewAt: { lte: now },
           remindedAt: null,
+          // Left unclaimed while the account waits for deletion: a learner
+          // who cancels still gets the reminder.
+          user: ACTIVE_ACCOUNT,
         },
         select: {
           id: true,

@@ -5449,207 +5449,177 @@ async function main() {
       targetText:
         'The library opens at eight o’clock and closes at six in the evening.',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Read Aloud A1 — Weather',
       targetText:
         'It will be sunny this morning, but light rain is expected after lunch.',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Read Aloud A2 — Appointment',
       targetText:
         'Your appointment is scheduled for Thursday, September seventeenth, at two thirty in the afternoon.',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Read Aloud A2 — Travel',
       targetText:
         'Passengers for Flight 318 should proceed to Gate 12 with their boarding passes ready.',
       difficulty: 'BEGINNER',
-      category: 'TOEIC',
     },
     {
       title: 'Read Aloud A2 — Store Notice',
       targetText:
         'Customers may return unused items within thirty days if they have the original receipt.',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Read Aloud B1 — Office Announcement',
       targetText:
         'The monthly staff meeting will begin at nine thirty in Conference Room B. Please bring the latest project update.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'Read Aloud B1 — Hotel Service',
       targetText:
         'Breakfast is served from six thirty until ten on the second floor, next to the business center.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'Read Aloud B1 — Delivery',
       targetText:
         'Because of severe weather, deliveries to the northern region may arrive one business day later than scheduled.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'Read Aloud B2 — Training',
       targetText:
         'Employees who wish to attend the leadership workshop should register online before Friday and obtain approval from their department manager.',
       difficulty: 'ADVANCED',
-      category: 'TOEIC',
     },
     {
       title: 'Read Aloud B2 — Customer Policy',
       targetText:
         'To improve response times, customer requests received after five p.m. will be reviewed at the beginning of the next business day.',
       difficulty: 'ADVANCED',
-      category: 'TOEIC',
     },
     {
       title: 'Pronunciation — Final Consonants',
       targetText:
         'Please send the signed contract to the client before the end of the week.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Pronunciation — -ed Endings',
       targetText:
         'We reviewed the proposal, discussed the budget, and approved the revised schedule.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Pronunciation — Word Stress',
       targetText:
         'The marketing department will present a recommendation during tomorrow’s conference.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Pronunciation — Numbers & Dates',
       targetText:
         'The total is two hundred forty-eight dollars and sixty cents, payable by October twenty-first.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Pronunciation — Linking',
       targetText:
         'Could you send me an updated copy of the agenda before our afternoon meeting?',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Question Response A2 — Weekend',
       targetText: 'What do you usually do on weekends?',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Question Response A2 — Transport',
       targetText: 'How do you normally travel to school or work?',
       difficulty: 'BEGINNER',
-      category: 'GENERAL',
     },
     {
       title: 'Question Response B1 — Study Habit',
       targetText: 'What is one habit that helps you learn English effectively?',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Question Response B1 — Meeting Preparation',
       targetText:
         'How do you prepare for an important meeting or presentation?',
       difficulty: 'INTERMEDIATE',
-      category: 'BUSINESS',
     },
     {
       title: 'Question Response B2 — Customer Service',
       targetText:
         'What should a company do when a customer receives a damaged product?',
       difficulty: 'ADVANCED',
-      category: 'BUSINESS',
     },
     {
       title: 'Opinion B1 — Online Learning',
       targetText:
         'Do you prefer learning online or in a classroom? Explain your choice.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Opinion B1 — Public Transport',
       targetText:
         'Should cities invest more in public transportation? Give two reasons.',
       difficulty: 'INTERMEDIATE',
-      category: 'GENERAL',
     },
     {
       title: 'Opinion B2 — Remote Work',
       targetText:
         'Should employees be allowed to work remotely several days each week? Support your opinion.',
       difficulty: 'ADVANCED',
-      category: 'BUSINESS',
     },
     {
       title: 'Opinion B2 — Training',
       targetText:
         'Is professional training more effective during work hours or outside work hours? Explain.',
       difficulty: 'ADVANCED',
-      category: 'BUSINESS',
     },
     {
       title: 'TOEIC Speaking — Read Aloud 1',
       targetText:
         'Welcome to the Riverside Conference Center. Registration desks are located directly across from the main entrance and will remain open until ten thirty.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'TOEIC Speaking — Read Aloud 2',
       targetText:
         'Please note that the east parking garage will be unavailable this weekend while maintenance crews replace the lighting system.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'TOEIC Speaking — Describe Office Scene',
       targetText:
         'Describe a modern office where three colleagues are discussing a document while another employee is working at a computer.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'TOEIC Speaking — Describe Station Scene',
       targetText:
         'Describe a train station where travelers are looking at a departure board and one person is carrying a large suitcase.',
       difficulty: 'INTERMEDIATE',
-      category: 'TOEIC',
     },
     {
       title: 'TOEIC Speaking — Information Response',
       targetText:
         'A seminar schedule shows registration at 9:00, a presentation at 10:00, lunch at 12:30, and a workshop at 2:00. Explain the afternoon schedule.',
       difficulty: 'ADVANCED',
-      category: 'TOEIC',
     },
     {
       title: 'TOEIC Speaking — Express Opinion',
       targetText:
         'Do you think companies should provide employees with free language training? Give reasons and examples.',
       difficulty: 'ADVANCED',
-      category: 'TOEIC',
     },
   ];
   const seminarStimulus = await prisma.speakingStimulus.upsert({
@@ -5716,13 +5686,6 @@ async function main() {
       true
     )
   `;
-  const speakingCategoryIds = new Map(
-    (
-      await prisma.speakingCategory.findMany({
-        select: { id: true, code: true },
-      })
-    ).map((c) => [c.code, c.id]),
-  );
   const speakingAudioFor = (id: number, premium: boolean): string | null => {
     const key = practiceMedia.speakingAudio[String(id)];
     if (!key) {
@@ -5742,15 +5705,9 @@ async function main() {
     const range = parseCefrRange(set.level)!;
     const premium = practiceRequiresPlus(range);
     const difficulty = SPEAKING_SET_DIFFICULTY[levelGroup(range)!];
-    const categoryId = speakingCategoryIds.get(set.category);
-    if (categoryId === undefined) {
-      throw new Error(`Speaking category ${set.category} is missing`);
-    }
     const setData = {
       title: set.title,
       description: set.description,
-      category: set.category,
-      categoryId,
       level: set.level,
       scope: 'SKILL_PRACTICE' as const,
       publicationStatus: QuizPublicationStatus.PUBLISHED,
@@ -5759,6 +5716,11 @@ async function main() {
       where: { id: set.id },
       update: setData,
       create: { id: set.id, ...setData },
+    });
+    // The set's Lĩnh vực tags; a tag an admin added later stays.
+    await prisma.speakingSetTrack.createMany({
+      data: set.tracks.map((track) => ({ setId: set.id, track })),
+      skipDuplicates: true,
     });
     let order = 1;
     for (const id of set.members) {
@@ -5807,7 +5769,6 @@ async function main() {
         targetText: task.text,
         taskType: task.taskType,
         difficulty,
-        category: set.category,
         isPremiumContent: premium,
         imageUrl: 'image' in task ? seedAssetUrl(task.image) : null,
         stimulusId,

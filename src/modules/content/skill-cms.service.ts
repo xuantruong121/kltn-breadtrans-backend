@@ -17,7 +17,6 @@ import {
 import { randomUUID } from 'node:crypto';
 import {
   type LearningContentType,
-  type LearningTrack,
   Prisma,
   QuizPublicationStatus,
   QuizType,
@@ -39,7 +38,6 @@ import { QuizService } from '../quiz/quiz.service';
 import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authoring.service';
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
 import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
-import { SpeakingCategoryService } from './speaking-category.service';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
 import { SpeakingService } from '../speaking/speaking.service';
@@ -55,6 +53,7 @@ import {
 } from './skill-cms-list';
 import { writingQuestionContent } from './writing-question-content.logic';
 import { UploadService } from '../upload/upload.service';
+import { unavailableTracks } from '../learning-track/learning-track.logic';
 import {
   SENTENCE_TRANSLATION,
   SENTENCE_TRANSLATION_TOPIC,
@@ -97,6 +96,12 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';
 
+/** Tags in the order admins set for the tracks. */
+const TRACK_ORDER = [
+  { trackRef: { sortOrder: 'asc' as const } },
+  { track: 'asc' as const },
+];
+
 @Injectable()
 export class SkillCmsService {
   constructor(
@@ -105,8 +110,6 @@ export class SkillCmsService {
     private readonly listeningAudioAuthoring?: ListeningAudioAuthoringService,
     @Optional()
     private readonly quizService?: QuizService,
-    @Optional()
-    private readonly speakingCategoryService?: SpeakingCategoryService,
     @Optional()
     private readonly speakingService?: SpeakingService,
     @Optional()
@@ -144,13 +147,6 @@ export class SkillCmsService {
         `SpeakingPracticeSet.level phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
       );
     }
-  }
-
-  private async speakingCategory(
-    code: string,
-    scope: 'practiceSet' | 'exercise',
-  ) {
-    return this.speakingCategoryService?.getByCode(code, scope);
   }
 
   private contentTypeWhere(domain: Exclude<Domain, 'speaking'>) {
@@ -227,12 +223,10 @@ export class SkillCmsService {
         exercises: {
           orderBy: [{ order: 'asc' as const }, { id: 'asc' as const }],
           include: {
-            categoryTaxonomy: true,
             stimulus: true,
             _count: { select: { submissions: true } },
           },
         },
-        categoryTaxonomy: true,
       };
       if (!wantsPage(query))
         return this.prisma.speakingPracticeSet.findMany({
@@ -240,8 +234,8 @@ export class SkillCmsService {
           orderBy: { updatedAt: 'desc' },
           include,
         });
-      const speakingTracks = await this.tracksByContent('SPEAKING_SET');
-      // Light rows decide the page; exercises load for that page only.
+      // Light rows decide the page; exercises load for that page only. A
+      // set's tags are its own (SpeakingSetTrack), whatever its exercises.
       const rows = (
         await this.prisma.speakingPracticeSet.findMany({
           where: { scope: 'SKILL_PRACTICE' },
@@ -249,22 +243,17 @@ export class SkillCmsService {
             id: true,
             title: true,
             description: true,
-            category: true,
             level: true,
             publicationStatus: true,
-            updatedAt: true,
-            exercises: {
-              orderBy: [{ order: 'asc' }, { id: 'asc' }],
-              take: 1,
-              select: { id: true },
-            },
+            createdAt: true,
+            tracks: { orderBy: TRACK_ORDER, select: { track: true } },
             _count: { select: { exercises: true } },
           },
         })
-      ).map(({ _count, exercises, ...row }) => ({
+      ).map(({ _count, tracks, ...row }) => ({
         ...row,
         exerciseCount: _count.exercises,
-        tracks: speakingTracks.get(exercises[0]?.id) ?? [],
+        tracks: tracks.map((tag) => tag.track),
       }));
       const page = pageOf(filterSpeakingSets(rows, query), query, 12);
       const full = await this.prisma.speakingPracticeSet.findMany({
@@ -306,8 +295,8 @@ export class SkillCmsService {
       },
     });
     const quizTracks = wantsPage(query)
-      ? await this.tracksByContent('QUIZ')
-      : new Map<number, LearningTrack[]>();
+      ? await this.quizTracks()
+      : new Map<number, string[]>();
     // Writing reads every task once: the first image and each task type decide
     // the card's kind ("Dịch câu", tranh, câu, email; owner 2026-11-19).
     const writingTasks =
@@ -354,7 +343,7 @@ export class SkillCmsService {
         : {}),
     }));
     if (domain !== 'listening' || !quizzes.length)
-      return this.listPage(tagged, query);
+      return this.listPage(tagged, query, domain === 'writing');
     // Comprehension and dictation play one clip per question: count them.
     const withAudio = await this.prisma.question.groupBy({
       by: ['quizId'],
@@ -394,11 +383,12 @@ export class SkillCmsService {
   private listPage<T extends Parameters<typeof filterQuizList>[0][number]>(
     rows: T[],
     query: ListQuery,
+    writing = false,
   ) {
     if (!wantsPage(query)) return rows;
     return {
       ...pageOf(filterQuizList(rows, query), query),
-      facets: quizListFacets(rows),
+      facets: quizListFacets(rows, { writing }),
     };
   }
 
@@ -414,21 +404,17 @@ export class SkillCmsService {
       const set = await this.prisma.speakingPracticeSet.findUnique({
         where: { id: rawId },
         include: {
-          categoryTaxonomy: true,
           exercises: {
             orderBy: [{ order: 'asc' }, { id: 'asc' }],
-            include: { categoryTaxonomy: true, stimulus: true },
+            include: { stimulus: true },
           },
+          tracks: { orderBy: TRACK_ORDER, select: { track: true } },
         },
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       if (set.scope === 'EXAM_INTERNAL' && !allowExamInternal)
         throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
-      const key = set.exercises[0]?.id;
-      return {
-        ...set,
-        tracks: key ? await this.tracksOf('SPEAKING_SET', key) : [],
-      };
+      return { ...set, tracks: set.tracks.map((tag) => tag.track) };
     }
     const id = this.id(rawId);
     const quiz = await this.prisma.quiz.findFirst({
@@ -452,7 +438,7 @@ export class SkillCmsService {
     return {
       ...quiz,
       passage: quiz.theoryContent,
-      tracks: await this.tracksOf('QUIZ', quiz.id),
+      tracks: await this.quizTracksOf(quiz.id),
       ...(domain === 'writing'
         ? {
             writingKind: writingKindOf({
@@ -486,45 +472,89 @@ export class SkillCmsService {
       : null;
   }
 
-  private async tracksByContent(contentType: LearningContentType) {
+  /** Each quiz's track codes. Speaking sets keep theirs in SpeakingSetTrack. */
+  private async quizTracks() {
     const tags =
       (await this.prisma.contentTrackTag?.findMany({
-        where: { contentType },
+        where: { contentType: 'QUIZ' },
+        orderBy: TRACK_ORDER,
         select: { contentId: true, track: true },
       })) ?? [];
-    const byContent = new Map<number, LearningTrack[]>();
+    const byContent = new Map<number, string[]>();
     for (const { contentId, track } of tags)
       byContent.set(contentId, [...(byContent.get(contentId) ?? []), track]);
     return byContent;
   }
 
-  private async tracksOf(contentType: LearningContentType, contentId: number) {
+  private async quizTracksOf(quizId: number) {
     const tags =
       (await this.prisma.contentTrackTag?.findMany({
-        where: { contentType, contentId },
+        where: { contentType: 'QUIZ', contentId: quizId },
+        orderBy: TRACK_ORDER,
         select: { track: true },
       })) ?? [];
     return tags.map((tag) => tag.track);
   }
 
+  private async setTracksOf(setId: string) {
+    const tags = await this.prisma.speakingSetTrack.findMany({
+      where: { setId },
+      orderBy: TRACK_ORDER,
+      select: { track: true },
+    });
+    return tags.map((tag) => tag.track);
+  }
+
   /**
-   * Replaces an item's career tracks. Recommendations read a quiz by its id
-   * and a speaking set by its first exercise (learning-path.catalog.ts).
+   * Replaces an item's career tracks: a quiz's by its id, a speaking set's
+   * on the set itself, so a set with no exercise yet can be tagged too. Only
+   * active tracks can be added; an inactive one the item already has stays.
    */
   async setTracks(
     rawDomain: string,
     rawId: string,
-    tracks: LearningTrack[],
+    tracks: string[],
     user: Admin,
   ) {
-    const item = await this.get(rawDomain, rawId, user);
-    const isSet = this.domain(rawDomain) === 'speaking';
-    const contentType: LearningContentType = isSet ? 'SPEAKING_SET' : 'QUIZ';
-    const contentId = isSet
-      ? (item as { exercises: Array<{ id: number }> }).exercises[0]?.id
-      : (item as { id: number }).id;
-    if (!contentId)
-      throw new BadRequestException('Bộ luyện chưa có bài để gắn lĩnh vực');
+    const item = (await this.get(rawDomain, rawId, user)) as {
+      id: number | string;
+      tracks: string[];
+    };
+    const added = tracks.filter((code) => !item.tracks.includes(code));
+    if (added.length) {
+      const active = await this.prisma.learningTrack.findMany({
+        where: { code: { in: added }, isActive: true },
+        select: { code: true },
+      });
+      const refused = unavailableTracks(
+        tracks,
+        item.tracks,
+        active.map((track) => track.code),
+      );
+      if (refused.length)
+        throw new BadRequestException(
+          `Lĩnh vực không tồn tại hoặc đã tắt: ${refused.join(', ')}`,
+        );
+    }
+    if (this.domain(rawDomain) === 'speaking') {
+      const setId = String(item.id);
+      await this.prisma.$transaction([
+        this.prisma.speakingSetTrack.deleteMany({
+          where: { setId, track: { notIn: tracks } },
+        }),
+        this.prisma.speakingSetTrack.createMany({
+          data: tracks.map((track) => ({
+            setId,
+            track,
+            createdById: user.id,
+          })),
+          skipDuplicates: true,
+        }),
+      ]);
+      return { tracks: await this.setTracksOf(setId) };
+    }
+    const contentType: LearningContentType = 'QUIZ';
+    const contentId = Number(item.id);
     await this.prisma.$transaction([
       this.prisma.contentTrackTag.deleteMany({
         where: { contentType, contentId, track: { notIn: tracks } },
@@ -539,7 +569,7 @@ export class SkillCmsService {
         skipDuplicates: true,
       }),
     ]);
-    return { tracks: await this.tracksOf(contentType, contentId) };
+    return { tracks: await this.quizTracksOf(contentId) };
   }
 
   async create(rawDomain: string, dto: SkillContentDto, user: Admin) {
@@ -547,25 +577,15 @@ export class SkillCmsService {
     const domain = this.domain(rawDomain);
     if (domain === 'speaking') {
       this.assertSpeakingSetContract(dto);
-      const categoryCode =
-        dto.category?.trim() ||
-        (this.speakingCategoryService
-          ? (await this.speakingCategoryService.getDefault('practiceSet')).code
-          : 'GENERAL');
-      const category = await this.speakingCategory(categoryCode, 'practiceSet');
-      const title = dto.title.trim();
-      const id = `speaking-${randomUUID()}`;
-      const data: any = {
-        id,
-        title,
-        description: dto.description?.trim() ?? '',
-        category: category?.code || categoryCode,
-        level: dto.level?.trim() || 'A1-B1',
-        publicationStatus: QuizPublicationStatus.DRAFT,
-      };
-      if (category) data.categoryId = category.id;
+      // A set carries no category: Lĩnh vực tags it (PUT :domain/:id/tracks).
       return this.prisma.speakingPracticeSet.create({
-        data,
+        data: {
+          id: `speaking-${randomUUID()}`,
+          title: dto.title.trim(),
+          description: dto.description?.trim() ?? '',
+          level: dto.level?.trim() || 'A1-B1',
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        },
       });
     }
     const type = this.quizType(domain);
@@ -613,19 +633,13 @@ export class SkillCmsService {
       });
       if (!set) throw new NotFoundException('Không tìm thấy bộ luyện Nói.');
       await this.assertSpeakingEditable(rawId);
-      const category = dto.category
-        ? await this.speakingCategory(dto.category.trim(), 'practiceSet')
-        : undefined;
-      const data: any = {
-        title: dto.title?.trim(),
-        description: dto.description?.trim(),
-        category: category?.code || dto.category?.trim(),
-        level: dto.level?.trim(),
-      };
-      if (category) data.categoryId = category.id;
       return this.prisma.speakingPracticeSet.update({
         where: { id: rawId },
-        data,
+        data: {
+          title: dto.title?.trim(),
+          description: dto.description?.trim(),
+          level: dto.level?.trim(),
+        },
       });
     }
     const id = this.id(rawId);
@@ -882,13 +896,10 @@ export class SkillCmsService {
       stimulus,
     });
     if (semanticErrors.length) throw new BadRequestException(semanticErrors);
-    const category = dto.category
-      ? await this.speakingCategory(dto.category.trim(), 'exercise')
-      : undefined;
+    // No category: Lĩnh vực sits on the set.
     const data: any = {
       title: dto.title.trim(),
       targetText: dto.targetText.trim(),
-      category: category?.code || set.category,
       difficulty: dto.difficulty || set.level,
       imageUrl: dto.imageUrl,
       audioUrl: dto.audioUrl,
@@ -899,7 +910,6 @@ export class SkillCmsService {
       practiceSetId: rawSetId,
       publicationStatus: QuizPublicationStatus.DRAFT,
     };
-    if (this.speakingCategoryService) data.categoryId = category?.id ?? null;
     return this.inTransaction(
       client,
       async (tx) => {
@@ -953,11 +963,7 @@ export class SkillCmsService {
     const exerciseId = this.id(rawExerciseId);
     const exercise = await db.speakingExercise.findFirst({
       where: { id: exerciseId, practiceSetId: rawSetId },
-      include: {
-        categoryTaxonomy: true,
-        practiceSet: { select: { category: true, categoryId: true } },
-        stimulus: true,
-      },
+      include: { stimulus: true },
     });
     if (!exercise) throw new NotFoundException('Không tìm thấy bài luyện Nói.');
     if (dto.order !== undefined) {
@@ -991,16 +997,10 @@ export class SkillCmsService {
         })
       : [];
     if (semanticErrors.length) throw new BadRequestException(semanticErrors);
-    const hasCategoryInput = dto.category !== undefined;
-    const category =
-      hasCategoryInput && dto.category
-        ? await this.speakingCategory(dto.category.trim(), 'exercise')
-        : undefined;
+    // No category here: an exercise has none of its own any more.
     const data: any = {
       title: dto.title?.trim(),
       targetText: dto.targetText?.trim(),
-      category:
-        category?.code || exercise.practiceSet?.category || exercise.category,
       difficulty: dto.difficulty,
       imageUrl: dto.imageUrl,
       // A new sample sentence retires the clip that reads the old one; the
@@ -1016,9 +1016,6 @@ export class SkillCmsService {
       taskType,
       stimulusId: dto.stimulusId === null ? null : stimulus?.id,
     };
-    if (hasCategoryInput && this.speakingCategoryService) {
-      data.categoryId = category?.id ?? null;
-    }
     return db.speakingExercise.update({
       where: { id: exerciseId },
       data,
@@ -1215,6 +1212,11 @@ export class SkillCmsService {
           );
         throw error;
       }
+      // Tags have no foreign key to the quiz: left behind, they would keep
+      // their track counted as in use and block its delete.
+      await tx.contentTrackTag.deleteMany({
+        where: { contentType: 'QUIZ', contentId: id },
+      });
       return { id, deleted: true };
     });
   }
@@ -1330,7 +1332,7 @@ export class SkillCmsService {
           include: {
             exercises: {
               orderBy: [{ order: 'asc' }, { id: 'asc' }],
-              include: { categoryTaxonomy: true, stimulus: true },
+              include: { stimulus: true },
             },
           },
         });

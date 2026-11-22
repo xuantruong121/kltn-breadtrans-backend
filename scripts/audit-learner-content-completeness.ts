@@ -214,7 +214,7 @@ async function main() {
         model: 'SpeakingExercise',
         id: exercise.id,
         title: exercise.title,
-        type: exercise.taskType ?? exercise.category,
+        type: exercise.taskType,
         publication: exercise.publicationStatus,
         tier: exercise.isPremiumContent ? 'PREMIUM' : 'FREE',
         missingFields: missing,

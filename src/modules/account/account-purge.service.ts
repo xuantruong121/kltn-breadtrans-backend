@@ -3,12 +3,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { AiGenerationJobStatus, Prisma, Role } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../common/email/email.service';
+import { accountDeletedEmail } from '../../common/email/email-templates';
 import { R2Service } from '../upload/r2.service';
 import { forgetAuthUser } from '../auth/auth-user-cache';
 import { AuthSessionStore } from '../auth/session-store';
@@ -43,6 +46,7 @@ export class AccountPurgeService {
     private readonly prisma: PrismaService,
     private readonly r2: R2Service,
     @InjectRedis() private readonly redis: Redis,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   /** Every account due at `now`, at most `limit` per run. */
@@ -101,16 +105,18 @@ export class AccountPurgeService {
   ): Promise<PurgeResult> {
     const files = await this.filesOf(userId);
 
-    const outcome = await this.prisma.$transaction(async (tx) => {
+    const { outcome, notifyTo } = await this.prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<
         Array<{
           id: number;
           role: Role;
+          email: string;
           anonymizedAt: Date | null;
+          deletionRequestedAt: Date | null;
           deletionScheduledAt: Date | null;
         }>
       >`
-        SELECT id, role, "anonymizedAt", "deletionScheduledAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+        SELECT id, role, email, "anonymizedAt", "deletionRequestedAt", "deletionScheduledAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
       if (!locked.length)
         throw new NotFoundException('Người dùng không tồn tại');
       // A shell already holds only kept records: nothing personal left.
@@ -121,7 +127,12 @@ export class AccountPurgeService {
         options.onlyIfDue &&
         (!scheduled || scheduled.getTime() > now.getTime())
       )
-        return 'SKIPPED' as const;
+        return { outcome: 'SKIPPED' as const, notifyTo: null };
+      // The owner asked for it: they hear when it is done (owner 2026-11-21).
+      // An admin deleting an account nobody asked to delete sends nothing.
+      const requestedBy = locked[0].deletionRequestedAt
+        ? locked[0].email
+        : null;
       // The last admin is never purged (audit A9, 2026-11-18).
       if (locked[0].role === Role.ADMIN) await assertKeepsAnAdmin(tx, userId);
 
@@ -194,7 +205,7 @@ export class AccountPurgeService {
       }
       // Everything else of the learner cascades with the account.
       await tx.user.delete({ where: { id: userId } });
-      return result;
+      return { outcome: result, notifyTo: requestedBy };
     });
     if (outcome === 'SKIPPED') {
       this.logger.log(`account_purge_skipped user=${userId}: no longer due`);
@@ -207,7 +218,22 @@ export class AccountPurgeService {
     this.logger.log(
       `account_purged user=${userId} outcome=${outcome} files=${files.length}`,
     );
+    if (notifyTo) await this.noticeDeleted(userId, notifyTo, now);
     return outcome;
+  }
+
+  /** After the commit; a mail failure never undoes or fails the purge. */
+  private async noticeDeleted(userId: number, to: string, deletedAt: Date) {
+    try {
+      await this.email?.sendAccountDeleted(
+        to,
+        accountDeletedEmail({ accountEmail: to, deletedAt }),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `account_deleted_email_failed user=${userId}: ${String(error)}`,
+      );
+    }
   }
 
   private async keptCounts(

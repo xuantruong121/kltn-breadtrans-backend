@@ -7,7 +7,8 @@
  *   Quiz LISTENING_PRACTICE / BILINGUAL_READING / WRITING_*  -> QUIZ, quiz id
  *   SpeakingPracticeSet (SKILL_PRACTICE)                      -> SPEAKING_SET,
  *     contentId = the set's first exercise id (sets have string ids; the
- *     learner opens a set at its first exercise)
+ *     learner opens a set at its first exercise). Its tracks are the set's
+ *     own (SpeakingSetTrack), read by set id.
  * History scores are normalised to 0-100 (percentOfAttempt): each skill
  * stores its own scale.
  */
@@ -24,6 +25,7 @@ import {
   planSatisfies,
   requiredPracticePlan,
 } from '../subscription/practice-level';
+import { GENERAL_TRACK } from '../learning-track/learning-track.logic';
 import { itemLevel, seedDifficulty } from './ability.logic';
 import { weakFocus } from './weak-focus.logic';
 import { percentOfAttempt } from './progression.logic';
@@ -58,6 +60,7 @@ type Db = Pick<
   | 'quiz'
   | 'speakingPracticeSet'
   | 'contentTrackTag'
+  | 'learningTrack'
   | 'contentDifficulty'
   | 'submission'
   | 'speakingSubmission'
@@ -100,15 +103,17 @@ export async function loadCandidates(
           orderBy: [{ order: 'asc' }, { id: 'asc' }],
           select: { id: true, taskType: true },
         },
+        tracks: { select: { track: true } },
       },
     }),
-    db.contentTrackTag.findMany(),
+    db.contentTrackTag.findMany({
+      where: { contentType: 'QUIZ' },
+      select: { contentId: true, track: true },
+    }),
     db.contentDifficulty.findMany(),
   ]);
-  const tracksOf = (type: LearningContentType, id: number) =>
-    tags
-      .filter((t) => t.contentType === type && t.contentId === id)
-      .map((t) => t.track);
+  const quizTracksOf = (id: number) =>
+    tags.filter((t) => t.contentId === id).map((t) => t.track);
   const difficultyOf = (type: LearningContentType, id: number) =>
     difficulties.find((d) => d.contentType === type && d.contentId === id)
       ?.difficulty;
@@ -130,7 +135,7 @@ export async function loadCandidates(
       title: q.title,
       route: `${ROUTE[skill]}/${q.id}`,
       difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(range),
-      tracks: tracksOf('QUIZ', q.id),
+      tracks: quizTracksOf(q.id),
       kinds: [q.type],
       planLocked: !planSatisfies(planCode, requiredPlan),
       requiredPlan,
@@ -152,7 +157,7 @@ export async function loadCandidates(
       route: `/speaking/${first.id}?set=${encodeURIComponent(set.id)}`,
       difficulty:
         difficultyOf('SPEAKING_SET', first.id) ?? seedDifficulty(range),
-      tracks: tracksOf('SPEAKING_SET', first.id),
+      tracks: set.tracks.map((t) => t.track),
       kinds: [...new Set(set.exercises.map((e) => String(e.taskType)))],
       planLocked: !planSatisfies(planCode, requiredPlan),
       requiredPlan,
@@ -170,7 +175,10 @@ export async function loadLearnerState(
 ): Promise<LearnerState & { minutesPerDay: number }> {
   const [profile, levels, submissions, speaking, saved, diagnostic] =
     await Promise.all([
-      db.learnerProfile.findUnique({ where: { userId } }),
+      db.learnerProfile.findUnique({
+        where: { userId },
+        include: { trackRef: { select: { name: true } } },
+      }),
       db.learnerSkillLevel.findMany({ where: { userId } }),
       db.submission.findMany({
         where: { userId },
@@ -258,8 +266,19 @@ export async function loadLearnerState(
       unlockedLevel: l.unlockedLevel,
       ability: l.ability,
     };
+  // Before onboarding there is no profile: the learner is on GENERAL.
+  const trackName =
+    profile?.trackRef?.name ??
+    (
+      await db.learningTrack.findUnique({
+        where: { code: GENERAL_TRACK },
+        select: { name: true },
+      })
+    )?.name ??
+    GENERAL_TRACK;
   return {
-    track: profile?.track ?? 'GENERAL',
+    track: profile?.track ?? GENERAL_TRACK,
+    trackName,
     goal: profile?.goal ?? 'GENERAL',
     weakFocus: weakFocus([
       ...(diagnostic?.speakingResponses ?? []).map((r) => ({

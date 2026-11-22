@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 import { LearningPathService } from './learning-path.service';
 import { fakeDb } from '../../../test/helpers/learning-path-fake-db';
@@ -40,6 +40,7 @@ describe('LearningPathService profile', () => {
     const p = await svc.getProfile(7);
     expect(p).toMatchObject({
       track: 'GENERAL',
+      trackName: 'Chung',
       goal: 'GENERAL',
       minutesPerDay: 15,
       placementSource: 'NONE',
@@ -64,6 +65,7 @@ describe('LearningPathService profile', () => {
     });
     expect(p).toMatchObject({
       track: 'IT_SOFTWARE',
+      trackName: 'Công nghệ thông tin',
       minutesPerDay: 20,
       selfLevel: 'STARTER',
       placementSource: 'SELF',
@@ -78,6 +80,41 @@ describe('LearningPathService profile', () => {
     await expect(
       svc.updateProfile(7, { selfLevel: 'ADVANCED' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('refuses a track that is unknown or switched off', async () => {
+    const { db, svc } = service();
+    db.tracks.set('HOSPITALITY_TOURISM', {
+      code: 'HOSPITALITY_TOURISM',
+      name: 'Nhà hàng – Khách sạn – Du lịch',
+      isActive: false,
+    });
+    await expect(
+      svc.updateProfile(7, { track: 'HOSPITALITY_TOURISM' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      svc.updateProfile(7, { track: 'NOT_A_TRACK' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.profiles.has(7)).toBe(false);
+  });
+
+  it('keeps a track the learner chose before an admin switched it off', async () => {
+    const { db, svc } = service();
+    db.tracks.set('HOSPITALITY_TOURISM', {
+      code: 'HOSPITALITY_TOURISM',
+      name: 'Nhà hàng – Khách sạn – Du lịch',
+      isActive: false,
+    });
+    db.profiles.set(7, { userId: 7, track: 'HOSPITALITY_TOURISM' });
+    const p = await svc.updateProfile(7, {
+      track: 'HOSPITALITY_TOURISM',
+      minutesPerDay: 30,
+    });
+    expect(p).toMatchObject({
+      track: 'HOSPITALITY_TOURISM',
+      trackName: 'Nhà hàng – Khách sạn – Du lịch',
+      minutesPerDay: 30,
+    });
   });
 
   it('keeps the first onboarding time', async () => {

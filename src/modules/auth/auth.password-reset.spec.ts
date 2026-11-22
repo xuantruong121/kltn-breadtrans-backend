@@ -51,7 +51,10 @@ describe('AuthService password reset', () => {
   const user = { id: 7, email: 'learner@example.com', password: 'old-hash' };
   let redis: ReturnType<typeof memoryRedis>;
   let prisma: any;
-  let email: { sendPasswordResetEmail: jest.Mock };
+  let email: {
+    sendPasswordResetEmail: jest.Mock;
+    sendPasswordChanged: jest.Mock;
+  };
   let service: AuthService;
   const tokenFrom = () =>
     /token=([0-9a-f]+)/.exec(
@@ -68,7 +71,10 @@ describe('AuthService password reset', () => {
         update: jest.fn(async () => user),
       },
     };
-    email = { sendPasswordResetEmail: jest.fn(async () => undefined) };
+    email = {
+      sendPasswordResetEmail: jest.fn(async () => undefined),
+      sendPasswordChanged: jest.fn(async () => undefined),
+    };
     service = new AuthService(prisma, {} as any, redis as any, email as any);
   });
 
@@ -128,5 +134,47 @@ describe('AuthService password reset', () => {
       service.resetPassword('f'.repeat(64), 'Z-Password-1!'),
     ).rejects.toThrow();
     expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(email.sendPasswordChanged).not.toHaveBeenCalled();
+  });
+
+  describe('password changed notice (owner 2026-11-21)', () => {
+    it('tells the mailbox after a reset that every device was signed out', async () => {
+      await service.requestPasswordReset(user.email);
+      await service.resetPassword(tokenFrom(), 'New-Password-1!');
+      expect(email.sendPasswordChanged).toHaveBeenCalledWith(
+        user.email,
+        expect.objectContaining({
+          subject: 'Mật khẩu tài khoản BreadTrans vừa được đổi',
+          html: expect.stringContaining('đăng xuất trên mọi thiết bị'),
+        }),
+      );
+    });
+
+    it('a failing notice does not fail the reset', async () => {
+      email.sendPasswordChanged.mockRejectedValue(new Error('SMTP down'));
+      await service.requestPasswordReset(user.email);
+      await expect(
+        service.resetPassword(tokenFrom(), 'New-Password-1!'),
+      ).resolves.toEqual({ message: 'Đặt lại mật khẩu thành công.' });
+    });
+
+    it('keeps the device that changed it, from the account page', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...user,
+        password: await bcrypt.hash('Old-Password-1!', 4),
+      });
+      await service.changePassword(
+        user.id,
+        'Old-Password-1!',
+        'New-Password-1!',
+        'laptop',
+      );
+      expect(email.sendPasswordChanged).toHaveBeenCalledWith(
+        user.email,
+        expect.objectContaining({
+          html: expect.stringContaining('đăng xuất trên các thiết bị khác'),
+        }),
+      );
+    });
   });
 });

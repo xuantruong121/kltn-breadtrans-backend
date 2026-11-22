@@ -62,14 +62,6 @@ export class CreateExerciseDto {
   @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
   difficulty?: string;
 
-  @ApiPropertyOptional({
-    example: 'GENERAL',
-    description: 'Speaking category code validated by the taxonomy service',
-  })
-  @IsOptional()
-  @IsString()
-  category?: string;
-
   @ApiPropertyOptional({ description: 'Reusable shared stimulus ID' })
   @IsOptional()
   @IsInt()

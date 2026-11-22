@@ -23,6 +23,7 @@ describe('winbackMessage', () => {
     percentOff: 20,
     validTo: new Date('2026-11-11T09:00:00+07:00'),
     learnerName: 'An <b>',
+    appUrl: 'https://app.example.com/',
   });
 
   it('names the code, the discount and the deadline', () => {
@@ -38,6 +39,18 @@ describe('winbackMessage', () => {
 
   it('escapes the learner name in the email', () => {
     expect(message.emailHtml).toContain('Chào An &lt;b&gt;,');
+  });
+
+  it('the email shows the code in a box and its button fills it in on the plans page', () => {
+    expect(message.emailSubject).toBe(
+      'Tặng bạn mã giảm 20% để tiếp tục học cùng BreadTrans',
+    );
+    expect(message.emailHtml).toContain('>QUAYLAI-7KQ4M2</span>');
+    expect(message.emailHtml).toContain(
+      'href="https://app.example.com/plans?promo=QUAYLAI-7KQ4M2"',
+    );
+    expect(message.emailHtml).toContain('Dùng mã ngay');
+    expect(message.emailHtml).toContain('09:00 ngày 11/11/2026');
   });
 
   it('uses one notification type per ended plan', () => {

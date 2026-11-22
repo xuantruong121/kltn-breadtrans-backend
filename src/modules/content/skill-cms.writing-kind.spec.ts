@@ -61,3 +61,59 @@ describe('SkillCmsService.get writing kind', () => {
     expect(email.writingKind).toBe('EMAIL');
   });
 });
+
+describe('SkillCmsService.list writing kind counts', () => {
+  it('counts each kind over the whole Writing list for the header', async () => {
+    const prisma = {
+      quiz: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            title: 'A',
+            type: QuizType.WRITING_PICTURE,
+            practiceTopicId: 77,
+          },
+          {
+            id: 2,
+            title: 'B',
+            type: QuizType.WRITING_PICTURE,
+            practiceTopicId: 77,
+          },
+          {
+            id: 3,
+            title: 'C',
+            type: QuizType.WRITING_EMAIL,
+            practiceTopicId: 9,
+          },
+          {
+            id: 4,
+            title: 'D',
+            type: QuizType.WRITING_PICTURE,
+            practiceTopicId: 9,
+          },
+        ]),
+      },
+      question: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { quizId: 4, content: { taskType: 'SENTENCE' } },
+          ]),
+      },
+      practiceTopic: { findFirst: jest.fn().mockResolvedValue({ id: 77 }) },
+      contentTrackTag: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const page: any = await new SkillCmsService(prisma as any).list(
+      'writing',
+      { id: 1, role: Role.ADMIN },
+      { page: '1', kind: 'EMAIL' },
+    );
+    expect(page.items.map((item: { id: number }) => item.id)).toEqual([3]);
+    expect(page.facets.kinds).toEqual({
+      TRANSLATION: 2,
+      PICTURE: 0,
+      SENTENCE: 1,
+      EMAIL: 1,
+    });
+  });
+});

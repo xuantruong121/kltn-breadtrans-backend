@@ -193,8 +193,15 @@ export function filterQuizList<T extends QuizListRow>(
   return visible.sort(order[query.sort ?? ''] ?? order.NEWEST);
 }
 
-/** Header and tab counts over the whole domain, not the filtered rows. */
-export function quizListFacets(rows: QuizListRow[]) {
+/**
+ * Header and tab counts over the whole domain, not the filtered rows. Writing
+ * also counts each kind (writingKindOf, set on the rows by the service) for
+ * the "Dạng bài" select.
+ */
+export function quizListFacets(
+  rows: QuizListRow[],
+  options: { writing?: boolean } = {},
+) {
   return {
     total: rows.length,
     published: rows.filter((row) => row.publicationStatus === 'PUBLISHED')
@@ -208,6 +215,16 @@ export function quizListFacets(rows: QuizListRow[]) {
     levels: CMS_LEVELS.filter((level) =>
       rows.some((row) => contentLevel(row) === level),
     ),
+    ...(options.writing
+      ? {
+          kinds: Object.fromEntries(
+            WRITING_KINDS.map((kind) => [
+              kind,
+              rows.filter((row) => row.writingKind === kind).length,
+            ]),
+          ) as Record<WritingKind, number>,
+        }
+      : {}),
   };
 }
 
@@ -216,10 +233,9 @@ export type SpeakingSetRow = {
   tracks?: string[];
   title: string;
   description?: string | null;
-  category?: string | null;
   level?: string | null;
   publicationStatus?: string | null;
-  updatedAt?: Date | string | null;
+  createdAt?: Date | string | null;
   exerciseCount: number;
 };
 
@@ -234,29 +250,33 @@ function speakingLevelRank(level?: string | null) {
   );
 }
 
-/** Speaking sets after search, level, category and status, newest first. */
+/**
+ * Speaking sets after search, level, status and track, newest first. The old
+ * category filter is gone: Phân loại folded into Lĩnh vực (2026-11-21).
+ */
 export function filterSpeakingSets<T extends SpeakingSetRow>(
   rows: T[],
   query: ListQuery,
 ): T[] {
   const visible = rows.filter(
     (row) =>
-      (matchesSearch(query.q, row.title, row.description, row.category) ||
+      (matchesSearch(query.q, row.title, row.description) ||
         hasTitleId(query, row.id)) &&
       (isAll(query.level) || row.level === query.level) &&
-      (isAll(query.category) || row.category === query.category) &&
       (isAll(query.status) || row.publicationStatus === query.status) &&
       matchesTrack(row.tracks, query.track),
   );
-  const updated = (row: T) => new Date(row.updatedAt ?? 0).getTime();
+  // "Mới tạo trước" like the other lists: by creation, not by last edit.
+  const created = (row: T) => new Date(row.createdAt ?? 0).getTime();
   const order: Record<string, (a: T, b: T) => number> = {
-    NEWEST: (a, b) => updated(b) - updated(a),
+    NEWEST: (a, b) => created(b) - created(a),
+    OLDEST: (a, b) => created(a) - created(b),
     TITLE: (a, b) => a.title.localeCompare(b.title, 'vi'),
     LEVEL: (a, b) =>
       speakingLevelRank(a.level) - speakingLevelRank(b.level) ||
-      updated(b) - updated(a),
+      created(b) - created(a),
     FEWEST: (a, b) =>
-      a.exerciseCount - b.exerciseCount || updated(b) - updated(a),
+      a.exerciseCount - b.exerciseCount || created(b) - created(a),
   };
   return visible.sort(order[query.sort ?? ''] ?? order.NEWEST);
 }

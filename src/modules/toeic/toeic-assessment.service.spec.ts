@@ -191,7 +191,7 @@ describe('ToeicAssessmentService', () => {
     });
   });
 
-  it('keeps Speaking slot semantics independent from titles and categories', () => {
+  it('keeps Speaking slot semantics independent from titles', () => {
     const instance = service() as any;
     const taskTypes = [
       'READ_ALOUD',
@@ -211,7 +211,6 @@ describe('ToeicAssessmentService', () => {
         order: index + 1,
         taskType,
         title: `unrelated title ${index}`,
-        category: 'UNRELATED_CATEGORY',
         ...(taskType === 'DESCRIBE_PICTURE'
           ? { imageUrl: `https://cdn.example/${index}.png` }
           : {}),

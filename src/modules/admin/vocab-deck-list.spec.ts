@@ -30,6 +30,7 @@ describe('vocab deck list rules', () => {
     expect(ids({ category: 'Travel' })).toEqual([2]);
     expect(ids({ level: 'NONE' })).toEqual([3]);
     expect(ids({ status: 'PUBLISHED' })).toEqual([1]);
+    expect(ids({ sort: 'OLDEST' })).toEqual([1, 2, 3]);
     expect(ids({ sort: 'LEVEL' })).toEqual([2, 1, 3]);
     expect(ids({ sort: 'FEWEST' })).toEqual([2, 3, 1]);
     expect(ids({ sort: 'TITLE' })).toEqual([2, 3, 1]);

@@ -1,19 +1,33 @@
 /**
  * Self-service account deletion (owner 2026-11-16).
  *
- * The account is locked at request and purged DELETION_GRACE_DAYS later,
- * well inside the 20 days the owner asked for; signing in before then offers
- * to cancel. Personal and learning data is deleted for real (the law asks for
- * it). Important records are kept by the soft-delete rule (memory
- * breadtrans-soft-delete-rule): orders, payments, purchased plans, the Bánh Mì
- * ledger and used promo codes move to a new anonymous shell user before the
- * account is deleted, and the shell has no e-mail, name, password or login.
+ * The account is locked at request and purged once DELETION_GRACE_DAYS full
+ * days have passed, well inside the 20 days the owner asked for; signing in
+ * before then offers to cancel. Personal and learning data is deleted for real
+ * (the law asks for it). Important records are kept by the soft-delete rule
+ * (memory breadtrans-soft-delete-rule): orders, payments, purchased plans, the
+ * Bánh Mì ledger and used promo codes move to a new anonymous shell user before
+ * the account is deleted, and the shell has no e-mail, name, password or login.
  *
  * Pure: no Prisma, no I/O.
  */
+import {
+  getBusinessDayKey,
+  getBusinessDayStart,
+} from '../../common/time/business-time.util';
 
 export const DELETION_GRACE_DAYS = 7;
 export const DAY_MS = 86_400_000;
+
+/**
+ * Who may still receive reminders, reports and offers: not an account waiting
+ * for deletion, nor the anonymous shell left by one (owner 2026-11-21). Spread
+ * into a `user` filter; the security mails (deletion, password) do not use it.
+ */
+export const ACTIVE_ACCOUNT = {
+  deletionRequestedAt: null,
+  anonymizedAt: null,
+} as const;
 
 export const PENDING_DELETION_CODE = 'ACCOUNT_PENDING_DELETION';
 /** Redis key of a one-time cancel token handed out after a valid sign-in. */
@@ -23,8 +37,18 @@ export const CANCEL_TOKEN_TTL_SECONDS = 600;
 /** Redis set of R2 keys whose deletion failed, retried by the next purge. */
 export const R2_RETRY_SET = 'account:purge:r2-retry';
 
+/**
+ * 00:00 Vietnam time once DELETION_GRACE_DAYS full days have passed after the
+ * request day; the purge job runs at 00:02 (owner 2026-11-21). The day the
+ * e-mail names is then the day of the purge, and signing in before that day
+ * still cancels. A request at 15:00 on 21/11 is purged at 00:02 on 29/11.
+ * Vietnam has no daylight saving, so a day is always DAY_MS long.
+ */
 export const deletionScheduledAt = (requestedAt: Date) =>
-  new Date(requestedAt.getTime() + DELETION_GRACE_DAYS * DAY_MS);
+  new Date(
+    getBusinessDayStart(getBusinessDayKey(requestedAt)).getTime() +
+      (DELETION_GRACE_DAYS + 1) * DAY_MS,
+  );
 
 /** The shell's e-mail: unique, not a mailbox (.invalid is reserved, RFC 2606). */
 export const shellEmail = (originalUserId: number, now: Date) =>

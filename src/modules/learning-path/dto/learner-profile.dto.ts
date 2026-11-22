@@ -1,20 +1,27 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { LearningGoal, LearningTrack, PracticeLevel } from '@prisma/client';
+import { LearningGoal, PracticeLevel } from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
+  IsString,
+  Matches,
   Max,
   Min,
 } from 'class-validator';
 
 export class UpdateLearnerProfileDto {
-  @ApiPropertyOptional({ enum: LearningTrack })
+  @ApiPropertyOptional({
+    example: 'IT_SOFTWARE',
+    description:
+      'Mã lĩnh vực (GET /learning-tracks). Phải là lĩnh vực đang bật; lĩnh vực học viên đang chọn thì giữ được dù đã tắt.',
+  })
   @IsOptional()
-  @IsEnum(LearningTrack)
-  track?: LearningTrack;
+  @IsString()
+  @Matches(/^[A-Z0-9_]{1,40}$/)
+  track?: string;
 
   @ApiPropertyOptional({ enum: LearningGoal })
   @IsOptional()

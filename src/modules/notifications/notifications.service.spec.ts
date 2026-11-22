@@ -212,4 +212,22 @@ describe('NotificationsService', () => {
       });
     });
   });
+
+  describe('sendPushToUser (owner 2026-11-21)', () => {
+    it('pushes only to an account that is not waiting for deletion', async () => {
+      // The filter is in the query: an account waiting for deletion, or its
+      // anonymous shell, matches no subscription, so nothing is sent.
+      prisma.pushSubscription.findMany.mockResolvedValue([]);
+      await expect(
+        service.sendPushToUser(10, { title: 'Nhắc học', body: 'x' }),
+      ).resolves.toEqual({ sent: 0, failed: 0 });
+      expect(prisma.pushSubscription.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 10,
+          user: { deletionRequestedAt: null, anonymizedAt: null },
+        },
+      });
+      expect(prisma.pushSubscription.delete).not.toHaveBeenCalled();
+    });
+  });
 });

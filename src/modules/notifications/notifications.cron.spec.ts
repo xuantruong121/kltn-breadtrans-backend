@@ -223,4 +223,54 @@ describe('NotificationsCronService', () => {
       );
     });
   });
+
+  // An account waiting for deletion, and the anonymous shell left after one,
+  // gets no reminder, report or offer (owner 2026-11-21).
+  describe('skips accounts waiting for deletion', () => {
+    const active = { deletionRequestedAt: null, anonymizedAt: null };
+    const whereOf = (mock: jest.Mock) =>
+      (mock.mock.calls[0][0] as { where: Record<string, unknown> }).where;
+
+    it('in the streak reminder and the vocabulary review', async () => {
+      await cronService.handleDailyStreakReminder();
+      expect(whereOf(prisma.userStats.findMany).user).toEqual(active);
+
+      await cronService.handleVocabSpacedReview();
+      expect(whereOf(prisma.userVocabWordProgress.findMany).user).toEqual(
+        active,
+      );
+    });
+
+    it('in the hourly study reminder', async () => {
+      prisma.userStats.findMany.mockResolvedValue([]);
+      // 10:00 in Vietnam: outside the quiet hours.
+      await cronService.runStudyReminder(new Date('2026-11-11T03:00:00Z'));
+      expect(whereOf(prisma.userStats.findMany).user).toEqual(
+        expect.objectContaining(active),
+      );
+    });
+
+    it('in the weekly report', async () => {
+      prisma.learnerProgressEvent = {
+        groupBy: jest.fn().mockResolvedValue([{ userId: 19 }]),
+        findMany: jest.fn().mockResolvedValue([]),
+      };
+      prisma.user = { findMany: jest.fn().mockResolvedValue([]) };
+      prisma.learnerSkillLevel = { findMany: jest.fn().mockResolvedValue([]) };
+      await cronService.runWeeklyReport('2026-11-16');
+      expect(whereOf(prisma.user.findMany)).toEqual(
+        expect.objectContaining(active),
+      );
+    });
+
+    it('in the plan expiry reminder and the win-back offer', async () => {
+      prisma.subscription = { findMany: jest.fn().mockResolvedValue([]) };
+      await cronService.runPlanExpiryReminder('2026-11-16');
+      expect(whereOf(prisma.subscription.findMany).user).toEqual(active);
+
+      prisma.subscription.findMany.mockClear();
+      await cronService.runWinback('2026-11-16');
+      expect(whereOf(prisma.subscription.findMany).user).toEqual(active);
+    });
+  });
 });

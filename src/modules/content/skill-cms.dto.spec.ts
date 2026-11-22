@@ -2,7 +2,12 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-import { ListeningQuestionDto, SkillContentDto } from './skill-cms.dto';
+import {
+  ListeningQuestionDto,
+  SkillContentDto,
+  SkillTracksDto,
+  SpeakingExerciseDto,
+} from './skill-cms.dto';
 
 const dto = (content: Record<string, unknown>) =>
   plainToInstance(ListeningQuestionDto, { type: 'MULTIPLE_CHOICE', content });
@@ -54,5 +59,44 @@ describe('SkillContentDto bilingualContent', () => {
   it('accepts a reading paragraph array and rejects a string', async () => {
     expect(await content([{ en: 'Hi', vi: 'Chào' }])).toEqual([]);
     expect((await content('DIALOGUE'))[0].property).toBe('bilingualContent');
+  });
+});
+
+describe('Speaking DTOs carry no category (2026-11-21)', () => {
+  const strict = { whitelist: true, forbidNonWhitelisted: true };
+
+  it('refuses a category on a set or an exercise when asked to be strict', async () => {
+    const set = await validate(
+      plainToInstance(SkillContentDto, { title: 'Bộ', category: 'GENERAL' }),
+      strict,
+    );
+    expect(set.map((e) => e.property)).toEqual(['category']);
+    const exercise = await validate(
+      plainToInstance(SpeakingExerciseDto, {
+        title: 'Câu',
+        targetText: 'Hello.',
+        category: 'BUSINESS',
+      }),
+      strict,
+    );
+    expect(exercise.map((e) => e.property)).toEqual(['category']);
+  });
+});
+
+describe('SkillTracksDto', () => {
+  const tracks = (value: unknown) =>
+    validate(plainToInstance(SkillTracksDto, { tracks: value }));
+
+  it('takes track codes, not only the six old ones', async () => {
+    expect(await tracks(['GENERAL', 'Y_TE_DIEU_DUONG'])).toEqual([]);
+    expect(await tracks([])).toEqual([]);
+  });
+
+  it('refuses malformed, repeated or too many codes', async () => {
+    expect(await tracks(['y te'])).not.toEqual([]);
+    expect(await tracks(['GENERAL', 'GENERAL'])).not.toEqual([]);
+    expect(
+      await tracks(Array.from({ length: 21 }, (_, i) => `T_${i}`)),
+    ).not.toEqual([]);
   });
 });

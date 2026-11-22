@@ -89,7 +89,6 @@ describeWithIsolatedDatabaseAndRedis(
         data: {
           title: 'S2A Verification Exercise',
           targetText: 'Practice speaking English accurately.',
-          category: 'GENERAL',
         },
       });
       testExerciseId = exercise.id;
@@ -321,7 +320,6 @@ describeWithIsolatedDatabaseAndRedis(
         data: {
           title: 'S2A Read Aloud',
           targetText: 'Practice speaking English accurately.',
-          category: 'GENERAL',
           taskType: 'READ_ALOUD',
         },
       });
@@ -457,7 +455,6 @@ describeWithIsolatedDatabaseAndRedis(
             data: {
               title: `S2A badge exercise ${i + 1}`,
               targetText: 'Practice speaking English accurately.',
-              category: 'GENERAL',
             },
           }),
         ),

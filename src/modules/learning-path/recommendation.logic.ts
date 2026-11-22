@@ -23,11 +23,11 @@
 import type {
   LearningContentType,
   LearningGoal,
-  LearningTrack,
   PracticeLevel,
   PracticeSkill,
 } from '@prisma/client';
 
+import { GENERAL_TRACK } from '../learning-track/learning-track.logic';
 import { fitScore, successProbability } from './ability.logic';
 import { focusOf, type WeakFocus } from './weak-focus.logic';
 import { UNPLACED_UNLOCKED } from './progression.logic';
@@ -37,15 +37,6 @@ import {
   PRACTICE_LEVEL_LABEL,
   PRACTICE_SKILLS,
 } from './placement.logic';
-
-export const TRACK_LABEL: Record<LearningTrack, string> = {
-  GENERAL: 'Chung',
-  IT_SOFTWARE: 'Công nghệ thông tin',
-  OFFICE_BUSINESS: 'Văn phòng – Kinh doanh',
-  SALES_CUSTOMER_SERVICE: 'Bán hàng – CSKH',
-  HOSPITALITY_TOURISM: 'Nhà hàng – Khách sạn – Du lịch',
-  STUDENT_ACADEMIC: 'Sinh viên – Học thuật',
-};
 
 export const SKILL_LABEL: Record<PracticeSkill, string> = {
   LISTENING: 'Nghe',
@@ -62,7 +53,8 @@ export type Candidate = {
   title: string;
   route: string;
   difficulty: number;
-  tracks: LearningTrack[];
+  /** Track codes the item is tagged with. */
+  tracks: string[];
   /** Speaking task types or the writing quiz type of the item. */
   kinds: string[];
   /** True when the item needs a plan the learner does not have. */
@@ -86,7 +78,10 @@ export type HistoryEntry = {
 };
 
 export type LearnerState = {
-  track: LearningTrack;
+  /** Track code the learner chose (GENERAL before onboarding). */
+  track: string;
+  /** Its name as admins set it, for the reason text. */
+  trackName: string;
   goal: LearningGoal;
   /** Missing skill = not placed yet: practised as BASIC, no level lock. */
   skills: Partial<Record<PracticeSkill, SkillState>>;
@@ -182,9 +177,9 @@ export function scoreCandidate(
     score -= 1;
     reasons.push('Ôn nền tảng');
   }
-  if (learner.track !== 'GENERAL' && c.tracks.includes(learner.track)) {
+  if (learner.track !== GENERAL_TRACK && c.tracks.includes(learner.track)) {
     score += 0.6;
-    reasons.push(`Chủ đề ${TRACK_LABEL[learner.track]}`);
+    reasons.push(`Chủ đề ${learner.trackName}`);
   }
   const focus = focusOf(c, learner.weakFocus);
   if (focus) {

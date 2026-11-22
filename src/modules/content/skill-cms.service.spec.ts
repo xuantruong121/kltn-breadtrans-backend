@@ -229,7 +229,6 @@ describe('SkillCmsService', () => {
         }),
         findUnique: jest.fn().mockResolvedValue({
           id: 'speaking-qa',
-          category: 'COMMUNICATION',
           level: 'BEGINNER',
         }),
       },
@@ -265,13 +264,58 @@ describe('SkillCmsService', () => {
         }),
       }),
     );
-    expect(tx.speakingExercise.create).toHaveBeenCalledWith(
+    const exerciseData = tx.speakingExercise.create.mock.calls[0][0].data;
+    expect(exerciseData).toEqual(
       expect.objectContaining({
-        data: expect.objectContaining({
-          publicationStatus: QuizPublicationStatus.DRAFT,
-        }),
+        publicationStatus: QuizPublicationStatus.DRAFT,
       }),
     );
+    // The category columns are gone (2026-11-22); Lĩnh vực sits on the set.
+    expect(exerciseData).not.toHaveProperty('category');
+    expect(exerciseData).not.toHaveProperty('categoryId');
+  });
+
+  it('creates a Speaking set with no category', async () => {
+    const prisma = {
+      speakingPracticeSet: {
+        create: jest.fn().mockResolvedValue({ id: 'speaking-new' }),
+      },
+    };
+    const service = new SkillCmsService(prisma as any);
+    await service.create('speaking', { title: 'Bộ mới', level: 'B1' }, admin);
+    const data = prisma.speakingPracticeSet.create.mock.calls[0][0].data;
+    expect(data).toEqual(
+      expect.objectContaining({
+        title: 'Bộ mới',
+        level: 'B1',
+        publicationStatus: QuizPublicationStatus.DRAFT,
+      }),
+    );
+    expect(data).not.toHaveProperty('category');
+    expect(data).not.toHaveProperty('categoryId');
+  });
+
+  it('saves a Speaking set with its title, description and level only', async () => {
+    const prisma = {
+      speakingPracticeSet: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'practice-question-response-a2',
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'set' }),
+      },
+      speakingSubmission: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new SkillCmsService(prisma as any);
+    await service.update(
+      'speaking',
+      'practice-question-response-a2',
+      { title: ' Phản hồi câu hỏi ', description: 'Mô tả', level: 'A2' },
+      admin,
+    );
+    expect(prisma.speakingPracticeSet.update).toHaveBeenCalledWith({
+      where: { id: 'practice-question-response-a2' },
+      data: { title: 'Phản hồi câu hỏi', description: 'Mô tả', level: 'A2' },
+    });
   });
 
   it('publishes a valid Speaking set and all of its exercises together', async () => {
@@ -348,15 +392,13 @@ describe('SkillCmsService', () => {
       imageUrl: null,
       stimulusId: null,
       stimulus: null,
-      category: 'COMMUNICATION',
-      practiceSet: { category: 'COMMUNICATION', categoryId: null },
+      practiceSet: { id: 's1' },
     };
     const tx: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       speakingPracticeSet: {
         findUnique: jest.fn().mockResolvedValue({
           id: 's1',
-          category: 'COMMUNICATION',
           level: 'BEGINNER',
           publicationStatus: QuizPublicationStatus.DRAFT,
         }),
@@ -666,14 +708,12 @@ describe('SkillCmsService', () => {
     expect(prisma.question.findFirst).not.toHaveBeenCalled();
   });
 
-  it('restores Speaking child category from the parent when an override is removed', async () => {
+  it('never writes a category on a Speaking exercise update', async () => {
     const prisma = {
       speakingExercise: {
         findFirst: jest.fn().mockResolvedValue({
           id: 42,
-          category: 'BUSINESS',
           difficulty: 'ADVANCED',
-          practiceSet: { category: 'COMMUNICATION' },
         }),
         update: jest.fn().mockResolvedValue({ id: 42 }),
       },
@@ -689,13 +729,10 @@ describe('SkillCmsService', () => {
       admin,
     );
 
-    expect(prisma.speakingExercise.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          category: 'COMMUNICATION',
-        }),
-      }),
-    );
+    const { data } = prisma.speakingExercise.update.mock.calls[0][0];
+    expect(data).toEqual(expect.objectContaining({ title: 'Updated' }));
+    expect(data).not.toHaveProperty('category');
+    expect(data).not.toHaveProperty('categoryId');
   });
 
   it('exposes Listening audio authoring only for a question owned by the quiz', async () => {
@@ -764,7 +801,7 @@ describe('Speaking reference audio follows the sample sentence', () => {
     stimulus: null,
     isPremiumContent: false,
     audioUrl: 'https://pub/catalog/speaking/reference/30.v1.mp3',
-    practiceSet: { category: 'WORK', categoryId: 1 },
+    practiceSet: { id: 'set-1' },
   };
   const prismaWith = () => ({
     speakingExercise: {
@@ -823,7 +860,6 @@ describe('Speaking reference audio follows the sample sentence', () => {
       prisma as any,
       undefined,
       undefined,
-      undefined,
       speaking as any,
       upload as any,
     );
@@ -857,7 +893,6 @@ describe('Speaking reference audio follows the sample sentence', () => {
     };
     const service = new SkillCmsService(
       prisma as any,
-      undefined,
       undefined,
       undefined,
       speaking as any,

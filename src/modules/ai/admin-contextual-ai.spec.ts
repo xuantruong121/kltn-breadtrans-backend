@@ -23,7 +23,7 @@ import {
 describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () => {
   let controller: AdminContextualAiController;
   let mockAiService: Partial<Record<keyof AiService, jest.Mock>>;
-  let mockSpeakingCategoryService: { getByCode: jest.Mock };
+  let mockPrisma: { learningTrack: { findFirst: jest.Mock } };
 
   beforeEach(() => {
     mockAiService = {
@@ -37,23 +37,28 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       suggestWritingTask: jest.fn(),
       suggestSpeakingPracticeSet: jest.fn(),
       suggestSpeakingExercises: jest.fn(),
+      suggestSpeakingFullDraft: jest.fn(),
       checkAndIncrementDailyQuota: jest.fn().mockResolvedValue(1),
     };
-    mockSpeakingCategoryService = {
-      getByCode: jest.fn((code: string) =>
-        Promise.resolve({
-          code,
-          name: code,
-          allowPracticeSet: true,
-          allowExercise: true,
-        }),
-      ),
+    mockPrisma = {
+      learningTrack: {
+        findFirst: jest.fn(({ where }: { where: { code: string } }) =>
+          Promise.resolve(
+            where.code === 'OFFICE_BUSINESS'
+              ? {
+                  code: 'OFFICE_BUSINESS',
+                  name: 'Văn phòng – Kinh doanh',
+                  description: 'Hành chính, kế toán, nhân sự, quản lý',
+                }
+              : null,
+          ),
+        ),
+      },
     };
     controller = new AdminContextualAiController(
       mockAiService as any,
       {} as any,
-      {} as any,
-      mockSpeakingCategoryService as any,
+      mockPrisma as any,
     );
   });
 
@@ -154,20 +159,17 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         plainToInstance(SuggestSpeakingPracticeSetDto, {
           topic: '',
           level: 'BEGINNER',
-          category: 'UNKNOWN',
+          track: 'not a code',
         }),
       );
       expect(speakingSetErrors.some((e) => e.property === 'topic')).toBe(true);
       expect(speakingSetErrors.some((e) => e.property === 'level')).toBe(true);
-      expect(speakingSetErrors.some((e) => e.property === 'category')).toBe(
-        false,
-      );
+      expect(speakingSetErrors.some((e) => e.property === 'track')).toBe(true);
 
       const speakingExerciseErrors = await validate(
         plainToInstance(SuggestSpeakingExercisesDto, {
           practiceSetTitle: '',
           level: 'BEGINNER',
-          category: 'COMMUNICATION',
           count: 6,
         }),
       );
@@ -377,8 +379,8 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const setResult = {
         title: 'Giới thiệu bản thân cơ bản',
         description: 'Luyện các câu giới thiệu bản thân ngắn.',
-        category: 'COMMUNICATION',
         level: 'BEGINNER',
+        track: 'OFFICE_BUSINESS',
       };
       const exerciseResult = {
         candidates: [
@@ -397,7 +399,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         controller.suggestSpeakingPracticeSet({
           topic: 'Giới thiệu bản thân',
           level: 'BEGINNER',
-          category: 'COMMUNICATION',
+          track: 'OFFICE_BUSINESS',
           currentTitle: 'Bản nháp cũ',
         }),
       ).resolves.toEqual(setResult);
@@ -406,43 +408,52 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
           practiceSetTitle: setResult.title,
           practiceSetDescription: setResult.description,
           level: 'BEGINNER',
-          category: 'COMMUNICATION',
           existingExerciseTitles: ['Chào hỏi'],
           taskType: 'READ_ALOUD',
           count: 1,
         }),
       ).resolves.toEqual(exerciseResult);
 
+      // The track's name and description reach the prompt.
       expect(mockAiService.suggestSpeakingPracticeSet).toHaveBeenCalledWith({
         topic: 'Giới thiệu bản thân',
         level: 'BEGINNER',
-        category: 'COMMUNICATION',
         currentTitle: 'Bản nháp cũ',
         currentDescription: undefined,
-        categoryContext: {
-          code: 'COMMUNICATION',
-          displayLabel: 'COMMUNICATION',
-          allowPracticeSet: true,
-          allowExercise: true,
+        trackContext: {
+          code: 'OFFICE_BUSINESS',
+          name: 'Văn phòng – Kinh doanh',
+          description: 'Hành chính, kế toán, nhân sự, quản lý',
         },
       });
+      expect(mockPrisma.learningTrack.findFirst).toHaveBeenCalledWith({
+        where: { code: 'OFFICE_BUSINESS', isActive: true },
+        select: { code: true, name: true, description: true },
+      });
+      // No track: a general draft, no lookup.
       expect(mockAiService.suggestSpeakingExercises).toHaveBeenCalledWith({
         practiceSetTitle: setResult.title,
         practiceSetDescription: setResult.description,
         level: 'BEGINNER',
-        category: 'COMMUNICATION',
         currentTitle: undefined,
         currentTargetText: undefined,
         taskType: 'READ_ALOUD',
         existingExerciseTitles: ['Chào hỏi'],
         count: 1,
-        categoryContext: {
-          code: 'COMMUNICATION',
-          displayLabel: 'COMMUNICATION',
-          allowPracticeSet: true,
-          allowExercise: true,
-        },
       });
+      expect(mockPrisma.learningTrack.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a track that is unknown or switched off, before any AI call', async () => {
+      await expect(
+        controller.suggestSpeakingFullDraft({
+          topic: 'Khách sạn',
+          level: 'A1-B1',
+          track: 'HOSPITALITY_TOURISM',
+          count: 1,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockAiService.suggestSpeakingFullDraft).not.toHaveBeenCalled();
     });
   });
 
@@ -521,7 +532,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         title: 't',
         description: 'd',
         level: 'BEGINNER',
-        category: 'COMMUNICATION',
+        track: null,
       });
       mockAiService.suggestSpeakingExercises!.mockResolvedValue({
         candidates: [],
@@ -546,12 +557,10 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await controller.suggestSpeakingPracticeSet({
         topic: 't',
         level: 'BEGINNER',
-        category: 'COMMUNICATION',
       });
       await controller.suggestSpeakingExercises({
         practiceSetTitle: 't',
         level: 'BEGINNER',
-        category: 'COMMUNICATION',
         count: 1,
       });
 
@@ -643,7 +652,6 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
           controller.suggestSpeakingExercises({
             practiceSetTitle: 'T',
             level: 'BEGINNER',
-            category: 'COMMUNICATION',
             count: 1,
           }),
         ).rejects.toThrow(BadGatewayException);

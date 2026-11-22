@@ -3,6 +3,8 @@
  * (F8.1). Each choice was made from the item's own text. Only items the
  * recommender can show are listed: it needs a level tag in the title.
  * Adds tags, never removes one; the rollback file names what was added.
+ * Track codes are rows of LearningTrack (2026-11-21); speaking set tags go
+ * on the set (SpeakingSetTrack), quiz tags stay in ContentTrackTag.
  *
  * A non-harness target needs SKILL_PRACTICE_APPLY_AUTHORIZED=apply.
  *
@@ -10,18 +12,18 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type LearningTrack, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const DIR = join('artifacts', 'skill-practice-v1');
 const ADMIN_ID = 17;
 
-const GENERAL: LearningTrack[] = ['GENERAL'];
-const OFFICE: LearningTrack[] = ['OFFICE_BUSINESS'];
-const HOSPITALITY: LearningTrack[] = ['HOSPITALITY_TOURISM'];
-const CUSTOMER: LearningTrack[] = ['SALES_CUSTOMER_SERVICE'];
-const ACADEMIC: LearningTrack[] = ['STUDENT_ACADEMIC'];
+const GENERAL = ['GENERAL'];
+const OFFICE = ['OFFICE_BUSINESS'];
+const HOSPITALITY = ['HOSPITALITY_TOURISM'];
+const CUSTOMER = ['SALES_CUSTOMER_SERVICE'];
+const ACADEMIC = ['STUDENT_ACADEMIC'];
 
-const QUIZZES: Record<number, LearningTrack[]> = {
+const QUIZZES: Record<number, string[]> = {
   1: GENERAL,
   5: OFFICE,
   9: GENERAL,
@@ -50,7 +52,8 @@ const QUIZZES: Record<number, LearningTrack[]> = {
   46: OFFICE,
 };
 
-const SETS: Record<string, LearningTrack[]> = {
+/** The same tags as `tracks` in prisma/data/speaking-practice-sets.ts (the seed). */
+const SETS: Record<string, string[]> = {
   'practice-read-aloud-a1-a2': GENERAL,
   'practice-read-aloud-b1-b2': OFFICE,
   'practice-pronunciation-b1': OFFICE,
@@ -77,54 +80,43 @@ async function main() {
     const ids = Object.keys(QUIZZES).map(Number);
     const quizzes = await prisma.quiz.count({ where: { id: { in: ids } } });
     if (quizzes !== ids.length) throw new Error(`${quizzes} quizzes found`);
-    const sets = await prisma.speakingPracticeSet.findMany({
+    const sets = await prisma.speakingPracticeSet.count({
       where: { id: { in: Object.keys(SETS) } },
-      select: {
-        id: true,
-        // The key the recommender reads a set by (learning-path.catalog.ts).
-        exercises: {
-          where: { publicationStatus: 'PUBLISHED' },
-          orderBy: [{ order: 'asc' }, { id: 'asc' }],
-          take: 1,
-          select: { id: true },
-        },
-      },
     });
-    if (sets.length !== Object.keys(SETS).length)
-      throw new Error(`${sets.length} speaking sets found`);
+    if (sets !== Object.keys(SETS).length)
+      throw new Error(`${sets} speaking sets found`);
 
-    const rows = [
-      ...Object.entries(QUIZZES).flatMap(([id, tracks]) =>
-        tracks.map((track) => ({
-          contentType: 'QUIZ' as const,
-          contentId: Number(id),
-          track,
-          createdById: ADMIN_ID,
-        })),
-      ),
-      ...sets.flatMap((set) =>
-        SETS[set.id].map((track) => {
-          if (!set.exercises[0]) throw new Error(`${set.id} has no exercise`);
-          return {
-            contentType: 'SPEAKING_SET' as const,
-            contentId: set.exercises[0].id,
-            track,
-            createdById: ADMIN_ID,
-          };
-        }),
-      ),
-    ];
+    const quizRows = Object.entries(QUIZZES).flatMap(([id, tracks]) =>
+      tracks.map((track) => ({
+        contentType: 'QUIZ' as const,
+        contentId: Number(id),
+        track,
+        createdById: ADMIN_ID,
+      })),
+    );
+    const setRows = Object.entries(SETS).flatMap(([setId, tracks]) =>
+      tracks.map((track) => ({ setId, track, createdById: ADMIN_ID })),
+    );
     mkdirSync(DIR, { recursive: true });
     const file = join(
       DIR,
       `track-tagging-${harness ? 'harness' : 'target'}.json`,
     );
-    writeFileSync(file, JSON.stringify(rows, null, 1));
-    const { count } = await prisma.contentTrackTag.createMany({
-      data: rows,
+    writeFileSync(
+      file,
+      JSON.stringify({ quiz: quizRows, speakingSet: setRows }, null, 1),
+    );
+    const quiz = await prisma.contentTrackTag.createMany({
+      data: quizRows,
       skipDuplicates: true,
     });
-    console.log(`tags added ${count} of ${rows.length}; rollback ${file}`);
+    const set = await prisma.speakingSetTrack.createMany({
+      data: setRows,
+      skipDuplicates: true,
+    });
+    console.log(
+      `tags added: quiz ${quiz.count} of ${quizRows.length}, speaking set ${set.count} of ${setRows.length}; rollback ${file}`,
+    );
   } finally {
     await prisma.$disconnect();
   }

@@ -20,7 +20,6 @@ describe('SpeakingService - Phase 2 Presigned R2 Upload & Finalization', () => {
     title: 'Test Read Aloud',
     targetText: 'Hello world',
     difficulty: 'BEGINNER',
-    category: 'GENERAL',
   };
 
   beforeEach(() => {
