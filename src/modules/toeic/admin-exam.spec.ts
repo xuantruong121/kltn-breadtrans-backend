@@ -195,10 +195,10 @@ describe('AdminExamService (Phase 4)', () => {
       );
     });
 
-    it('publishes a valid exam when all media and questions meet invariants', async () => {
+    it('rejects a part practice whose Part is not complete', async () => {
       prisma.toeicExamSet.findUnique.mockResolvedValue({
         id: 301,
-        title: 'Valid Part 5 Test',
+        title: 'One Part 5 question',
         type: 'PRACTICE_BY_PART',
         durationSeconds: 1800,
         groups: [
@@ -216,6 +216,33 @@ describe('AdminExamService (Phase 4)', () => {
             ],
           },
         ],
+      });
+
+      await expect(adminExamService.publishExam(301)).rejects.toThrow(
+        'Đề luyện tập theo Part chưa đủ điều kiện xuất bản cho học viên',
+      );
+      expect(prisma.toeicExamSet.update).not.toHaveBeenCalled();
+    });
+
+    it('publishes a part practice whose Part is complete, with its media and questions', async () => {
+      prisma.toeicExamSet.findUnique.mockResolvedValue({
+        id: 301,
+        title: 'Valid Part 5 Test',
+        type: 'PRACTICE_BY_PART',
+        durationSeconds: 1800,
+        groups: Array.from({ length: 30 }, (_, index) => ({
+          id: index + 1,
+          part: 5,
+          groupOrder: index + 1,
+          questions: [
+            {
+              id: 101 + index,
+              questionNumber: 101 + index,
+              options: ['apply', 'application', 'applicable', 'applying'],
+              correctIndex: 1,
+            },
+          ],
+        })),
       });
       prisma.toeicExamSet.update.mockResolvedValue({
         id: 301,
@@ -356,6 +383,60 @@ describe('AdminExamService (Phase 4)', () => {
       await expect(
         adminExamService.updateQuestion(301, 1, 2, { explanation: 'x' }),
       ).rejects.toThrow('chuyển đề về bản nháp');
+    });
+
+    // QA 2026-11-22: groups of Parts 1, 2 and 5 get their question by hand,
+    // checked as the readiness check reads it.
+    describe('manual questions in one-question Parts', () => {
+      const draftGroup = (part: number, questions: number) => {
+        prisma.toeicExamSet.findUnique.mockResolvedValue({
+          id: 301,
+          publicationStatus: QuizPublicationStatus.DRAFT,
+        });
+        prisma.toeicQuestionGroup.findUnique.mockResolvedValue({
+          id: 1,
+          examId: 301,
+          part,
+          mediaMetadata: null,
+          _count: { questions },
+        });
+        prisma.toeicAttempt.findFirst.mockResolvedValue(null);
+        prisma.toeicQuestion.create.mockResolvedValue({ id: 9 });
+      };
+      const dto = (options: string[], correctIndex = 0) => ({
+        questionNumber: 1,
+        options,
+        correctIndex,
+      });
+
+      it('adds the one question of a Part 5 group', async () => {
+        draftGroup(5, 0);
+        await adminExamService.addQuestion(
+          301,
+          1,
+          dto(['clear', 'clearly', 'clearing', 'clearance']),
+        );
+        expect(prisma.toeicQuestion.create).toHaveBeenCalled();
+      });
+
+      it('refuses a second question in a Part 1 group', async () => {
+        draftGroup(1, 1);
+        await expect(
+          adminExamService.addQuestion(301, 1, dto(['a', 'b', 'c', 'd'])),
+        ).rejects.toThrow('chỉ có một câu hỏi');
+        expect(prisma.toeicQuestion.create).not.toHaveBeenCalled();
+      });
+
+      it('refuses a Part 2 question without exactly three responses', async () => {
+        draftGroup(2, 0);
+        await expect(
+          adminExamService.addQuestion(301, 1, dto(['a', 'b', 'c', 'd'])),
+        ).rejects.toThrow('Part 2 cần đúng 3 phương án');
+        await expect(
+          adminExamService.addQuestion(301, 1, dto(['a', 'b', 'c'], 3)),
+        ).rejects.toThrow('Đáp án đúng nằm ngoài các phương án đã nhập.');
+        expect(prisma.toeicQuestion.create).not.toHaveBeenCalled();
+      });
     });
 
     it('rejects group reorder if forged cross-exam group IDs are submitted', async () => {

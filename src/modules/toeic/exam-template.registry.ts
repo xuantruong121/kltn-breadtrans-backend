@@ -127,9 +127,7 @@ export function resolveExamTemplate(
     );
   }
   if (!template.authoringEnabled) {
-    throw new BadRequestException(
-      `${template.displayName} đang ở trạng thái Coming soon và chưa thể tạo đề`,
-    );
+    throw new BadRequestException(`${template.displayName} chưa mở soạn đề`);
   }
   return template;
 }

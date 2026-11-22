@@ -1,4 +1,7 @@
-import { validateToeicExam } from './toeic.validation';
+import {
+  humanizeToeicValidationIssues,
+  validateToeicExam,
+} from './toeic.validation';
 import {
   toeicMediaHash,
   withManualMedia,
@@ -92,14 +95,115 @@ test('validates the standard 200-question structure and grouping', () => {
   });
 });
 
-test('explains why a single-Part Draft cannot be published as a TOEIC template', () => {
-  const exam = makeExam();
-  exam.type = 'PRACTICE_BY_PART';
-  const result = validateToeicExam(exam);
-  expect(result.learnerReady).toBe(false);
-  expect(result.issues).toContainEqual(
-    expect.objectContaining({ code: 'INCOMPLETE_TEMPLATE' }),
-  );
+// QA 2026-11-22: a "Luyện tập theo Part" exam was never learner-ready, since
+// INCOMPLETE_TEMPLATE was always added. It is judged by its own Parts now.
+describe('part practice is judged by its own Parts', () => {
+  const practiceOf = (...parts: number[]) => {
+    const exam = makeExam();
+    exam.type = 'PRACTICE_BY_PART';
+    exam.groups = exam.groups.filter((group) => parts.includes(group.part));
+    return exam;
+  };
+
+  test('a complete Part 5 with valid questions is ready', () => {
+    const result = validateToeicExam(practiceOf(5));
+    expect(result.issues).toEqual([]);
+    expect(result.learnerReady).toBe(true);
+    expect(result.counts.total).toBe(30);
+  });
+
+  test('complete Listening Parts are ready with their media, not without', () => {
+    expect(validateToeicExam(practiceOf(1, 2)).learnerReady).toBe(true);
+    const exam = practiceOf(1, 2);
+    exam.groups.find((group) => group.part === 1).imageUrl = null;
+    exam.groups.find((group) => group.part === 2).audioUrl = null;
+    const result = validateToeicExam(exam);
+    expect(result.learnerReady).toBe(false);
+    expect(result.issues.map((issue) => issue.code).sort()).toEqual([
+      'MISSING_AUDIO',
+      'MISSING_IMAGE',
+    ]);
+  });
+
+  test('an unfinished Part says what it lacks, never the Full Test template', () => {
+    // The QA case: one Part 6 question and an empty Part 5 group.
+    const exam = {
+      id: 6,
+      type: 'PRACTICE_BY_PART',
+      durationSeconds: 4500,
+      groups: [
+        { id: 1, part: 5, groupOrder: 1, questions: [] },
+        {
+          id: 2,
+          part: 6,
+          groupOrder: 2,
+          passageText: 'A notice.',
+          questions: [
+            {
+              id: 9,
+              questionNumber: 1,
+              options: ['a', 'b', 'c', 'd'],
+              correctIndex: 0,
+            },
+          ],
+        },
+      ],
+    };
+    const result = validateToeicExam(exam);
+    expect(result.learnerReady).toBe(false);
+    expect(result.issues.map((issue) => [issue.code, issue.groupId])).toEqual([
+      ['EMPTY_GROUP', 1],
+      ['PART_COUNT', 1],
+      ['PART_COUNT', 2],
+    ]);
+    const messages = humanizeToeicValidationIssues(exam, result.issues).map(
+      (issue) => issue.humanMessage,
+    );
+    expect(messages).toEqual([
+      'Reading · Part 5 · Nhóm 1 chưa có câu hỏi.',
+      'Reading · Part 5: cần đủ 30 câu để thành một Part hoàn chỉnh, hiện có 0 câu.',
+      'Reading · Part 6: cần đủ 16 câu để thành một Part hoàn chỉnh, hiện có 1 câu.',
+    ]);
+    expect(messages.join(' ')).not.toMatch(/Full Test/);
+  });
+
+  test('a Part with the right count but the wrong groups is not ready', () => {
+    const exam = practiceOf(3);
+    const [first, second] = exam.groups;
+    second.questions.unshift(first.questions.pop());
+    const result = validateToeicExam(exam);
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'GROUP_STRUCTURE',
+    );
+    expect(
+      humanizeToeicValidationIssues(exam, result.issues)[0].humanMessage,
+    ).toBe('Listening · Part 3: cần 13 nhóm, mỗi nhóm ba câu hỏi.');
+  });
+
+  test('an empty practice and repeated numbers are named', () => {
+    expect(validateToeicExam({ ...practiceOf(5), groups: [] }).issues).toEqual([
+      expect.objectContaining({ code: 'EMPTY_PRACTICE' }),
+    ]);
+    const exam = practiceOf(5);
+    exam.groups[1].questions[0].questionNumber =
+      exam.groups[0].questions[0].questionNumber;
+    expect(validateToeicExam(exam).issues).toContainEqual(
+      expect.objectContaining({ code: 'QUESTION_ORDER' }),
+    );
+  });
+
+  test('the full test keeps its own rules and message', () => {
+    const exam = makeExam();
+    exam.groups = exam.groups.filter((group) => group.part === 5);
+    const result = validateToeicExam(exam);
+    expect(result.learnerReady).toBe(false);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: 'TOTAL_COUNT' }),
+    );
+    expect(
+      humanizeToeicValidationIssues(exam, result.issues)[0].humanMessage,
+    ).toMatch(/TOEIC Full Test/);
+  });
 });
 
 test('rejects missing durable listening media without weakening count checks', () => {
