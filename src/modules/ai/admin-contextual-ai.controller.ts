@@ -55,6 +55,7 @@ import {
   normalizeDictationSentences,
   normalizeVocabDecks,
 } from './document-import.logic';
+import { GrammarDraftRejected } from '../grammar/grammar-full-draft.logic';
 
 @ApiTags('Admin Contextual AI')
 @Controller('admin')
@@ -556,6 +557,11 @@ export class AdminContextualAiController {
 
   @Post('grammar/ai/full-draft')
   @ApiOperation({ summary: 'Soạn bài Grammar cùng câu hỏi nháp' })
+  @ApiResponse({
+    status: 502,
+    description:
+      'AI không trả lời, hoặc trả bản nháp thiếu lý thuyết hay viết tiếng Việt không dấu.',
+  })
   async suggestGrammarFullDraft(@Body() dto: SuggestGrammarFullDraftDto) {
     try {
       return await this.aiService.suggestGrammarFullDraft({
@@ -568,6 +574,9 @@ export class AdminContextualAiController {
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.warn(`AI Grammar full draft failed: ${error?.message || ''}`);
+      // The model answered, but with a draft the editor cannot use: say why.
+      if (error instanceof GrammarDraftRejected)
+        throw new BadGatewayException(error.message);
       throw new BadGatewayException('Không thể soạn bài Grammar lúc này.');
     }
   }
