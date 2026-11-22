@@ -18,6 +18,7 @@ import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import {
   filterGrammarTopics,
   gradeGrammarQuestion,
+  grammarPublishProblems,
   grammarTopicFacets,
   normalizeOptionExplanations,
   questionProblems,
@@ -169,10 +170,51 @@ export class GrammarService {
       learnerAttemptCount: attemptsByTopic.get(topic.id) ?? 0,
     }));
     if (!wantsPage(query)) return rows;
+    const page = pageOf(filterGrammarTopics(rows, query), query);
     return {
-      ...pageOf(filterGrammarTopics(rows, query), query),
+      ...page,
+      items: await this.withPublishProblems(page.items),
       facets: grammarTopicFacets(rows),
     };
+  }
+
+  /**
+   * Each draft on the page with what blocks its publishing, so the list's
+   * publish icon shows only when the server would accept it. One query for
+   * the page's questions; a published topic needs no check.
+   */
+  private async withPublishProblems<
+    T extends {
+      id: number;
+      title: string;
+      description: string | null;
+      publicationStatus: QuizPublicationStatus;
+    },
+  >(items: T[]): Promise<Array<T & { publishProblems: string[] }>> {
+    const drafts = items
+      .filter((item) => item.publicationStatus !== 'PUBLISHED')
+      .map((item) => item.id);
+    const questions = drafts.length
+      ? await this.prisma.grammarQuestion.findMany({
+          where: { topicId: { in: drafts } },
+          select: {
+            topicId: true,
+            question: true,
+            options: true,
+            correctIndex: true,
+            optionExplanations: true,
+          },
+        })
+      : [];
+    return items.map((item) => ({
+      ...item,
+      publishProblems: drafts.includes(item.id)
+        ? grammarPublishProblems({
+            ...item,
+            questions: questions.filter((q) => q.topicId === item.id),
+          })
+        : [],
+    }));
   }
 
   /**
@@ -351,19 +393,25 @@ export class GrammarService {
     });
     if (!topic)
       throw new NotFoundException(`Không tìm thấy chủ đề ngữ pháp #${id}.`);
-    if (!topic.questions || topic.questions.length === 0) {
-      throw new BadRequestException(
-        'Chủ đề ngữ pháp phải có ít nhất 1 câu hỏi trước khi xuất bản',
-      );
+    // The editor's checklist, item for item (grammarPublishProblems).
+    const ordered = [...(topic.questions ?? [])].sort(
+      (a, b) => a.order - b.order,
+    );
+    const missing = grammarPublishProblems({ ...topic, questions: ordered });
+    if (missing.length) {
+      const index = ordered.findIndex((q) => questionProblems(q).length);
+      throw new BadRequestException({
+        message: [
+          `Chưa xuất bản được. Còn thiếu: ${missing.join('; ')}.`,
+          index >= 0
+            ? `Câu ${index + 1}: ${questionProblems(ordered[index]).join('; ')}.`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        missing,
+      });
     }
-    const ordered = [...topic.questions].sort((a, b) => a.order - b.order);
-    ordered.forEach((q, index) => {
-      const problems = questionProblems(q);
-      if (problems.length)
-        throw new BadRequestException(
-          `Câu ${index + 1}: ${problems.join('; ')}`,
-        );
-    });
     return this.prisma.grammarTopic.update({
       where: { id },
       data: { publicationStatus: QuizPublicationStatus.PUBLISHED },
