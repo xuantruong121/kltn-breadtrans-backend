@@ -410,6 +410,7 @@ export function buildPracticeWritingRequest(
     'Each comment must agree with its score: a criterion with full marks is not described as weak, and a low score names the concrete problem. Never contradict facts.wordCount or facts.keywords.',
     'Criteria: grammar = grammatical accuracy only; vocabulary/naturalness = word choice and natural phrasing; organization = clear order, opening and closing; taskAchievement/taskCompletion = covering every requirement in a way that fits the situation and register.',
     'Penalise each mistake under ONE criterion only: a grammar error is not also a vocabulary or organization error.',
+    'The grammar comment names the same errors as the corrections, quotes the same words and says exactly where the error is (for example: after "are" the main verb takes -ing, "are ordering"). Never describe an error that is not in the corrections.',
     'The sample response only shows the expected scope and register. Never reward or penalise similarity to it: different ideas, details, names, structure or style that meet every requirement deserve full task marks.',
     'facts.length compares the word count with task.wordRange. FAR_BELOW: the server caps the total at half, so score every criterion only on what is actually written and do not lower grammar, vocabulary or organization for shortness. BELOW may cost at most one task point. ABOVE is not penalised unless the extra text breaks focus. Length is never a grammar or vocabulary error.',
     ...(task.picture
@@ -422,6 +423,7 @@ export function buildPracticeWritingRequest(
           'Return sceneMatch: MATCH (the answer describes people, actions or objects of task.picture), PARTIAL (partly relevant, with important details missing or wrong), MISMATCH (clearly describes a different scene or contradicts task.picture), UNCERTAIN (cannot tell). Using the required keywords never makes an answer MATCH by itself; different wording from the sample is never MISMATCH.',
           'Return sceneEvidence in Vietnamese with full diacritics: one sentence naming the concrete details of the answer that agree with or contradict task.picture.',
           'Score grammar on grammatical accuracy only. Writing two correct sentences instead of the one requested sentence is a task requirement issue for taskCompletion, not a grammar error. A correction that joins sentences must be natural English that keeps the meaning, using a fitting connector or a relative clause.',
+          'Do not judge the capital letter at the start or the final punctuation mark: the server checks them the same way for every answer. Never put them in corrections, never mention them in a comment and never lower a score for them.',
         ]
       : []),
     ...(!task.picture
@@ -583,6 +585,83 @@ const texts = (v: unknown, max = 8) =>
         .slice(0, max)
     : null;
 
+type Correction = { original: string; corrected: string; explanation: string };
+
+const CAPITAL_NOTE = 'Chữ cái đầu câu phải viết hoa.';
+const PERIOD_NOTE = 'Câu phải kết thúc bằng dấu chấm.';
+const BOTH_NOTE =
+  'Chữ cái đầu câu phải viết hoa và câu phải kết thúc bằng dấu chấm.';
+
+/** Where a correction's original text sits in the answer: exact first, then without case. */
+function spanOf(answer: string, original: string): [number, number] | null {
+  let at = answer.indexOf(original);
+  if (at < 0) at = answer.toLowerCase().indexOf(original.toLowerCase());
+  return at < 0 ? null : [at, at + original.length];
+}
+const upperFirstLetter = (s: string) =>
+  s.replace(/\p{L}/u, (ch) => ch.toUpperCase());
+const endsSentence = (s: string) => /[.!?…]["'’”)\]]*\s*$/.test(s);
+
+/**
+ * Picture answers (owner 2026-11-24): the capital letter at the start and the
+ * final punctuation mark are checked here, the same way for every answer,
+ * instead of by the AI grader (which flagged them on one picture and not on
+ * the next). Returns whether each is missing, and the corrections with one
+ * fix for each: folded into the grader's correction that covers that place
+ * when there is one, else a correction of its own quoting the learner's
+ * first word or last words, or one correction of the whole text when the
+ * answer is that short. Pure.
+ */
+export function pictureMechanics(
+  answer: string,
+  corrections: Correction[],
+): { capital: boolean; period: boolean; corrections: Correction[] } {
+  const text = answer.trimEnd();
+  const first = text.search(/\p{L}/u);
+  const capital = first >= 0 && text[first] !== text[first].toUpperCase();
+  const period = text.trim().length > 0 && !endsSentence(text);
+  if (!capital && !period) return { capital, period, corrections };
+  const out = corrections.map((c) => ({ ...c }));
+  let needCapital = capital;
+  let needPeriod = period;
+  out.forEach((c) => {
+    const span = spanOf(answer, c.original);
+    if (!span) return;
+    if (needCapital && span[0] <= first && first < span[1]) {
+      c.corrected = upperFirstLetter(c.corrected);
+      needCapital = false;
+    }
+    if (needPeriod && span[1] >= text.length) {
+      if (!endsSentence(c.corrected)) c.corrected = `${c.corrected}.`;
+      needPeriod = false;
+    }
+  });
+  const head = /^\s*(\S+)/.exec(text);
+  const tail = /(\S+(?:\s+\S+){0,2})\s*$/.exec(text);
+  if (needCapital && needPeriod && tail && tail.index <= first) {
+    const whole = text.trim();
+    out.push({
+      original: whole,
+      corrected: `${upperFirstLetter(whole)}.`,
+      explanation: BOTH_NOTE,
+    });
+    return { capital, period, corrections: out };
+  }
+  if (needCapital && head)
+    out.push({
+      original: head[1],
+      corrected: upperFirstLetter(head[1]),
+      explanation: CAPITAL_NOTE,
+    });
+  if (needPeriod && tail)
+    out.push({
+      original: tail[1],
+      corrected: `${tail[1]}.`,
+      explanation: PERIOD_NOTE,
+    });
+  return { capital, period, corrections: out };
+}
+
 /** Accept a grader result only when complete, in range and grounded. */
 export function validatePracticeWritingResult(
   raw: unknown,
@@ -686,6 +765,28 @@ export function validatePracticeWritingResult(
         };
     }
   }
+  // Picture answers: a missing capital or final period costs one grammar
+  // point, decided here so every answer is treated the same (owner 24/11).
+  const mechanics = task.picture ? pictureMechanics(answer, []) : null;
+  if (mechanics && (mechanics.capital || mechanics.period)) {
+    const missing =
+      mechanics.capital && mechanics.period
+        ? 'chưa viết hoa chữ cái đầu và chưa có dấu chấm cuối câu'
+        : mechanics.capital
+          ? 'chưa viết hoa chữ cái đầu'
+          : 'chưa có dấu chấm cuối câu';
+    finalCriteria = finalCriteria.map((c) =>
+      c.key !== 'grammar'
+        ? c
+        : c.score > 0
+          ? {
+              ...c,
+              score: c.score - 1,
+              comment: `${c.comment} Câu ${missing} (trừ 1 điểm).`,
+            }
+          : { ...c, comment: `${c.comment} Câu ${missing}.` },
+    );
+  }
   // A text strictly under two thirds of the minimum cannot cover the task:
   // the total is capped at half, whatever the grader said. Criterion scores
   // stay as graded; when the off-topic cap is lower, it wins (caps never add).
@@ -745,7 +846,9 @@ export function validatePracticeWritingResult(
       maxScore: task.rubric.reduce((n, c) => n + c.max, 0),
       criteria: finalCriteria,
       strengths,
-      corrections,
+      corrections: mechanics
+        ? pictureMechanics(answer, corrections).corrections
+        : corrections,
       feedback:
         scene?.match === 'MISMATCH'
           ? `Câu trả lời chưa mô tả đúng bức tranh nên điểm tối đa là ${Math.floor(maxTotal * SCENE_MISMATCH_CAP_RATIO)}/${maxTotal}. ${scene.evidence} ${r.feedback.trim()}`

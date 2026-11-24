@@ -1,8 +1,4 @@
-import {
-  allowance,
-  buildDailyUsage,
-  nextBusinessDayStart,
-} from './daily-usage';
+import { allowance, buildDailyUsage, nextQuotaReset } from './daily-usage';
 
 describe('daily usage (owner 2026-11-13: "Gói của tôi" shows what is left)', () => {
   it('counts what was used, never past the limit or below zero', () => {
@@ -23,14 +19,18 @@ describe('daily usage (owner 2026-11-13: "Gói của tôi" shows what is left)',
     expect(usage.tutor).toEqual({ limit: 30, used: 1, remaining: 29 });
   });
 
-  it('resets at 00:00 of the next Vietnam day', () => {
-    // 23:30 on 13/11 in Vietnam is 16:30 UTC.
-    expect(
-      nextBusinessDayStart(new Date('2026-11-13T16:30:00Z')).toISOString(),
-    ).toBe('2026-11-13T17:00:00.000Z');
-    // 00:30 on 14/11 in Vietnam: the next reset is 00:00 on 15/11.
-    expect(
-      nextBusinessDayStart(new Date('2026-11-13T17:30:00Z')).toISOString(),
-    ).toBe('2026-11-14T17:00:00.000Z');
+  it('resets at 00:01 of the next Vietnam day, not 00:00 (owner 24/11)', () => {
+    // 23:30 on 13/11 in Vietnam is 16:30 UTC: the reset is 00:01 on 14/11.
+    expect(nextQuotaReset(new Date('2026-11-13T16:30:00Z')).toISOString()).toBe(
+      '2026-11-13T17:01:00.000Z',
+    );
+    // 00:00:30 on 14/11 is still the quota day of 13/11.
+    expect(nextQuotaReset(new Date('2026-11-13T17:00:30Z')).toISOString()).toBe(
+      '2026-11-13T17:01:00.000Z',
+    );
+    // 00:30 on 14/11: the next reset is 00:01 on 15/11.
+    expect(nextQuotaReset(new Date('2026-11-13T17:30:00Z')).toISOString()).toBe(
+      '2026-11-14T17:01:00.000Z',
+    );
   });
 });

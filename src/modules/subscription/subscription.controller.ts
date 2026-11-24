@@ -9,7 +9,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { aiQuotaKey } from '../../common/guards/ai-rate-limit.guard';
-import { getBusinessDayKey } from '../../common/time/business-time.util';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
 import { tutorQuotaKey } from '../ai/tutor-prompt.logic';
 import { buildDailyUsage, type DailyUsage } from './daily-usage';
 import {
@@ -37,7 +37,7 @@ export class SubscriptionController {
   @Get('me/usage')
   @ApiOperation({
     summary:
-      'Lượt AI chấm (Nói và Viết) và lượt hỏi Trợ lý đã dùng hôm nay, theo gói, làm mới lúc 00:00 giờ Việt Nam',
+      'Lượt AI chấm (Nói và Viết) và lượt hỏi Trợ lý đã dùng hôm nay, theo gói, làm mới mỗi ngày lúc 00:01 giờ Việt Nam',
   })
   @ApiResponse({
     status: 200,
@@ -47,7 +47,7 @@ export class SubscriptionController {
     @Request() request: { user: { id: number } },
   ): Promise<DailyUsage> {
     const userId = request.user.id;
-    const day = getBusinessDayKey();
+    const day = getLearnerDayKey();
     const [planCode, counters] = await Promise.all([
       this.subscriptionService.planCodeFor(userId),
       this.redis

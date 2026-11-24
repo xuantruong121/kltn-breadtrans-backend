@@ -17,6 +17,8 @@ import {
 import {
   getBusinessDayKey,
   getBusinessDayStart,
+  getLearnerDayStart,
+  getLearnerDayStartOf,
 } from '../../common/time/business-time.util';
 import {
   daysUntil,
@@ -74,7 +76,8 @@ export class NotificationsCronService {
    */
   private async mayPushStudyReminder(userId: number, now: Date) {
     if (isQuietHour(vietnamHour(now))) return false;
-    const today = getBusinessDayStart(getBusinessDayKey(now));
+    // Today is the learner day, from 00:01 (owner 2026-11-24).
+    const today = getLearnerDayStart(now);
     const earlier = await this.prisma.notification.count({
       where: {
         userId,
@@ -96,7 +99,8 @@ export class NotificationsCronService {
   async runStudyReminder(now = new Date()) {
     const hour = vietnamHour(now);
     if (isQuietHour(hour)) return { hour, candidates: 0, sent: 0 };
-    const today = getBusinessDayStart(getBusinessDayKey(now));
+    // Today is the learner day, from 00:01 (owner 2026-11-24).
+    const today = getLearnerDayStart(now);
     const candidates = await this.prisma.userStats.findMany({
       where: {
         user: {
@@ -569,7 +573,7 @@ export class NotificationsCronService {
     this.logger.log('[Queue] Running daily streak reminder check...');
 
     try {
-      const today = getBusinessDayStart(dayKey);
+      const today = getLearnerDayStartOf(dayKey);
 
       // Find students with active streak who haven't studied today
       const usersWithStreak = await this.prisma.userStats.findMany({

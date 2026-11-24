@@ -12,7 +12,7 @@ import Redis from 'ioredis';
 import { Role } from '@prisma/client';
 import { Response } from 'express';
 
-import { getBusinessDayKey } from '../time/business-time.util';
+import { getLearnerDayKey } from '../time/business-time.util';
 import {
   aiGradingLimitMessage,
   planLimits,
@@ -20,7 +20,7 @@ import {
 } from '../../modules/subscription/plan-limits';
 import { SubscriptionService } from '../../modules/subscription/subscription.service';
 
-/** Redis key of one learner's AI gradings for one Vietnam day. */
+/** Redis key of one learner's AI gradings for one quota day (from 00:01, Vietnam time). */
 export const aiQuotaKey = (userId: number, dayKey: string) =>
   `ai_quota:${userId}:${dayKey}`;
 
@@ -36,7 +36,7 @@ export async function takeAiGrading(
   planCode: PlanCode,
 ) {
   const limit = planLimits(planCode).aiGradingPerDay;
-  const key = aiQuotaKey(userId, getBusinessDayKey());
+  const key = aiQuotaKey(userId, getLearnerDayKey());
   const count = await redis.incr(key);
   if (count === 1) {
     // The key outlives its day by a margin and then goes away.

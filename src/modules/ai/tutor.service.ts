@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { getBusinessDayKey } from '../../common/time/business-time.util';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { AiService } from './ai.service';
 import { MistakesService } from '../mistakes/mistakes.service';
@@ -63,7 +63,7 @@ export class TutorService {
   async quota(userId: number): Promise<TutorQuota> {
     const limit = await this.limitFor(userId);
     const used = Number(
-      (await this.redis.get(tutorQuotaKey(userId, getBusinessDayKey()))) ?? 0,
+      (await this.redis.get(tutorQuotaKey(userId, getLearnerDayKey()))) ?? 0,
     );
     return { limit, remaining: Math.max(0, limit - used) };
   }
@@ -78,7 +78,7 @@ export class TutorService {
     },
   ): Promise<TutorReply> {
     const limit = await this.limitFor(userId);
-    const key = tutorQuotaKey(userId, getBusinessDayKey());
+    const key = tutorQuotaKey(userId, getLearnerDayKey());
     const used = await this.redis.incr(key);
     if (used === 1) await this.redis.expire(key, 2 * 86400);
     if (used > limit) {

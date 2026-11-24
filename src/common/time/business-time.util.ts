@@ -70,6 +70,31 @@ export function getBusinessWeekStart(date = new Date()): Date {
  */
 export const BUSINESS_ROLLOVER_DELAY_MS = 60_000;
 
+/**
+ * The learner's day: what anything renewed or counted per day belongs to
+ * (AI gradings, tutor questions, daily quests, streaks, pet and Arena caps,
+ * daily rewards, "Hôm nay" rankings). It turns at 00:01 like the day jobs,
+ * never 00:00 (owner 2026-11-24), so a request made in the first minute
+ * after midnight still counts in the day before.
+ */
+export function getLearnerDayKey(date = new Date()): string {
+  return getBusinessDayKey(
+    new Date(date.getTime() - BUSINESS_ROLLOVER_DELAY_MS),
+  );
+}
+
+/** When the learner day of `dayKey` begins: 00:01 of that date, Vietnam time. */
+export function getLearnerDayStartOf(dayKey: string): Date {
+  return new Date(
+    getBusinessDayStart(dayKey).getTime() + BUSINESS_ROLLOVER_DELAY_MS,
+  );
+}
+
+/** When the learner day holding `date` began (00:01, Vietnam time). */
+export function getLearnerDayStart(date = new Date()): Date {
+  return getLearnerDayStartOf(getLearnerDayKey(date));
+}
+
 export function isPastBusinessRollover(
   periodStart: Date,
   now = new Date(),

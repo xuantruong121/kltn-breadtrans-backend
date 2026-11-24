@@ -190,7 +190,8 @@ describe('NotificationsCronService.runStudyReminder', () => {
     const { cron, prisma } = setup({ candidates: [] });
     await cron.runStudyReminder(vn(11, 20));
     const where = prisma.userStats.findMany.mock.calls[0][0].where;
-    const today = new Date('2026-11-10T17:00:00Z');
+    // The learner day began at 00:01 on 11/11 in Vietnam (owner 24/11).
+    const today = new Date('2026-11-10T17:01:00Z');
     expect(where.lastStreakUpdate).toEqual({
       gte: new Date(today.getTime() - 14 * 86_400_000),
       lt: today,

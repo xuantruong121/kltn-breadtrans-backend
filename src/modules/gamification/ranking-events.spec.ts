@@ -10,6 +10,7 @@ describe('learner events for the ranking feed', () => {
     streak: { count: number; daysAgo: number },
   ) {
     const events: { type: string; value: number }[] = [];
+    const notices: { type: string; title: string }[] = [];
     const lastStreakUpdate = new Date(Date.now() - streak.daysAgo * 86_400_000);
     const tx: any = {
       $executeRaw: jest.fn(),
@@ -40,13 +41,19 @@ describe('learner events for the ranking feed', () => {
           return Promise.resolve(data);
         }),
       },
+      notification: {
+        create: jest.fn(({ data }: any) => {
+          notices.push({ type: data.type, title: data.title });
+          return Promise.resolve(data);
+        }),
+      },
     };
     const service = new GamificationService(
       tx as never,
       { emit: jest.fn() } as never,
       {} as never,
     );
-    return { service, tx, events };
+    return { service, tx, events, notices };
   }
 
   it('crossing 100 XP records LEVEL_UP to Lv. 2, once', async () => {
@@ -55,10 +62,22 @@ describe('learner events for the ranking feed', () => {
     expect(events).toEqual([{ type: 'LEVEL_UP', value: 2 }]);
   });
 
+  it('a new level also leaves one line in Thông báo (owner 24/11)', async () => {
+    const { service, tx, notices } = setup(90, { count: 0, daysAgo: 0 });
+    await service.awardXp(1, 20, 'test', { tx });
+    expect(notices).toEqual([
+      { type: 'level_up:2', title: 'Bạn đã lên Cấp 2' },
+    ]);
+  });
+
   it('XP inside a level records nothing', async () => {
-    const { service, tx, events } = setup(110, { count: 0, daysAgo: 0 });
+    const { service, tx, events, notices } = setup(110, {
+      count: 0,
+      daysAgo: 0,
+    });
     await service.awardXp(1, 20, 'test', { tx });
     expect(events).toEqual([]);
+    expect(notices).toEqual([]);
   });
 
   it('the day a streak reaches 7 records STREAK_MILESTONE 7', async () => {

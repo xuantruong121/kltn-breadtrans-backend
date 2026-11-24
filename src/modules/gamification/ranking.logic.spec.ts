@@ -34,21 +34,22 @@ describe('periodStart', () => {
   // 03:00 on Wednesday 11 Nov 2026 in Vietnam.
   const now = new Date('2026-11-10T20:00:00Z');
   it('today, this week from Monday, this month, all time, in Vietnam time', () => {
+    // Every period starts at 00:01 like the learner day (owner 24/11).
     expect(periodStart('today', now)!.toISOString()).toBe(
-      '2026-11-10T17:00:00.000Z',
+      '2026-11-10T17:01:00.000Z',
     );
     expect(periodStart('week', now)!.toISOString()).toBe(
-      '2026-11-08T17:00:00.000Z',
+      '2026-11-08T17:01:00.000Z',
     );
     expect(periodStart('month', now)!.toISOString()).toBe(
-      '2026-10-31T17:00:00.000Z',
+      '2026-10-31T17:01:00.000Z',
     );
     expect(periodStart('all', now)).toBeNull();
   });
   it('a Monday starts its own week', () => {
     const monday = new Date('2026-11-09T01:00:00Z'); // 08:00 Monday in Vietnam
     expect(periodStart('week', monday)!.toISOString()).toBe(
-      '2026-11-08T17:00:00.000Z',
+      '2026-11-08T17:01:00.000Z',
     );
   });
 });

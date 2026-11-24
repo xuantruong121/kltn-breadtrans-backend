@@ -9,6 +9,8 @@
  * words from the vocabulary decks only.
  */
 
+import { getLearnerDayStart } from '../../common/time/business-time.util';
+
 export const ARENA_ROUNDS = 10;
 export const ROUND_SECONDS = 12;
 export const FINAL_ROUND_MULTIPLIER = 2;
@@ -53,13 +55,12 @@ export function arenaXp(correctAnswers: number, earnedToday: number): number {
   return Math.max(0, Math.min(full, ARENA_XP_DAILY_CAP - earnedToday));
 }
 
-const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Midnight of the current day in Vietnam (UTC+7, no daylight saving). */
+/**
+ * When the learner's current day began: 00:01 in Vietnam, never 00:00 (owner
+ * 2026-11-24). Daily caps (Arena XP, Hầm) count from here.
+ */
 export function vietnamDayStart(now: Date): Date {
-  const local = now.getTime() + VN_OFFSET_MS;
-  return new Date(local - (local % DAY_MS) - VN_OFFSET_MS);
+  return getLearnerDayStart(now);
 }
 
 export type QuestionKind = 'fill_blank' | 'meaning_to_word' | 'word_to_meaning';
