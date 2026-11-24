@@ -4,6 +4,7 @@ import {
   linkingWord,
   exceedsPictureWordLimit,
   keywordCheck,
+  pictureMechanics,
   pictureTaskIssues,
   practiceWritingTask,
   validatePracticeWritingResult,
@@ -531,5 +532,184 @@ describe('picture writing: scene relevance policy (CP58-H)', () => {
     );
     expect(systemInstruction).toContain('not a grammar error');
     expect(systemInstruction).toContain('natural English');
+  });
+});
+
+describe('picture writing: capital letter and final punctuation are checked by the server (owner 24/11)', () => {
+  const content = {
+    taskType: 'PICTURE_SENTENCE',
+    imageUrl: 'https://example.r2.dev/catalog/writing/picture/cafe-counter.png',
+    sceneDescription:
+      'Customers stand at a cafe counter and order drinks from a barista behind the counter.',
+    prompt: 'Viết một hoặc hai câu mô tả bức tranh, dùng cả hai từ gợi ý.',
+    requiredKeywords: ['order', 'counter'],
+    sampleResponse: 'Two customers are ordering coffee at the counter.',
+    wordRange: [1, 40],
+    rubric: { grammar: 4, vocabulary: 2, taskCompletion: 4 },
+  };
+  const task = practiceWritingTask(content, 'fallback')!;
+  const raw = (
+    grammar: number,
+    corrections: Array<{
+      original: string;
+      corrected: string;
+      explanation: string;
+    }> = [],
+  ) => ({
+    criteria: [
+      {
+        key: 'grammar',
+        score: grammar,
+        comment: 'Sau "are", động từ chính phải thêm -ing: "are ordering".',
+      },
+      {
+        key: 'vocabulary',
+        score: 2,
+        comment: 'Dùng từ tự nhiên, đúng ngữ cảnh.',
+      },
+      {
+        key: 'taskCompletion',
+        score: 4,
+        comment: 'Mô tả đúng tranh và dùng đủ hai từ gợi ý.',
+      },
+    ],
+    strengths: ['Dùng đủ hai từ gợi ý.'],
+    corrections,
+    feedback: 'Bài viết mô tả đúng tranh, cần chia đúng thì của động từ.',
+    suggestions: ['Ôn thì hiện tại tiếp diễn.'],
+    sceneMatch: 'MATCH',
+    sceneEvidence: 'Câu tả khách gọi đồ uống ở quầy, đúng với tranh.',
+  });
+  const validate = (r: unknown, text: string) =>
+    validatePracticeWritingResult(
+      r,
+      task,
+      text,
+      buildPracticeWritingRequest(task, text).facts,
+    );
+
+  it('tells the grader to leave capitals and final punctuation to the server, and to keep the grammar comment on the corrected words', () => {
+    const { systemInstruction } = buildPracticeWritingRequest(
+      task,
+      'they order drinks at the counter',
+    );
+    expect(systemInstruction).toContain(
+      'Do not judge the capital letter at the start or the final punctuation mark',
+    );
+    expect(systemInstruction).toContain(
+      'names the same errors as the corrections',
+    );
+  });
+
+  it('a missing capital and period cost one grammar point and get corrections, whatever the grader said', () => {
+    const text = 'they are order some drinks at the counter';
+    const r = validate(
+      raw(2, [
+        {
+          original: 'they are order',
+          corrected: 'they are ordering',
+          explanation: 'Sau "are" động từ thêm -ing.',
+        },
+      ]),
+      text,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const grammar = r.value.criteria.find((c) => c.key === 'grammar')!;
+    expect(grammar.score).toBe(1);
+    expect(grammar.comment).toContain(
+      'chưa viết hoa chữ cái đầu và chưa có dấu chấm cuối câu (trừ 1 điểm)',
+    );
+    expect(r.value.score).toBe(7);
+    expect(r.value.corrections).toEqual([
+      {
+        original: 'they are order',
+        corrected: 'They are ordering',
+        explanation: 'Sau "are" động từ thêm -ing.',
+      },
+      {
+        original: 'at the counter',
+        corrected: 'at the counter.',
+        explanation: 'Câu phải kết thúc bằng dấu chấm.',
+      },
+    ]);
+  });
+
+  it('a correct capital and period change nothing', () => {
+    const r = validate(
+      raw(4),
+      'Two customers are ordering coffee at the counter.',
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.score).toBe(10);
+    expect(r.value.corrections).toEqual([]);
+    expect(r.value.criteria[0].comment).not.toContain('trừ 1 điểm');
+  });
+
+  it('adds its own corrections when the grader gave none, and one combined correction for a very short answer', () => {
+    expect(pictureMechanics('they order drinks at the counter', [])).toEqual({
+      capital: true,
+      period: true,
+      corrections: [
+        {
+          original: 'they',
+          corrected: 'They',
+          explanation: 'Chữ cái đầu câu phải viết hoa.',
+        },
+        {
+          original: 'at the counter',
+          corrected: 'at the counter.',
+          explanation: 'Câu phải kết thúc bằng dấu chấm.',
+        },
+      ],
+    });
+    expect(pictureMechanics('order counter', []).corrections).toEqual([
+      {
+        original: 'order counter',
+        corrected: 'Order counter.',
+        explanation:
+          'Chữ cái đầu câu phải viết hoa và câu phải kết thúc bằng dấu chấm.',
+      },
+    ]);
+    expect(pictureMechanics('They order drinks at the counter!', [])).toEqual({
+      capital: false,
+      period: false,
+      corrections: [],
+    });
+  });
+
+  it('a grammar score already at 0 is not lowered and its comment does not claim a deduction', () => {
+    const r = validate(raw(0), 'they order drinks at the counter');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const grammar = r.value.criteria.find((c) => c.key === 'grammar')!;
+    expect(grammar.score).toBe(0);
+    expect(grammar.comment).toContain(
+      'chưa viết hoa chữ cái đầu và chưa có dấu chấm cuối câu.',
+    );
+    expect(grammar.comment).not.toContain('trừ 1 điểm');
+  });
+
+  it('ordinary sentence tasks are not checked this way', () => {
+    const r = validatePracticeWritingResult(
+      {
+        criteria: [
+          { key: 'grammar', score: 4, comment: 'Câu đúng ngữ pháp.' },
+          { key: 'naturalness', score: 2, comment: 'Diễn đạt tự nhiên.' },
+          { key: 'taskCompletion', score: 4, comment: 'Đáp ứng đủ yêu cầu.' },
+        ],
+        strengths: ['Rõ ràng.'],
+        corrections: [],
+        feedback: 'Bài viết tốt, đáp ứng đề.',
+        suggestions: ['Giữ phong độ.'],
+        taskRelevance: 'ON_TASK',
+        relevanceEvidence: 'Bài viết trả lời đúng yêu cầu của đề.',
+      },
+      sentenceTask,
+      'i like coffee',
+      buildPracticeWritingRequest(sentenceTask, 'i like coffee').facts,
+    );
+    if (r.ok) expect(r.value.criteria[0].score).toBe(4);
   });
 });
