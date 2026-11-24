@@ -4,6 +4,7 @@
  * Pure: no Prisma, no I/O.
  */
 import { vietnamDayStart } from '../events/arena-questions.logic';
+import { BUSINESS_ROLLOVER_DELAY_MS } from '../../common/time/business-time.util';
 
 export type RankingMetric = 'xp' | 'streak' | 'referral';
 export type RankingPeriod = 'today' | 'week' | 'month' | 'all';
@@ -38,7 +39,10 @@ export function maskName(fullName: string | null | undefined): string {
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Where a period begins, in Vietnam time; the week starts on Monday like the league. */
+/**
+ * Where a period begins, in Vietnam time, at 00:01 like the learner day; the
+ * week starts on Monday like the league.
+ */
 export function periodStart(period: RankingPeriod, now: Date): Date | null {
   if (period === 'all') return null;
   const day = vietnamDayStart(now);
@@ -48,8 +52,11 @@ export function periodStart(period: RankingPeriod, now: Date): Date | null {
     const sinceMonday = (local.getUTCDay() + 6) % 7;
     return new Date(day.getTime() - sinceMonday * DAY_MS);
   }
+  // The 1st of the month at 00:01, like every learner day.
   return new Date(
-    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) - VN_OFFSET_MS,
+    Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) -
+      VN_OFFSET_MS +
+      BUSINESS_ROLLOVER_DELAY_MS,
   );
 }
 

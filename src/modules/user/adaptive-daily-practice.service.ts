@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { QuizPublicationStatus, QuizType, Role } from '@prisma/client';
 import {
-  getBusinessDayKey,
-  getBusinessDayStart,
+  getLearnerDayKey,
+  getLearnerDayStartOf,
 } from '../../common/time/business-time.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
@@ -358,8 +358,9 @@ export class AdaptiveDailyPracticeService {
     userId: number,
     role: Role = Role.STUDENT,
   ): Promise<DailyPracticeResponse> {
-    const dateKey = getBusinessDayKey();
-    const dayStart = getBusinessDayStart(dateKey);
+    // The learner day: a new set of practice from 00:01 (owner 2026-11-24).
+    const dateKey = getLearnerDayKey();
+    const dayStart = getLearnerDayStartOf(dateKey);
     const tracking = await this.userService.getSkillProgressSummary(
       userId,
       role,

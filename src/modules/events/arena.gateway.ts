@@ -35,6 +35,7 @@ import {
   roundPoints,
   type QuestionKind,
 } from './arena-questions.logic';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
 
 const getSocketCorsConfig = () => {
   if (process.env.NODE_ENV !== 'production') {
@@ -1721,13 +1722,9 @@ export class ArenaGateway
     return out;
   }
 
+  /** The learner day (turns at 00:01, owner 2026-11-24). */
   private getVietnamDateKey() {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    return getLearnerDayKey();
   }
 
   // ==========================================

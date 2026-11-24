@@ -24,6 +24,7 @@ import {
   questionProblems,
 } from './grammar-question.logic';
 import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
 
 @Injectable()
 export class GrammarService {
@@ -326,13 +327,9 @@ export class GrammarService {
     };
   }
 
+  /** The learner day (turns at 00:01, owner 2026-11-24). */
   private getVietnamDateKey() {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    return getLearnerDayKey();
   }
 
   async getMyAttempts(userId: number) {

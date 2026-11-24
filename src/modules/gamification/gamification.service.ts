@@ -21,11 +21,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import {
-  getBusinessDayKey,
-  getBusinessDayStart,
   getPreviousBusinessDayKey,
   getBusinessWeekKey,
   getBusinessWeekStart,
+  getLearnerDayKey,
+  getLearnerDayStartOf,
 } from '../../common/time/business-time.util';
 import { weeklyCatchUpDue } from './weekly-league.logic';
 import { vietnamDayStart } from '../events/arena-questions.logic';
@@ -51,6 +51,9 @@ import { questsForDay, type DailyQuestDefinition } from './daily-quest-catalog';
 const dateKeyFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export function getTodayDateKey(timeZone = 'Asia/Ho_Chi_Minh'): string {
+  // The learner's day turns at 00:01, never 00:00 (owner 2026-11-24): quests,
+  // streaks, pet and feeding caps, daily rewards all renew then.
+  if (timeZone === 'Asia/Ho_Chi_Minh') return getLearnerDayKey();
   let formatter = dateKeyFormatters.get(timeZone);
   if (!formatter) {
     formatter = new Intl.DateTimeFormat('en-CA', {
@@ -1196,13 +1199,8 @@ export class GamificationService {
           return;
         }
 
-        // Use Vietnam timezone for last streak date
-        const lastDateStr = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Ho_Chi_Minh',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(lastUpdate);
+        // The learner day of the last streak update (turns at 00:01).
+        const lastDateStr = getLearnerDayKey(lastUpdate);
 
         // Same Vietnam day - no change unless streak was cleared (count is 0)
         if (nowDateStr === lastDateStr) {
@@ -2157,8 +2155,9 @@ export class GamificationService {
       };
     });
 
-    const startOfToday = new Date(`${dateKey}T00:00:00+07:00`);
-    const endOfToday = new Date(`${dateKey}T23:59:59.999+07:00`);
+    // The learner day: 00:01 today to 00:01 tomorrow (owner 2026-11-24).
+    const startOfToday = getLearnerDayStartOf(dateKey);
+    const endOfToday = new Date(startOfToday.getTime() + 86_400_000 - 1);
 
     const activities = await this.prisma.learningActivity.findMany({
       where: {
@@ -2318,8 +2317,10 @@ export class GamificationService {
   // ADVANCED GAMIFICATION (LEAGUES, STREAKS)
   // ==========================================
 
-  async triggerDailyCron(dayKey = getBusinessDayKey()) {
-    const previousDayStart = getBusinessDayStart(
+  async triggerDailyCron(dayKey = getLearnerDayKey()) {
+    // Yesterday's learner day began at 00:01: a streak last kept before that
+    // missed yesterday.
+    const previousDayStart = getLearnerDayStartOf(
       getPreviousBusinessDayKey(dayKey),
     );
     const processedAt = new Date();

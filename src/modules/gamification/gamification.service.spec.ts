@@ -1556,3 +1556,16 @@ describe('awardPetStudyExp', () => {
     expect(update).not.toHaveBeenCalled();
   });
 });
+
+describe('getTodayDateKey', () => {
+  afterEach(() => jest.useRealTimers());
+
+  it('gives the learner day, which turns at 00:01 (owner 24/11)', () => {
+    jest.useFakeTimers();
+    // 00:00:30 on 25/11 in Vietnam: quests, streaks and caps are still on 24/11.
+    jest.setSystemTime(new Date('2026-11-24T17:00:30Z'));
+    expect(getTodayDateKey('Asia/Ho_Chi_Minh')).toBe('2026-11-24');
+    jest.setSystemTime(new Date('2026-11-24T17:01:00Z'));
+    expect(getTodayDateKey('Asia/Ho_Chi_Minh')).toBe('2026-11-25');
+  });
+});

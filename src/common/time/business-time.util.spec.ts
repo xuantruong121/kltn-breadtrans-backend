@@ -1,6 +1,8 @@
 import {
   getBusinessDayKey,
-  getQuotaDayKey,
+  getLearnerDayKey,
+  getLearnerDayStart,
+  getLearnerDayStartOf,
   getBusinessDayStart,
   getBusinessFiveMinuteKey,
   getBusinessWeekKey,
@@ -70,13 +72,26 @@ describe('business-time.util', () => {
     expect(isPastBusinessRollover(start, at(60))).toBe(true);
   });
 
-  it('turns the quota day at 00:01, not 00:00 (owner 24/11)', () => {
+  it('turns the learner day at 00:01, not 00:00 (owner 24/11)', () => {
     const start = getBusinessDayStart('2026-11-25');
     const at = (seconds: number) => new Date(start.getTime() + seconds * 1000);
 
-    expect(getQuotaDayKey(at(-60))).toBe('2026-11-24');
-    expect(getQuotaDayKey(at(59))).toBe('2026-11-24');
-    expect(getQuotaDayKey(at(60))).toBe('2026-11-25');
-    expect(getQuotaDayKey(at(12 * 3600))).toBe('2026-11-25');
+    expect(getLearnerDayKey(at(-60))).toBe('2026-11-24');
+    expect(getLearnerDayKey(at(59))).toBe('2026-11-24');
+    expect(getLearnerDayKey(at(60))).toBe('2026-11-25');
+    expect(getLearnerDayKey(at(12 * 3600))).toBe('2026-11-25');
+  });
+
+  it('a learner day runs from 00:01 to the next 00:01', () => {
+    expect(getLearnerDayStartOf('2026-11-25').toISOString()).toBe(
+      '2026-11-24T17:01:00.000Z',
+    );
+    // 00:00:30 on 25/11 is still the day of 24/11.
+    expect(
+      getLearnerDayStart(new Date('2026-11-24T17:00:30Z')).toISOString(),
+    ).toBe('2026-11-23T17:01:00.000Z');
+    expect(
+      getLearnerDayStart(new Date('2026-11-24T17:01:00Z')).toISOString(),
+    ).toBe('2026-11-24T17:01:00.000Z');
   });
 });

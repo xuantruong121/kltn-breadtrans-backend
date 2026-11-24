@@ -91,15 +91,19 @@ describe('arenaXp and vietnamDayStart', () => {
     expect(arenaXp(7, 400)).toBe(0);
   });
 
-  it('the day starts at midnight in Vietnam', () => {
+  it('the day starts at 00:01 in Vietnam (owner 24/11)', () => {
     // 03:00 on 9 Nov in Vietnam is 20:00 UTC on 8 Nov.
     expect(
       vietnamDayStart(new Date('2026-11-08T20:00:00Z')).toISOString(),
-    ).toBe('2026-11-08T17:00:00.000Z');
+    ).toBe('2026-11-08T17:01:00.000Z');
     // 23:59 on 8 Nov in Vietnam.
     expect(
       vietnamDayStart(new Date('2026-11-08T16:59:00Z')).toISOString(),
-    ).toBe('2026-11-07T17:00:00.000Z');
+    ).toBe('2026-11-07T17:01:00.000Z');
+    // 00:00:30 on 9 Nov still belongs to 8 Nov.
+    expect(
+      vietnamDayStart(new Date('2026-11-08T17:00:30Z')).toISOString(),
+    ).toBe('2026-11-07T17:01:00.000Z');
   });
 });
 

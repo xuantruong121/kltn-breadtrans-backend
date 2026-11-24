@@ -52,6 +52,10 @@ import {
   takeAiGrading,
 } from '../../common/guards/ai-rate-limit.guard';
 import { SubscriptionService } from '../subscription/subscription.service';
+import {
+  getLearnerDayKey,
+  getLearnerDayStart,
+} from '../../common/time/business-time.util';
 
 /**
  * Set (not serialised) on a response that returns a submission another
@@ -809,8 +813,8 @@ export class SpeakingService {
 
     // 6. Count and create under a per-user/day PostgreSQL advisory lock.
     // This keeps the quota atomic without a schema migration.
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // The learner day in Vietnam (00:01), not the server's midnight.
+    const startOfDay = getLearnerDayStart();
     let submission;
     // The trial grading is taken here, after the early check above and before
     // the row is made; a refusal or a failed save gives it back and deletes
@@ -824,7 +828,7 @@ export class SpeakingService {
         // Prisma does not try to deserialize a result row from the lock call.
         await tx.$executeRaw`
           SELECT pg_advisory_xact_lock(
-            hashtext(${`speaking-quota:${userId}:${startOfDay.toISOString().slice(0, 10)}`})
+            hashtext(${`speaking-quota:${userId}:${getLearnerDayKey(startOfDay)}`})
           );
         `;
 
@@ -1079,8 +1083,8 @@ export class SpeakingService {
     }
 
     // 3. Enforce daily speaking quota
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // The learner day in Vietnam (00:01), not the server's midnight.
+    const startOfDay = getLearnerDayStart();
     const quotaError = await this.dailySpeakingQuotaError(
       this.prisma,
       userId,
@@ -1491,8 +1495,8 @@ export class SpeakingService {
     }
 
     // 7. Atomic creation and quota enforcement under PostgreSQL advisory lock
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // The learner day in Vietnam (00:01), not the server's midnight.
+    const startOfDay = getLearnerDayStart();
 
     let submission: SpeakingSubmission | null;
     // Taken before the row is made, given back if it is not (audit R11).
@@ -1503,7 +1507,7 @@ export class SpeakingService {
       submission = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           SELECT pg_advisory_xact_lock(
-            hashtext(${`speaking-quota:${userId}:${startOfDay.toISOString().slice(0, 10)}`})
+            hashtext(${`speaking-quota:${userId}:${getLearnerDayKey(startOfDay)}`})
           );
         `;
 

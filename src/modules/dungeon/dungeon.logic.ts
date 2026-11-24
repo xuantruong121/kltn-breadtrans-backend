@@ -24,6 +24,7 @@ import {
   letterHint,
   normalizeAnswer,
 } from '../word-blaster/word-blaster.logic';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
 
 export const DUNGEON_MODES = ['daily', 'free'] as const;
 export type DungeonMode = (typeof DUNGEON_MODES)[number];
@@ -64,10 +65,12 @@ export function hashSeed(text: string): number {
   return h >>> 0;
 }
 
-/** The day's dungeon, by the date in Vietnam: "2026-11-09" for everyone that day. */
+/**
+ * The day's dungeon, by the learner day in Vietnam (from 00:01, owner
+ * 2026-11-24): "2026-11-09" for everyone that day.
+ */
 export function dailySeed(now: Date): { seed: number; day: string } {
-  const vn = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  const day = vn.toISOString().slice(0, 10);
+  const day = getLearnerDayKey(now);
   return { seed: hashSeed(`dungeon:${day}`), day };
 }
 
