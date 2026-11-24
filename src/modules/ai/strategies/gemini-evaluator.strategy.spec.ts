@@ -1,3 +1,4 @@
+import { LESSON_COPY_RULE } from '../lesson-copy.logic';
 import {
   extractGeminiImage,
   GeminiEvaluatorStrategy,
@@ -499,6 +500,10 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
       request.generationConfig.responseSchema.properties.questions.items
         .required,
     ).toContain('explanationEn');
+    // Title and description are Vietnamese like every published lesson
+    // (owner 2026-11-24); only the lesson content is English.
+    expect(text).toContain(LESSON_COPY_RULE);
+    expect(text).not.toMatch(/title, description[^.;]*in English/i);
   });
 });
 
@@ -810,6 +815,12 @@ describe('GeminiEvaluatorStrategy Reading drafts store the question type in uppe
     expect(
       schema.properties.questions.items.properties.questionType.enum,
     ).toContain('VOCAB_IN_CONTEXT');
+    // Vietnamese title and description; the passage stays English (owner 2026-11-24).
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toContain(LESSON_COPY_RULE);
+    expect(text).toMatch(/Passage, questions and options in English/);
+    expect(text).not.toMatch(/Title, passage/);
   });
 
   it('uses the same rule for the question suggestions', async () => {
