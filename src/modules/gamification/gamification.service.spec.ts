@@ -919,6 +919,7 @@ describe('GamificationService weekly cron hardening', () => {
           create: jest.fn().mockResolvedValue({ id: 10 }),
         },
         badge: { findFirst: jest.fn().mockResolvedValue(null) },
+        notification: { create: jest.fn().mockResolvedValue({}) },
       };
       const prisma: any = {
         $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
@@ -953,6 +954,72 @@ describe('GamificationService weekly cron hardening', () => {
       expect(pet.exp).toBe(105);
       expect(pet.dailyFeedCount).toBe(1);
       expect(pet.dailyRewardedFeedCount).toBe(1);
+      // No level crossed, so no line in Thông báo.
+      expect(tx.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('a level reached by feeding leaves one line in Thông báo (owner 24/11)', async () => {
+      const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const entry = {
+        level: 1,
+        exp: 998,
+        health: 80,
+        happiness: 70,
+        satiety: 40,
+        lastFedAt: past.toISOString(),
+        stateUpdatedAt: past.toISOString(),
+        dailyFeedDateKey: getTodayDateKey('Asia/Ho_Chi_Minh'),
+        dailyFeedCount: 0,
+        dailyRewardedFeedCount: 0,
+      };
+      const tx: any = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        userPet: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 1,
+            userId: 5,
+            name: 'Bready',
+            level: 1,
+            exp: 998,
+            health: 80,
+            happiness: 70,
+            lastFedAt: past,
+            roster: { bready: entry },
+          }),
+          update: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ ...data, id: 1, name: 'Bready' }),
+            ),
+        },
+        userStats: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUnique: jest.fn().mockResolvedValue({ totalBanhRan: 90 }),
+        },
+        banhTransaction: { create: jest.fn().mockResolvedValue({ id: 12 }) },
+        badge: { findFirst: jest.fn().mockResolvedValue(null) },
+        notification: { create: jest.fn().mockResolvedValue({}) },
+      };
+      const prisma: any = {
+        $transaction: jest.fn((cb: (arg: any) => any) => cb(tx)),
+      };
+      const service = new GamificationService(
+        prisma,
+        { emit: jest.fn() } as any,
+        {} as any,
+      );
+
+      const pet = await service.feedPet(5);
+
+      expect(pet.level).toBe(2);
+      expect(tx.notification.create).toHaveBeenCalledTimes(1);
+      expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+        userId: 5,
+        type: 'pet_level_up:2',
+        title: 'Thú ảo đã lên Cấp 2',
+        body: 'Thú ảo lớn lên nhờ bài luyện tập và bữa ăn mỗi ngày. Còn 997 EXP để lên Cấp 3.',
+        url: '/pet',
+      });
     });
 
     it('rejects feeding when satiety >= 80 (FULL)', async () => {
@@ -1404,14 +1471,16 @@ describe('awardPetStudyExp', () => {
   const today = getTodayDateKey('Asia/Ho_Chi_Minh');
   const serviceWith = (pet: any) => {
     const update = jest.fn().mockResolvedValue({});
+    const notify = jest.fn().mockResolvedValue({});
     const tx: any = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       userPet: { findUnique: jest.fn().mockResolvedValue(pet), update },
+      notification: { create: notify },
     };
     const prisma: any = { $transaction: jest.fn((run: any) => run(tx)) };
     const service = new GamificationService(prisma, {} as any, {} as any);
     jest.spyOn(service, 'awardBadgeIfEarned').mockResolvedValue(false);
-    return { service, update };
+    return { service, update, notify };
   };
   const pet = (entry: Record<string, unknown>) => ({
     userId: 7,
@@ -1459,6 +1528,26 @@ describe('awardPetStudyExp', () => {
     const ahead = serviceWith(pet({ level: 4, exp: 60 }));
     await ahead.service.awardPetStudyExp(7);
     expect(ahead.update.mock.calls[0][0].data.level).toBe(4);
+  });
+
+  it('a level reached through practice leaves one line in Thông báo (owner 24/11)', async () => {
+    const up = serviceWith(pet({ exp: 995 }));
+    await up.service.awardPetStudyExp(7);
+    expect(up.notify).toHaveBeenCalledTimes(1);
+    expect(up.notify.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        userId: 7,
+        type: 'pet_level_up:2',
+        title: 'Thú ảo đã lên Cấp 2',
+        url: '/pet',
+      }),
+    );
+    const same = serviceWith(pet({ exp: 120 }));
+    await same.service.awardPetStudyExp(7);
+    const ahead = serviceWith(pet({ level: 4, exp: 60 }));
+    await ahead.service.awardPetStudyExp(7);
+    expect(same.notify).not.toHaveBeenCalled();
+    expect(ahead.notify).not.toHaveBeenCalled();
   });
 
   it('does nothing for a learner without a pet', async () => {

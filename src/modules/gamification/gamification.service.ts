@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { streakShieldUsedNotice } from './streak-shield.logic';
+import { levelUpNotice, petLevelUpNotice } from './level-up.logic';
 import {
   OWNING_ORDER_STATUSES,
   ordersHoldSlug,
@@ -392,6 +393,16 @@ export class GamificationService {
     if (levelAfter > xpLevel(updatedLeaderboard.totalPoints - points)) {
       await client.learnerEvent.create({
         data: { userId, type: 'LEVEL_UP', value: levelAfter },
+      });
+      // ...and a line in Thông báo, in the same transaction (owner 24/11).
+      await client.notification.create({
+        data: {
+          userId,
+          ...levelUpNotice({
+            level: levelAfter,
+            totalPoints: updatedLeaderboard.totalPoints,
+          }),
+        },
       });
     }
 
@@ -1830,6 +1841,17 @@ export class GamificationService {
         where: { userId },
         data: { level, exp, roster: roster as any } as any,
       });
+      if (level > state.level) {
+        await tx.notification.create({
+          data: {
+            userId,
+            ...petLevelUpNotice({
+              level,
+              expToNext: level * PET_EXP_PER_LEVEL - exp,
+            }),
+          },
+        });
+      }
       return { granted, level };
     };
     const result = options?.tx
@@ -1941,6 +1963,8 @@ export class GamificationService {
       // A level is never taken away: data whose level ran ahead of its EXP
       // (old demo pets: Cấp 4 at 60 EXP) used to drop to Cấp 1 when fed.
       const newLevel = petLevelAfterExp(activePetData.level, newPetExp);
+      // Kept before the entry is overwritten below, to tell a level-up.
+      const levelBefore = activePetData.level;
 
       activePetData.satiety = newSatiety;
       activePetData.health = newHealth;
@@ -1969,6 +1993,18 @@ export class GamificationService {
           roster: roster as any,
         } as any,
       });
+
+      if (newLevel > levelBefore) {
+        await tx.notification.create({
+          data: {
+            userId,
+            ...petLevelUpNotice({
+              level: newLevel,
+              expToNext: newLevel * PET_EXP_PER_LEVEL - newPetExp,
+            }),
+          },
+        });
+      }
 
       return {
         updatedPet,
