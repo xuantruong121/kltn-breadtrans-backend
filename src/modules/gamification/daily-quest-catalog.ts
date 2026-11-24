@@ -40,8 +40,8 @@ export const DAILY_QUEST_POOL: readonly DailyQuestDefinition[] = [
   },
   {
     type: 'DO_READING',
-    title: 'Luyện đọc 1 bài',
-    description: 'Hoàn thành một bài luyện Đọc',
+    title: 'Luyện đọc hiểu 1 bài',
+    description: 'Hoàn thành một bài Đọc hiểu (bài Ngữ pháp không tính)',
     targetValue: 1,
     rewardXP: 20,
     rewardBanh: 8,
@@ -49,7 +49,8 @@ export const DAILY_QUEST_POOL: readonly DailyQuestDefinition[] = [
   {
     type: 'DO_WRITING',
     title: 'Luyện viết 1 bài',
-    description: 'Nộp một bài luyện Viết',
+    description:
+      'Hoàn thành một bài luyện Viết (chấm đủ mọi câu hoặc tranh của bài)',
     targetValue: 1,
     rewardXP: 20,
     rewardBanh: 8,
@@ -74,7 +75,7 @@ export const DAILY_QUEST_POOL: readonly DailyQuestDefinition[] = [
   {
     type: 'PERFECT_QUIZ',
     title: 'Làm đúng 100% một bài',
-    description: 'Đạt điểm tuyệt đối ở một bài luyện Nghe hoặc Đọc',
+    description: 'Đạt điểm tuyệt đối ở một bài luyện Nghe hoặc Đọc hiểu',
     targetValue: 1,
     rewardXP: 30,
     rewardBanh: 12,
