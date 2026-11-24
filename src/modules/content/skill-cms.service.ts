@@ -1,6 +1,11 @@
 import { historyEditProblem } from './edit-with-history';
 import { skillDeleteRefusal } from './skill-content-delete';
-import { parseCefrRange, titleWithLevel } from '../subscription/practice-level';
+import {
+  listeningTitleLabel,
+  parseCefrRange,
+  relabelTitleHead,
+  titleWithLevel,
+} from '../subscription/practice-level';
 import {
   mergeListeningContent,
   spokenTextChanged,
@@ -174,6 +179,19 @@ export class SkillCmsService {
    * the admin picked in it (writingKind), next to what it already holds;
    * listening sends its own metadata object, reading its paragraphs.
    */
+  /** A Listening title's head names its form: Hội thoại, Nghe chép or Nghe hiểu (owner 2026-11-24). */
+  private headedTitle(
+    domain: Exclude<Domain, 'speaking'>,
+    title: string,
+    metadata: unknown,
+  ): string {
+    if (domain !== 'listening') return title;
+    return relabelTitleHead(
+      title,
+      listeningTitleLabel(asRecord(metadata).mode),
+    );
+  }
+
   private contentMetadata(
     domain: Exclude<Domain, 'speaking'>,
     dto: SkillContentDto,
@@ -671,7 +689,11 @@ export class SkillCmsService {
     );
     return this.prisma.quiz.create({
       data: {
-        title: titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
+        title: this.headedTitle(
+          domain,
+          titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
+          dto.bilingualContent,
+        ),
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: this.contentMetadata(domain, dto),
@@ -726,15 +748,19 @@ export class SkillCmsService {
         'Nội dung đã có lịch sử làm bài; không thể đổi loại bài.',
       );
     // An exam task carries no level: the exam sets who can open it.
+    const metadata = this.contentMetadata(domain, dto, quiz.bilingualContent);
     const title =
       dto.level && !(await this.isExamTask(id))
-        ? titleWithLevel(
-            dto.title ?? quiz.title,
-            dto.level,
-            SKILL_TITLE_LABEL[domain],
+        ? this.headedTitle(
+            domain,
+            titleWithLevel(
+              dto.title ?? quiz.title,
+              dto.level,
+              SKILL_TITLE_LABEL[domain],
+            ),
+            metadata ?? quiz.bilingualContent,
           )
         : dto.title?.trim();
-    const metadata = this.contentMetadata(domain, dto, quiz.bilingualContent);
     return this.prisma.quiz.update({
       where: { id },
       data: {
