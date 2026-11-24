@@ -50,7 +50,7 @@ export const DAILY_QUEST_POOL: readonly DailyQuestDefinition[] = [
     type: 'DO_WRITING',
     title: 'Luyện viết 1 bài',
     description:
-      'Hoàn thành một bài luyện Viết (chấm đủ mọi câu hoặc tranh của bài)',
+      'Hoàn thành một bài luyện Viết: chấm một tranh, hoặc chấm đủ mọi câu của bài email, dịch câu',
     targetValue: 1,
     rewardXP: 20,
     rewardBanh: 8,

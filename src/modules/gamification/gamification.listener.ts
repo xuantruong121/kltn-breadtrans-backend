@@ -31,6 +31,12 @@ export class GamificationListener {
     isFirstSubmission?: boolean;
     /** The day the learner submitted (Vietnam); the quests count on it. */
     dateKey?: string;
+    /** One picture of "Viết câu theo tranh" (owner 2026-11-24). */
+    questionId?: number;
+    /** Bánh Mì to give instead of quizBanhReward (a picture pays a fifth). */
+    banh?: number;
+    /** Ledger reference of this reward; defaults to the quiz. */
+    rewardRef?: string;
   }) {
     this.logger.log(
       `Handling quiz.submitted event for user ${payload.userId} with score ${payload.score} (firstSubmission: ${payload.isFirstSubmission})`,
@@ -72,13 +78,16 @@ export class GamificationListener {
         // 2026-11-18): Listening and Reading always paid 10 before.
         if (payload.quizId && payload.isFirstSubmission !== false) {
           const percent = rewardPercent(payload);
-          const banhReward = quizBanhReward(percent);
+          const banhReward =
+            payload.banh !== undefined && Number.isFinite(payload.banh)
+              ? Math.max(0, Math.round(payload.banh))
+              : quizBanhReward(percent);
           if (banhReward > 0) {
             await this.gamificationService.awardBanh(
               payload.userId,
               banhReward,
               'QUIZ_FIRST_COMPLETION',
-              `quiz:${payload.quizId}`,
+              payload.rewardRef ?? `quiz:${payload.quizId}`,
               {
                 isCapped: true,
                 metadata: { score: payload.score, scorePercent: percent },

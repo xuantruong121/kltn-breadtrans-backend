@@ -3276,10 +3276,21 @@ export class QuizService {
         ids,
       );
       const task = submission.quiz.questions.find((q) => q.id === answeredTask);
+      const taskContent = task?.content as {
+        prompt?: string;
+        taskType?: string;
+        requiredKeywords?: unknown;
+      } | null;
       writingExercise = {
         questionId: answeredTask,
         position: ids.indexOf(answeredTask) + 1,
-        prompt: (task?.content as { prompt?: string } | null)?.prompt ?? null,
+        prompt: taskContent?.prompt ?? null,
+        // A picture is its own exercise (owner 2026-11-24): the result page
+        // names its cue words and offers the next picture, not the set.
+        taskType: taskContent?.taskType ?? null,
+        keywords: Array.isArray(taskContent?.requiredKeywords)
+          ? taskContent.requiredKeywords
+          : [],
         ...summary,
       };
     }
