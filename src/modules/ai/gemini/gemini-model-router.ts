@@ -16,12 +16,13 @@ export const DEFAULT_GEMINI_TEXT_MODEL = 'gemini-3.5-flash-lite';
 /**
  * Tried once when the main model is overloaded or out of quota on every key
  * (owner 2026-11-24: a 503 "high demand" on gemini-3.5-flash-lite stopped the
- * CMS drafts). Capacity and quota are per model; on 24/11 the lite models
- * (3.5 and 3.1) were overloaded at times while gemini-3.5-flash answered, and
- * the 2.5 models returned 404 for these keys. It reads images too, so it also
- * stands in for the vision model. GEMINI_FALLBACK_MODEL_NAME overrides it.
+ * CMS drafts). Capacity and quota are per model. The owner chose a lite model
+ * over gemini-3.5-flash: on 24/11 the lite and flash models were overloaded
+ * in turn, so neither was steadier, and lite costs less; the 2.5 models return
+ * 404 for these keys. When the main model is this one (the vision model), the
+ * text model stands in. GEMINI_FALLBACK_MODEL_NAME overrides it.
  */
-export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash';
+export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 
 export type GeminiModelPolicy = {
   taskType: AiTaskType;

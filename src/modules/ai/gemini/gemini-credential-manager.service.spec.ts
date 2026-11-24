@@ -142,7 +142,7 @@ describe('GeminiCredentialManager', () => {
       expect(
         models.filter((m) => m.endsWith('gemini-3.5-flash-lite')),
       ).toHaveLength(3);
-      expect(models[models.length - 1]).toMatch(/gemini-3\.5-flash$/);
+      expect(models[models.length - 1]).toMatch(/gemini-3\.1-flash-lite$/);
     });
 
     it('the main model resting on every key goes straight to the fallback', async () => {
@@ -169,7 +169,7 @@ describe('GeminiCredentialManager', () => {
       ).resolves.toBe('ok');
       warn.mockRestore();
       expect(models).toHaveLength(1);
-      expect(models[0]).toMatch(/gemini-3\.5-flash$/);
+      expect(models[0]).toMatch(/gemini-3\.1-flash-lite$/);
     });
 
     it('a wrong request is not retried on another model', async () => {
@@ -186,18 +186,18 @@ describe('GeminiCredentialManager', () => {
       expect(
         router.fallbackFor({
           taskType: AiTaskType.TEXT_AUTHORING,
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.5-flash-lite',
           capability: 'TEXT',
         })?.model,
-      ).toBe('gemini-3.5-flash-lite');
-      // The vision model (gemini-3.1-flash-lite) falls back to gemini-3.5-flash.
+      ).toBe('gemini-3.1-flash-lite');
+      // The vision model (gemini-3.1-flash-lite) falls back to the text model.
       expect(
         router.fallbackFor({
           taskType: AiTaskType.WRITING_PICTURE_EVALUATION,
           model: 'gemini-3.1-flash-lite',
           capability: 'VISION',
         })?.model,
-      ).toBe('gemini-3.5-flash');
+      ).toBe('gemini-3.5-flash-lite');
     });
   });
 
