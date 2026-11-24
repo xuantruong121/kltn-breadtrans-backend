@@ -6,11 +6,12 @@
  * The counters are the ones the limits themselves keep: AiRateLimitGuard's
  * ai_quota (Speaking and Writing gradings) and the tutor's tutor_quota, per
  * Vietnam day. The guard counts a refused request too, so "used" is capped at
- * the limit.
+ * the limit. A quota day starts at 00:01 (getQuotaDayKey).
  */
 import {
-  getBusinessDayKey,
+  BUSINESS_ROLLOVER_DELAY_MS,
   getBusinessDayStart,
+  getQuotaDayKey,
 } from '../../common/time/business-time.util';
 import { planLimits, type PlanCode } from './plan-limits';
 
@@ -18,7 +19,7 @@ export type DailyAllowance = { limit: number; used: number; remaining: number };
 
 export type DailyUsage = {
   planCode: PlanCode;
-  /** When the counters start again: 00:00 tomorrow, Vietnam time. */
+  /** When the counters start again: the next 00:01, Vietnam time. */
   resetsAt: string;
   aiGrading: DailyAllowance;
   tutor: DailyAllowance;
@@ -36,12 +37,12 @@ export function allowance(
   return { limit, used, remaining: limit - used };
 }
 
-/** 00:00 of the Vietnam day after `now`. */
-export function nextBusinessDayStart(now: Date): Date {
-  const tomorrow = getBusinessDayKey(
-    new Date(now.getTime() + 24 * 3600 * 1000),
+/** The next 00:01 (Vietnam time), when a new quota day starts (getQuotaDayKey). */
+export function nextQuotaReset(now: Date): Date {
+  const dayStart = getBusinessDayStart(getQuotaDayKey(now));
+  return new Date(
+    dayStart.getTime() + 24 * 3600 * 1000 + BUSINESS_ROLLOVER_DELAY_MS,
   );
-  return getBusinessDayStart(tomorrow);
 }
 
 export function buildDailyUsage(
@@ -53,7 +54,7 @@ export function buildDailyUsage(
   const limits = planLimits(planCode);
   return {
     planCode,
-    resetsAt: nextBusinessDayStart(now).toISOString(),
+    resetsAt: nextQuotaReset(now).toISOString(),
     aiGrading: allowance(limits.aiGradingPerDay, aiRaw),
     tutor: allowance(limits.tutorPerDay, tutorRaw),
   };

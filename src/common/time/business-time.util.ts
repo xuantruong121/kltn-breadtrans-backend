@@ -70,6 +70,18 @@ export function getBusinessWeekStart(date = new Date()): Date {
  */
 export const BUSINESS_ROLLOVER_DELAY_MS = 60_000;
 
+/**
+ * The day a daily allowance (AI gradings, tutor questions) counts in. It
+ * turns at 00:01 like the day jobs, not at 00:00 (owner 2026-11-24), so a
+ * request made in the first minute after midnight still counts in the day
+ * before.
+ */
+export function getQuotaDayKey(date = new Date()): string {
+  return getBusinessDayKey(
+    new Date(date.getTime() - BUSINESS_ROLLOVER_DELAY_MS),
+  );
+}
+
 export function isPastBusinessRollover(
   periodStart: Date,
   now = new Date(),

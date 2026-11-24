@@ -1,5 +1,6 @@
 import {
   getBusinessDayKey,
+  getQuotaDayKey,
   getBusinessDayStart,
   getBusinessFiveMinuteKey,
   getBusinessWeekKey,
@@ -67,5 +68,15 @@ describe('business-time.util', () => {
     expect(isPastBusinessRollover(start, at(0))).toBe(false);
     expect(isPastBusinessRollover(start, at(59))).toBe(false);
     expect(isPastBusinessRollover(start, at(60))).toBe(true);
+  });
+
+  it('turns the quota day at 00:01, not 00:00 (owner 24/11)', () => {
+    const start = getBusinessDayStart('2026-11-25');
+    const at = (seconds: number) => new Date(start.getTime() + seconds * 1000);
+
+    expect(getQuotaDayKey(at(-60))).toBe('2026-11-24');
+    expect(getQuotaDayKey(at(59))).toBe('2026-11-24');
+    expect(getQuotaDayKey(at(60))).toBe('2026-11-25');
+    expect(getQuotaDayKey(at(12 * 3600))).toBe('2026-11-25');
   });
 });
