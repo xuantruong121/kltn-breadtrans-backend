@@ -62,6 +62,7 @@ import {
   isWritingQuizType,
   learnerVisibleTaskContent,
 } from '../writing/writing-task-visibility';
+import { DICTATION_MIN_SENTENCES } from '../ai/document-import.logic';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -1098,10 +1099,10 @@ export class QuizService {
       quiz.type === QuizType.LISTENING_PRACTICE &&
       quiz.questions.length > 0 &&
       quiz.questions.every((question) => question.type === 'DICTATION') &&
-      quiz.questions.length < 20
+      quiz.questions.length < DICTATION_MIN_SENTENCES
     ) {
       throw new BadRequestException(
-        'Bài nghe chép cần có ít nhất 20 câu trước khi xuất bản',
+        `Bài nghe chép cần có ít nhất ${DICTATION_MIN_SENTENCES} câu trước khi xuất bản`,
       );
     }
     return this.prisma.quiz.update({
@@ -3276,10 +3277,21 @@ export class QuizService {
         ids,
       );
       const task = submission.quiz.questions.find((q) => q.id === answeredTask);
+      const taskContent = task?.content as {
+        prompt?: string;
+        taskType?: string;
+        requiredKeywords?: unknown;
+      } | null;
       writingExercise = {
         questionId: answeredTask,
         position: ids.indexOf(answeredTask) + 1,
-        prompt: (task?.content as { prompt?: string } | null)?.prompt ?? null,
+        prompt: taskContent?.prompt ?? null,
+        // A picture is its own exercise (owner 2026-11-24): the result page
+        // names its cue words and offers the next picture, not the set.
+        taskType: taskContent?.taskType ?? null,
+        keywords: Array.isArray(taskContent?.requiredKeywords)
+          ? taskContent.requiredKeywords
+          : [],
         ...summary,
       };
     }

@@ -41,6 +41,30 @@ export function parseCefrRange(
  * the one access reads. A title already tagged inside that level keeps its
  * tag: the form shows one level, and "A1–A2" must not shrink to "A1".
  */
+/**
+ * The head word of a Listening lesson's stored title, by its form (owner
+ * 2026-11-24: "lưu theo dạng đã chọn"), as the published dialogues already
+ * read ("Hội thoại A2 — …"). Learners never see the head (withoutLevelTag);
+ * its level decides access.
+ */
+export function listeningTitleLabel(mode: unknown): string {
+  if (mode === 'DIALOGUE') return 'Hội thoại';
+  if (mode === 'DICTATION') return 'Nghe chép';
+  if (mode === 'COMPREHENSION') return 'Nghe hiểu';
+  return 'Listening';
+}
+
+/** "Listening A2 — Work" with label "Nghe hiểu" → "Nghe hiểu A2 — Work"; a title with no level head is left alone. */
+export function relabelTitleHead(title: string, label: string): string {
+  const at = title.indexOf(' — ');
+  if (at < 0) return title;
+  const level = title
+    .slice(0, at)
+    .match(/\b[ABC][12](?:\s*[–-]\s*[ABC][12])?\b/i)?.[0];
+  if (!level) return title;
+  return `${label} ${level.toUpperCase()} — ${title.slice(at + 3)}`;
+}
+
 export function titleWithLevel(
   title: string,
   level: string | null | undefined,

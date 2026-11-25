@@ -394,12 +394,28 @@ describe('ListeningAudioAuthoringService.generatePreview', () => {
   };
 
   it('refuses two speakers on one voice before any synthesis', async () => {
-    // "Mark" reads as male and "Sarah" (unlisted) falls to slot 1 = male.
-    const { svc, upload } = service(quizWith([['Mark'], ['Sarah']]));
+    // Only an explicit choice can still put two speakers on one voice.
+    const { svc, upload } = service(
+      quizWith([
+        ['Mark', 'male-01'],
+        ['Sarah', 'male-01'],
+      ]),
+    );
     await expect(svc.generatePreview(58, 1)).rejects.toThrow(
       'giọng đọc khác nhau',
     );
     expect(upload.isPrivateStorageConfigured).not.toHaveBeenCalled();
+  });
+
+  it('gives "Mark" and "Sarah" two voices (owner 2026-11-25)', async () => {
+    // Before: Sarah was unlisted and the second slot made her male too.
+    const { svc } = service({
+      ...quizWith([['Mark'], ['Sarah']]),
+      bilingualContent: { mode: 'DIALOGUE' },
+    });
+    await expect(svc.validateContent(58)).resolves.toMatchObject({
+      speakers: ['Mark', 'Sarah'],
+    });
   });
 
   it('a dictation quiz may be read by one voice', async () => {

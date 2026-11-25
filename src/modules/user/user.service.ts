@@ -1,4 +1,5 @@
 import { OWNING_ORDER_STATUSES } from '../market/market-effects';
+import { writingItemsDone } from '../writing/picture-task-reward.logic';
 import {
   cosmeticsData,
   unownedCosmetic,
@@ -842,7 +843,7 @@ export class UserService {
               },
             },
           },
-          results: { select: { score: true } },
+          results: { select: { score: true, questionId: true } },
         },
       }),
       this.prisma.userStats.findUnique({ where: { userId } }),
@@ -895,24 +896,59 @@ export class UserService {
       ? Math.max(0, Math.floor(speakingCatalogCountRaw))
       : 0;
 
-    const [listeningCatalogCount, readingCatalogCount, writingCatalogCount] =
-      await Promise.all([
-        countQuizSafely({ type: QuizType.LISTENING_PRACTICE }),
-        countQuizSafely({
-          type: QuizType.BILINGUAL_READING,
-          publicationStatus: QuizPublicationStatus.PUBLISHED,
-          practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
-          questions: { some: {} },
-        }),
-        countQuizSafely({
-          type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
-          practiceTopic: {
-            category: {
-              in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
-            },
-          },
-        }),
-      ]);
+    // Each picture of "Viết câu theo tranh" is its own exercise (owner
+    // 2026-11-24): the total counts pictures, not their sets.
+    const writingCatalogWhere = {
+      type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
+      practiceTopic: {
+        category: {
+          in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
+        },
+      },
+    };
+    const pictureTaskWhere = {
+      path: ['taskType'],
+      equals: 'PICTURE_SENTENCE',
+    };
+    const countQuestionsSafely = async (where: any) => {
+      try {
+        if (typeof this.prisma.question?.count === 'function') {
+          const c = await this.prisma.question.count({ where });
+          return Number.isFinite(c) ? Math.max(0, Math.floor(c)) : 0;
+        }
+      } catch {
+        // Safe fallback
+      }
+      return 0;
+    };
+    const [
+      listeningCatalogCount,
+      readingCatalogCount,
+      writingCatalogCount,
+      pictureSetCount,
+      pictureTaskCount,
+    ] = await Promise.all([
+      countQuizSafely({ type: QuizType.LISTENING_PRACTICE }),
+      countQuizSafely({
+        type: QuizType.BILINGUAL_READING,
+        publicationStatus: QuizPublicationStatus.PUBLISHED,
+        practiceTopic: { category: TopicCategory.BILINGUAL_LEVEL },
+        questions: { some: {} },
+      }),
+      countQuizSafely(writingCatalogWhere),
+      countQuizSafely({
+        ...writingCatalogWhere,
+        questions: { some: { content: pictureTaskWhere } },
+      }),
+      countQuestionsSafely({
+        content: pictureTaskWhere,
+        quiz: writingCatalogWhere,
+      }),
+    ]);
+    const writingCatalogItems = Math.max(
+      0,
+      writingCatalogCount - pictureSetCount + pictureTaskCount,
+    );
 
     const listeningAttempts: ScoreAttempt[] = [];
     const listeningDimensions = new Map<string, { scores: number[] }>();
@@ -1047,9 +1083,6 @@ export class UserService {
     const completedListeningQuizIds = new Set(
       listeningSubmissions.map((s) => s.quiz.id),
     );
-    const completedWritingQuizIds = new Set(
-      writingSubmissions.map((s) => s.quizId),
-    );
     const listeningCompletedItems = completedListeningQuizIds.size;
     const listeningCompletedAttempts = listeningSubmissions.length;
     const speakingCompletedItems =
@@ -1063,7 +1096,13 @@ export class UserService {
       readingTracking?.progress.completedExercises ?? 0;
     const readingCompletedAttempts =
       readingTracking?.progress.completedAttempts ?? 0;
-    const writingCompletedItems = completedWritingQuizIds.size;
+    const writingCompletedItems = writingItemsDone(
+      writingSubmissions.map((s) => ({
+        quizId: s.quizId,
+        firstTaskContent: s.quiz.questions[0]?.content,
+        results: s.results,
+      })),
+    );
     const writingCompletedAttempts = writingAttempts.length;
 
     const calcPercent = (completed: number, total: number) =>
@@ -1122,11 +1161,11 @@ export class UserService {
         skill: 'WRITING' as const,
         title: 'Writing',
         categoryLabel: 'Viết và diễn đạt',
-        totalItems: writingCatalogCount,
+        totalItems: writingCatalogItems,
         completedItems: writingCompletedItems,
         progressPercent: calcPercent(
           writingCompletedItems,
-          writingCatalogCount,
+          writingCatalogItems,
         ),
         levelRange: 'A1 - C1',
         badge: 'AI phản hồi',

@@ -769,6 +769,7 @@ export class AiService {
 
   async suggestListeningFullDraft(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level?: string;
     mode: ListeningFullDraftMode;
@@ -777,7 +778,7 @@ export class AiService {
     await this.checkAndIncrementDailyQuota();
     // "Nghe chép" is a list of sentences, each its own item: a paragraph
     // plus MCQs could never be published (QA 2026-11-22). The sentences come
-    // from the dictation-lines writer, English only, 20 to 30 of them.
+    // from the dictation-lines writer, English only, 10 to 30 of them.
     if (input.mode === 'DICTATION') {
       if (!this.aiEvaluator.suggestDictationLines) {
         throw new BadRequestException(
@@ -789,6 +790,7 @@ export class AiService {
         level: input.level,
         count: dictationDraftCount(input.count),
         sourceText: input.sourceText,
+        brief: input.brief,
       });
       return dictationFullDraft(draft, input);
     }
@@ -802,6 +804,7 @@ export class AiService {
 
   async suggestReadingFullDraft(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -852,6 +855,8 @@ export class AiService {
     level?: string;
     count: number;
     sourceText?: string;
+    avoid?: string[];
+    brief?: string;
   }): Promise<ContextualDictationSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestDictationLines) {

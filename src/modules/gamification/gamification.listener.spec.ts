@@ -258,6 +258,36 @@ describe('GamificationListener', () => {
       );
     });
 
+    it('a picture pays its own Bánh Mì under its own ledger reference (owner 2026-11-24)', async () => {
+      prismaMock.dailyQuest.findMany.mockResolvedValueOnce([]);
+
+      await listener.handleQuizSubmittedEvent({
+        userId: 12,
+        quizId: 124,
+        questionId: 470,
+        score: 80,
+        scorePercent: 80,
+        xp: 16,
+        banh: 6,
+        rewardRef: 'quiz:124:q:470',
+        quizType: 'WRITING_PICTURE',
+        isFirstSubmission: true,
+      });
+
+      expect(gamificationServiceMock.awardXp).toHaveBeenCalledWith(
+        12,
+        16,
+        'Hoàn thành bài thi (Quiz)',
+      );
+      expect(gamificationServiceMock.awardBanh).toHaveBeenCalledWith(
+        12,
+        6,
+        'QUIZ_FIRST_COMPLETION',
+        'quiz:124:q:470',
+        expect.objectContaining({ isCapped: true }),
+      );
+    });
+
     it.each([
       ['zero', 0, 0],
       ['NaN', Number.NaN, 0],

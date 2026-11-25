@@ -87,18 +87,118 @@ describe('GeminiCredentialManager', () => {
           ),
       }),
     ).rejects.toThrow();
-    // every warn call logs a fingerprint; none of them may equal another —
-    // same credential must never be attempted twice within one call.
+    // Every failed request logs its model and key; within one model a key is
+    // never tried twice. The main model is tried on 3 keys (MAX_ATTEMPTS),
+    // then the fallback model once more on 3 keys (owner 2026-11-24).
+    const byModel = new Map<string, string[]>();
     for (const call of warnSpy.mock.calls) {
-      const match = /key=([a-f0-9]{12})/.exec(String(call[0]));
-      if (match) seenFingerprints.push(match[1]);
+      const match = /model=(\S+) key=([a-f0-9]{12})/.exec(String(call[0]));
+      if (!match) continue;
+      seenFingerprints.push(match[2]);
+      byModel.set(match[1], [...(byModel.get(match[1]) ?? []), match[2]]);
     }
-    expect(seenFingerprints.length).toBe(3); // MAX_ATTEMPTS
-    expect(new Set(seenFingerprints).size).toBe(3); // all distinct
+    expect(byModel.size).toBe(2);
+    for (const keys of byModel.values()) {
+      expect(keys.length).toBe(3); // MAX_ATTEMPTS
+      expect(new Set(keys).size).toBe(3); // all distinct
+    }
     for (const call of warnSpy.mock.calls)
       for (const key of ['key-a', 'key-b', 'key-c'])
         expect(String(call[0])).not.toContain(key);
     warnSpy.mockRestore();
+  });
+
+  describe('fallback model (owner 2026-11-24)', () => {
+    const run = (failModel: string | null, status = 503) => {
+      process.env.GEMINI_API_KEYS = 'key-a,key-b,key-c';
+      const cache = redis();
+      const manager = new GeminiCredentialManager(
+        new GeminiModelRouter(),
+        cache as any,
+      );
+      const models: string[] = [];
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      const done = manager
+        .execute({
+          taskType: AiTaskType.TEXT_AUTHORING,
+          operation: (model: any) => {
+            models.push(model.model);
+            return failModel === null || model.model.endsWith(failModel)
+              ? Promise.reject(
+                  Object.assign(new Error('high demand'), { status }),
+                )
+              : Promise.resolve('ok');
+          },
+        })
+        .finally(() => warn.mockRestore());
+      return { done, models, cache };
+    };
+
+    it('an overloaded main model on every key is answered by the fallback model', async () => {
+      const { done, models } = run('gemini-3.5-flash-lite');
+      await expect(done).resolves.toBe('ok');
+      expect(
+        models.filter((m) => m.endsWith('gemini-3.5-flash-lite')),
+      ).toHaveLength(3);
+      expect(models[models.length - 1]).toMatch(/gemini-3\.1-flash-lite$/);
+    });
+
+    it('the main model resting on every key goes straight to the fallback', async () => {
+      const first = run('gemini-3.5-flash-lite');
+      await first.done;
+      // Same cache: the main model rests on all keys, the fallback does not.
+      process.env.GEMINI_API_KEYS = 'key-a,key-b,key-c';
+      const manager = new GeminiCredentialManager(
+        new GeminiModelRouter(),
+        first.cache as any,
+      );
+      const models: string[] = [];
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      await expect(
+        manager.execute({
+          taskType: AiTaskType.TEXT_AUTHORING,
+          operation: (model: any) => {
+            models.push(model.model);
+            return Promise.resolve('ok');
+          },
+        }),
+      ).resolves.toBe('ok');
+      warn.mockRestore();
+      expect(models).toHaveLength(1);
+      expect(models[0]).toMatch(/gemini-3\.1-flash-lite$/);
+    });
+
+    it('a wrong request is not retried on another model', async () => {
+      const { done, models } = run(null, 400);
+      await expect(done).rejects.toThrow();
+      expect(models).toHaveLength(1);
+    });
+
+    it('image generation has no fallback; a failing fallback model is the last word', () => {
+      const router = new GeminiModelRouter();
+      expect(
+        router.fallbackFor(router.selectModel(AiTaskType.IMAGE_GENERATION)),
+      ).toBeNull();
+      expect(
+        router.fallbackFor({
+          taskType: AiTaskType.TEXT_AUTHORING,
+          model: 'gemini-3.5-flash-lite',
+          capability: 'TEXT',
+        })?.model,
+      ).toBe('gemini-3.1-flash-lite');
+      // The vision model (gemini-3.1-flash-lite) falls back to the text model.
+      expect(
+        router.fallbackFor({
+          taskType: AiTaskType.WRITING_PICTURE_EVALUATION,
+          model: 'gemini-3.1-flash-lite',
+          capability: 'VISION',
+        })?.model,
+      ).toBe('gemini-3.5-flash-lite');
+    });
   });
 
   describe('response deadline and ambiguous timeouts', () => {

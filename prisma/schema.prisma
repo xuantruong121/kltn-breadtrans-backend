@@ -199,6 +199,7 @@ model User {
   pushSubscriptions               PushSubscription[]
   userGrammarRewards              UserGrammarReward[]
   userQuizRewards                 UserQuizReward[]
+  userQuestionRewards             UserQuestionReward[]
   learningActivities              LearningActivity[]
   diagnosticAttempts              DiagnosticAttempt[]
   diagnosticSpeakingResponses     DiagnosticSpeakingResponse[]
@@ -728,6 +729,7 @@ model Question {
 
   audioAssets     QuizAudioAsset[]
   diagnosticClips ListeningDiagnosticClip[]
+  rewards         UserQuestionReward[]
 }
 
 /// Versioned source audio for a listening question. Only one asset is active at a time.
@@ -2297,6 +2299,19 @@ model UserQuizReward {
   createdAt DateTime @default(now())
 
   @@unique([userId, quizId])
+}
+
+/// A picture task rewarded on its first grade (owner 2026-11-24: each picture of
+/// "Viết câu theo tranh" is its own exercise and pays a fifth of a set).
+model UserQuestionReward {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, questionId])
 }
 
 enum SupportMode {

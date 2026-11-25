@@ -39,6 +39,30 @@ describe('SkillCmsService', () => {
     );
   });
 
+  it.each([
+    ['COMPREHENSION', 'Nghe hiểu A2 — Giao tiếp hằng ngày'],
+    ['DICTATION', 'Nghe chép A2 — Giao tiếp hằng ngày'],
+    ['DIALOGUE', 'Hội thoại A2 — Giao tiếp hằng ngày'],
+  ])(
+    'stores a %s Listening title under the form chosen (owner 2026-11-24)',
+    async (mode, stored) => {
+      const prisma = {
+        quiz: { create: jest.fn().mockResolvedValue({ id: 12 }) },
+      };
+      const service = new SkillCmsService(prisma as any);
+      await service.create(
+        'listening',
+        {
+          title: 'Giao tiếp hằng ngày',
+          level: 'A2',
+          bilingualContent: { mode },
+        },
+        admin,
+      );
+      expect(prisma.quiz.create.mock.calls[0][0].data.title).toBe(stored);
+    },
+  );
+
   it('rejects a Reading publish preflight with an invalid answer index', async () => {
     const prisma = {
       quiz: {
@@ -495,7 +519,7 @@ describe('SkillCmsService', () => {
       });
     });
 
-    it('asks a dictation quiz for 20 sentences, in Vietnamese', async () => {
+    it('asks a dictation quiz for 10 sentences, in Vietnamese', async () => {
       const sentence = (id: number) => ({
         id,
         type: 'DICTATION',
@@ -508,7 +532,7 @@ describe('SkillCmsService', () => {
         null,
       );
       expect(result.errors).toEqual([
-        'Bài nghe chép cần ít nhất 20 câu (đang có 3)',
+        'Bài nghe chép cần ít nhất 10 câu (đang có 3)',
         'Câu 3: chưa có câu cần chép',
       ]);
     });

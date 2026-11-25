@@ -370,6 +370,7 @@ export interface IAIEvaluator {
 
   suggestListeningFullDraft?(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level?: string;
     mode: ListeningFullDraftMode;
@@ -378,6 +379,7 @@ export interface IAIEvaluator {
 
   suggestReadingFullDraft?(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level: string;
     targetLength?: number;
@@ -404,6 +406,8 @@ export interface IAIEvaluator {
     level?: string;
     count: number;
     sourceText?: string;
+    brief?: string;
+    avoid?: string[];
   }): Promise<ContextualDictationSuggestion>;
 
   suggestGrammarFullDraft?(input: {

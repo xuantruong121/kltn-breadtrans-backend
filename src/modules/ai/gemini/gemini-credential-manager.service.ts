@@ -139,22 +139,38 @@ export class GeminiCredentialManager {
     return this.credentials.length > 0;
   }
 
-  private cooldownKey(fingerprint: string) {
-    return `gemini:credential:${fingerprint}:cooldown`;
+  /**
+   * A bad key (AUTH) rests for every model; overload, quota and timeouts are
+   * per model (owner 2026-11-24): a 503 on one model must not stop the same
+   * key from trying the fallback model.
+   */
+  private cooldownKey(fingerprint: string, model?: string) {
+    return model
+      ? `gemini:credential:${fingerprint}:${model}:cooldown`
+      : `gemini:credential:${fingerprint}:cooldown`;
   }
-  private async isCoolingDown(credential: Credential): Promise<boolean> {
+  private async isCoolingDown(
+    credential: Credential,
+    model: string,
+  ): Promise<boolean> {
+    if (!this.redis) return false;
     return Boolean(
-      await this.redis?.get(this.cooldownKey(credential.fingerprint)),
+      (await this.redis.get(this.cooldownKey(credential.fingerprint))) ||
+      (await this.redis.get(this.cooldownKey(credential.fingerprint, model))),
     );
   }
   private async setCooldown(
     credential: Credential,
     errorClass: GeminiErrorClass,
     seconds: number,
+    model: string,
   ) {
     if (this.redis)
       await this.redis.set(
-        this.cooldownKey(credential.fingerprint),
+        this.cooldownKey(
+          credential.fingerprint,
+          errorClass === 'AUTH' ? undefined : model,
+        ),
         errorClass,
         'EX',
         seconds,
@@ -174,7 +190,7 @@ export class GeminiCredentialManager {
         return 0;
     }
   }
-  private async nextCredentials(): Promise<Credential[]> {
+  private async nextCredentials(model: string): Promise<Credential[]> {
     if (!this.credentials.length) return [];
     const slot = this.redis
       ? await this.redis.incr('gemini:credential:round-robin')
@@ -185,7 +201,8 @@ export class GeminiCredentialManager {
     );
     const healthy: Credential[] = [];
     for (const credential of ordered)
-      if (!(await this.isCoolingDown(credential))) healthy.push(credential);
+      if (!(await this.isCoolingDown(credential, model)))
+        healthy.push(credential);
     return healthy;
   }
   private async telemetry(input: {
@@ -253,7 +270,36 @@ export class GeminiCredentialManager {
   async execute<T>(options: ExecuteOptions<T>): Promise<T> {
     if (!this.hasCredentials()) throw new Error('Thiếu GEMINI_API_KEYS');
     const policy = this.router.selectModel(options.taskType);
-    const candidates = await this.nextCredentials();
+    try {
+      return await this.executeWith(policy, options);
+    } catch (error) {
+      const fallback = this.router.fallbackFor(policy);
+      if (!fallback || !this.fallbackHelps(error, options)) throw error;
+      this.logger.warn(
+        `Gemini model=${policy.model} unavailable for task=${options.taskType}; trying model=${fallback.model}`,
+      );
+      return this.executeWith(fallback, options);
+    }
+  }
+
+  /**
+   * Whether another model can help: overload, quota, a retired model, or
+   * every key resting. Not a wrong answer, and not a timeout for a caller
+   * that must not pay twice.
+   */
+  private fallbackHelps<T>(error: unknown, options: ExecuteOptions<T>) {
+    const errorClass = classifyGeminiError(error);
+    if (errorClass === 'TIMEOUT') return options.failoverOnTimeout !== false;
+    return ['PROVIDER_TRANSIENT', 'RATE_LIMIT', 'MODEL_NOT_FOUND'].includes(
+      errorClass,
+    );
+  }
+
+  private async executeWith<T>(
+    policy: GeminiModelPolicy,
+    options: ExecuteOptions<T>,
+  ): Promise<T> {
+    const candidates = await this.nextCredentials(policy.model);
     if (!candidates.length)
       throw new Error('Gemini credentials are temporarily unavailable');
     const startedAt = Date.now();
@@ -283,7 +329,13 @@ export class GeminiCredentialManager {
         lastError = error;
         const errorClass = classifyGeminiError(error);
         const cooldown = this.cooldownSeconds(errorClass);
-        if (cooldown) await this.setCooldown(credential, errorClass, cooldown);
+        if (cooldown)
+          await this.setCooldown(
+            credential,
+            errorClass,
+            cooldown,
+            policy.model,
+          );
         await this.telemetry({
           taskType: options.taskType,
           policy,

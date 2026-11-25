@@ -198,7 +198,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         plainToInstance(SuggestListeningFullDraftDto, {
           topic: 'Getting around town',
           mode: 'VIDEO',
-          // Up to 30: "Nghe chép" asks for 20-30 sentences.
+          // Up to 30: "Nghe chép" asks for 10-30 sentences.
           count: 31,
         }),
       );
@@ -822,6 +822,33 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       });
       expect(draft.sentences).toEqual([
         'I would like to book an appointment on Monday.',
+      ]);
+    });
+
+    it('asks for one replacement that repeats nothing the lesson has (owner 2026-11-25)', async () => {
+      mockAiService.suggestDictationLines = jest.fn().mockResolvedValue({
+        title: 'Gia đình',
+        sentences: [
+          'We usually eat dinner together at six.',
+          'My aunt grows tomatoes in her small garden.',
+        ],
+      });
+      const draft = await controller.suggestDictationLines({
+        topic: 'Nói chuyện với người thân',
+        level: 'A2',
+        count: 1,
+        avoid: ['  We usually eat dinner together at six.  ', ''],
+        brief: 'Câu về gia đình',
+      });
+      expect(mockAiService.suggestDictationLines).toHaveBeenCalledWith(
+        expect.objectContaining({
+          count: 1,
+          avoid: ['We usually eat dinner together at six.'],
+          brief: 'Câu về gia đình',
+        }),
+      );
+      expect(draft.sentences).toEqual([
+        'My aunt grows tomatoes in her small garden.',
       ]);
     });
 

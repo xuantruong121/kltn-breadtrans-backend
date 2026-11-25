@@ -1,4 +1,9 @@
 import {
+  LESSON_COPY_RULE,
+  listeningDraftRule,
+  situationRule,
+} from '../lesson-copy.logic';
+import {
   extractGeminiImage,
   GeminiEvaluatorStrategy,
   parseGeminiApiKeys,
@@ -499,6 +504,13 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
       request.generationConfig.responseSchema.properties.questions.items
         .required,
     ).toContain('explanationEn');
+    // Title and description are Vietnamese like every published lesson
+    // (owner 2026-11-24); only the lesson content is English.
+    expect(text).toContain(LESSON_COPY_RULE);
+    expect(text).not.toMatch(/title, description[^.;]*in English/i);
+    // Written about the title at the chosen level, with a dialogue length for B1 (owner 2026-11-25).
+    expect(text).toContain(listeningDraftRule('B1', 'DIALOGUE'));
+    expect(text).toMatch(/Dialogue: 8 to 12 turns/);
   });
 });
 
@@ -584,6 +596,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     expect(prompt).toMatch(/exactly 2 separate short listening items/);
     expect(prompt).toMatch(/answerable from its own audioText alone/);
     expect(prompt).toMatch(/explanationEn in English/);
+    expect(prompt).toContain(listeningDraftRule('A2', 'COMPREHENSION'));
   });
 
   it('drops a question whose sentence is missing, blank or too long, and caps the count', async () => {
@@ -810,6 +823,12 @@ describe('GeminiEvaluatorStrategy Reading drafts store the question type in uppe
     expect(
       schema.properties.questions.items.properties.questionType.enum,
     ).toContain('VOCAB_IN_CONTEXT');
+    // Vietnamese title and description; the passage stays English (owner 2026-11-24).
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toContain(LESSON_COPY_RULE);
+    expect(text).toMatch(/Passage, questions and options in English/);
+    expect(text).not.toMatch(/Title, passage/);
   });
 
   it('uses the same rule for the question suggestions', async () => {
@@ -880,5 +899,104 @@ describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
     await expect(
       vietnamese.strategy.suggestListeningContent({ mode: 'DICTATION' }),
     ).rejects.toThrow('AI không thể tạo câu nghe chép hợp lệ');
+  });
+});
+
+describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (owner 2026-11-25)', () => {
+  const capture = () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest
+      .fn()
+      .mockResolvedValue({ response: { text: () => '{}' } });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const promptOf = () =>
+      generateContent.mock.calls[0][0].contents[0].parts[0].text as string;
+    return { strategy, promptOf };
+  };
+  const BRIEF = 'Nghe hội thoại giữa khách du lịch và lễ tân khách sạn.';
+
+  it('a listening dialogue draft gets the description as its situation', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestListeningFullDraft({
+        topic: 'Du lịch lữ hành',
+        level: 'B2',
+        mode: 'DIALOGUE',
+        count: 5,
+        brief: `  ${BRIEF}  `,
+      })
+      .catch(() => undefined);
+    const text = promptOf();
+    expect(text).toContain(`"situation":"${BRIEF}"`);
+    expect(text).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('dictation and reading drafts get it too', async () => {
+    const dictation = capture();
+    await dictation.strategy
+      .suggestDictationLines({
+        topic: 'Du lịch',
+        level: 'A2',
+        count: 20,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(dictation.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(dictation.promptOf()).toContain(situationRule(BRIEF).trim());
+    const reading = capture();
+    await reading.strategy
+      .suggestReadingFullDraft({
+        topic: 'Du lịch',
+        level: 'B1',
+        count: 3,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(reading.promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('without a description the prompt has no situation at all', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestListeningFullDraft({
+        topic: 'Du lịch lữ hành',
+        level: 'B2',
+        mode: 'COMPREHENSION',
+        count: 3,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).not.toContain('"situation"');
+    expect(promptOf()).not.toContain('Situation:');
+  });
+});
+
+describe('GeminiEvaluatorStrategy dictation replacements (owner 2026-11-25)', () => {
+  it('passes the sentences to avoid and tells the AI not to repeat them', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: {
+        text: () =>
+          '{"title":"t","description":"d","sentences":["A new line here."]}',
+      },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    await strategy.suggestDictationLines({
+      topic: 'Gia đình',
+      level: 'A2',
+      count: 1,
+      avoid: ['We eat dinner at six.'],
+    });
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toMatch(/Write exactly 1 original English sentences/);
+    expect(text).toContain('"avoid":["We eat dinner at six."]');
+    expect(text).toMatch(/never repeat or closely reword any of them/);
   });
 });

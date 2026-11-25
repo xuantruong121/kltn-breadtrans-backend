@@ -53,6 +53,8 @@ import {
   isReadableDocument,
   limitDocumentText,
   normalizeDictationSentences,
+  dictationAvoidList,
+  withoutAvoided,
   normalizeVocabDecks,
 } from './document-import.logic';
 import { GrammarDraftRejected } from '../grammar/grammar-full-draft.logic';
@@ -408,7 +410,7 @@ export class AdminContextualAiController {
   @ApiResponse({
     status: 201,
     description:
-      '{ title, description, level, mode, sentences[]? (DICTATION: 20-30 câu tiếng Anh, questions rỗng), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
+      '{ title, description, level, mode, sentences[]? (DICTATION: 10-30 câu tiếng Anh, questions rỗng), turns? (DIALOGUE), questions[]: { prompt, options[4], correctIndex, explanation, explanationEn?, audioText? (COMPREHENSION: câu nghe riêng của từng câu), turns? (COMPREHENSION, khi là đoạn trao đổi: 2-3 lượt { speaker: A|B, text }) } }',
   })
   @ApiResponse({
     status: 502,
@@ -422,6 +424,7 @@ export class AdminContextualAiController {
         mode: dto.mode,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -445,6 +448,7 @@ export class AdminContextualAiController {
         microSkill: dto.microSkill,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -515,15 +519,22 @@ export class AdminContextualAiController {
   @ApiOperation({ summary: 'Soạn các câu nghe chép nháp' })
   async suggestDictationLines(@Body() dto: SuggestDictationLinesDto) {
     try {
+      const avoid = dictationAvoidList(dto.avoid);
       const draft = await this.aiService.suggestDictationLines({
         topic: dto.topic,
         level: dto.level,
         count: dto.count || 20,
         sourceText: dto.sourceText,
+        avoid,
+        brief: dto.brief,
       });
       return {
         ...draft,
-        sentences: normalizeDictationSentences(draft.sentences),
+        // A sentence the lesson already has is never offered again.
+        sentences: withoutAvoided(
+          normalizeDictationSentences(draft.sentences),
+          avoid,
+        ),
       };
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;

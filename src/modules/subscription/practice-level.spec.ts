@@ -3,7 +3,9 @@ import {
   levelGroup,
   levelLabel,
   isDictationContent,
+  listeningTitleLabel,
   parseCefrRange,
+  relabelTitleHead,
   titleWithLevel,
   practiceRequiresPlus,
   requiredPracticePlan,
@@ -120,5 +122,33 @@ describe('plan matrix (owner 2026-10-30)', () => {
     expect(isDictationContent({ mode: 'DICTATION' })).toBe(true);
     expect(isDictationContent({ mode: 'DIALOGUE' })).toBe(false);
     expect(isDictationContent(null)).toBe(false);
+  });
+});
+
+describe('Listening title head by form (owner 2026-11-24)', () => {
+  it('names the form chosen', () => {
+    expect(listeningTitleLabel('DIALOGUE')).toBe('Hội thoại');
+    expect(listeningTitleLabel('DICTATION')).toBe('Nghe chép');
+    expect(listeningTitleLabel('COMPREHENSION')).toBe('Nghe hiểu');
+    expect(listeningTitleLabel(undefined)).toBe('Listening');
+  });
+
+  it('relabels the head and keeps its level and the title', () => {
+    expect(
+      relabelTitleHead('Listening A2 — Giao tiếp hằng ngày', 'Nghe hiểu'),
+    ).toBe('Nghe hiểu A2 — Giao tiếp hằng ngày');
+    expect(relabelTitleHead('Hội thoại B1-B2 — Work', 'Nghe chép')).toBe(
+      'Nghe chép B1-B2 — Work',
+    );
+    // No level head: left as it is.
+    expect(relabelTitleHead('Giao tiếp hằng ngày', 'Nghe hiểu')).toBe(
+      'Giao tiếp hằng ngày',
+    );
+  });
+
+  it('the level still decides access after relabelling', () => {
+    expect(
+      parseCefrRange(relabelTitleHead('Listening B1 — Work', 'Nghe chép')),
+    ).toEqual({ min: 'B1', max: 'B1' });
   });
 });

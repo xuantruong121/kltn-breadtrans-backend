@@ -10929,7 +10929,7 @@ async function main() {
       ],
       [
         'Luyện viết 1 bài',
-        'Hoàn thành một bài luyện Viết (chấm đủ mọi câu hoặc tranh của bài)',
+        'Hoàn thành một bài luyện Viết: chấm một tranh, hoặc chấm đủ mọi câu của bài email, dịch câu',
         'DO_WRITING',
         1,
         20,

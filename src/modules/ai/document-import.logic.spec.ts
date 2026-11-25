@@ -4,6 +4,7 @@ import {
   DOCUMENT_MAX_DECKS,
   DOCUMENT_MAX_WORDS_PER_DECK,
   deckHeadwords,
+  dictationAvoidList,
   dictationDraftCount,
   dictationFullDraft,
   isEnglishSentence,
@@ -11,6 +12,7 @@ import {
   limitDocumentText,
   normalizeDictationSentences,
   normalizeVocabDecks,
+  withoutAvoided,
 } from './document-import.logic';
 
 describe('document import logic', () => {
@@ -118,11 +120,12 @@ describe('document import logic', () => {
     expect(normalizeDictationSentences(undefined)).toEqual([]);
   });
 
-  it('keeps a dictation draft between 20 and 30 sentences', () => {
+  it('keeps a dictation draft between 10 and 30 sentences', () => {
     expect(dictationDraftCount(5)).toBe(DICTATION_MIN_SENTENCES);
     expect(dictationDraftCount(25)).toBe(25);
     expect(dictationDraftCount(99)).toBe(DICTATION_MAX_SENTENCES);
-    expect(dictationDraftCount(undefined)).toBe(20);
+    expect(dictationDraftCount(undefined)).toBe(10);
+    expect(DICTATION_MIN_SENTENCES).toBe(10);
   });
 
   describe('dictationFullDraft', () => {
@@ -168,5 +171,32 @@ describe('document import logic', () => {
           .title,
       ).toBe('Weekend');
     });
+  });
+});
+
+describe('replacement dictation sentences (owner 2026-11-25)', () => {
+  it('sends the sentences already in the lesson as one clean list', () => {
+    expect(
+      dictationAvoidList([
+        '  We eat dinner at six.  ',
+        'we eat dinner at six',
+        '',
+        7,
+        'Call your brother.',
+      ]),
+    ).toEqual(['We eat dinner at six.', 'Call your brother.']);
+    expect(dictationAvoidList(undefined)).toEqual([]);
+    expect(
+      dictationAvoidList(Array.from({ length: 50 }, (_, i) => `Line ${i}.`)),
+    ).toHaveLength(40);
+  });
+
+  it('never offers a sentence the lesson already has, whatever its case or end mark', () => {
+    expect(
+      withoutAvoided(
+        ['We eat dinner at six!', 'My aunt grows tomatoes in her garden.'],
+        ['we eat dinner at six.'],
+      ),
+    ).toEqual(['My aunt grows tomatoes in her garden.']);
   });
 });

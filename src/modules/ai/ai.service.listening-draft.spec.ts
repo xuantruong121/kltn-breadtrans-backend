@@ -2,7 +2,7 @@ import { AiService } from './ai.service';
 
 /**
  * "Soạn cả bài bằng AI" for "Nghe chép" (QA 2026-11-22): one paragraph plus
- * MCQs could never be published; the draft is now 20-30 English sentences,
+ * MCQs could never be published; the draft is now 10-30 English sentences,
  * each its own dictation item.
  */
 describe('AiService.suggestListeningFullDraft', () => {
@@ -44,7 +44,7 @@ describe('AiService.suggestListeningFullDraft', () => {
     expect(draft.sentences?.some((line) => /đ|ế/.test(line))).toBe(false);
   });
 
-  it('asks for 20 to 30 sentences whatever count arrives', async () => {
+  it('asks for 10 to 30 sentences whatever count arrives', async () => {
     const { evaluator, service } = build(sentences(30));
     await service.suggestListeningFullDraft({
       topic: 't',
@@ -58,7 +58,7 @@ describe('AiService.suggestListeningFullDraft', () => {
     });
     expect(
       evaluator.suggestDictationLines.mock.calls.map(([input]) => input.count),
-    ).toEqual([20, 30]);
+    ).toEqual([10, 30]);
   });
 
   it('fails with a plain error when no English sentence comes back', async () => {

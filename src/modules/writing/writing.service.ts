@@ -7,6 +7,13 @@ import {
   writingCompletionXp,
 } from './writing-exercise-progress';
 import {
+  isPictureTask,
+  pictureActivityTitle,
+  pictureRewardRef,
+  pictureTaskBanh,
+  pictureTaskXp,
+} from './picture-task-reward.logic';
+import {
   exceedsPictureWordLimit,
   PICTURE_SENTENCE,
   PICTURE_SENTENCE_MAX_WORDS,
@@ -294,6 +301,11 @@ export class WritingService {
     pendingSubmissionId?: number;
     /** More fields for aiFeedback (a translation check keeps its result here). */
     extra?: Record<string, unknown>;
+    /**
+     * A picture of "Viết câu theo tranh": its own exercise, rewarded on its
+     * own first grade (owner 2026-11-24, picture-task-reward.logic.ts).
+     */
+    picture?: { keywords: unknown };
   }) {
     const feedback = JSON.stringify({
       ...(input.detail ?? {}),
@@ -342,9 +354,11 @@ export class WritingService {
           data: {
             userId: input.userId,
             type: 'WRITING_PRACTICE_COMPLETED',
-            title: input.exercise
-              ? `${input.quizTitle} — Câu ${input.exercise.position}/${input.exercise.questionIds.length}`
-              : input.quizTitle,
+            title: input.picture
+              ? pictureActivityTitle(input.picture.keywords)
+              : input.exercise
+                ? `${input.quizTitle} — Câu ${input.exercise.position}/${input.exercise.questionIds.length}`
+                : input.quizTitle,
             detail: `${input.evaluation.score}/${input.maxScore} điểm`,
             score: Math.round((input.evaluation.score / input.maxScore) * 100),
             sourceType: 'WRITING_SUBMISSION',
@@ -356,9 +370,44 @@ export class WritingService {
       // Another pass already stored this grade, and its reward.
       if (!submission) return { id: input.pendingSubmissionId as number };
 
+      let score = Math.round((input.evaluation.score / input.maxScore) * 100);
+
+      // A picture is its own exercise (owner 2026-11-24): every grade counts
+      // for the quests, and its first grade pays a fifth of a set. A set
+      // already rewarded under the earlier rule pays its pictures nothing.
+      if (input.picture) {
+        const setRewarded = await this.prisma.userQuizReward.findUnique({
+          where: {
+            userId_quizId: { userId: input.userId, quizId: input.quizId },
+          },
+          select: { id: true },
+        });
+        const first = setRewarded
+          ? 0
+          : (
+              await this.prisma.userQuestionReward.createMany({
+                data: { userId: input.userId, questionId: input.questionId },
+                skipDuplicates: true,
+              })
+            ).count;
+        this.eventEmitter?.emit('quiz.submitted', {
+          userId: input.userId,
+          quizId: input.quizId,
+          questionId: input.questionId,
+          score,
+          scorePercent: score,
+          xp: pictureTaskXp(score),
+          banh: pictureTaskBanh(score),
+          rewardRef: pictureRewardRef(input.quizId, input.questionId),
+          quizType: input.quizType,
+          submissionId: submission.id,
+          isFirstSubmission: first === 1,
+        });
+        return submission;
+      }
+
       // A multi-task exercise is rewarded once, when its last task is graded,
       // with the exercise score; earlier tasks earn nothing on their own.
-      let score = Math.round((input.evaluation.score / input.maxScore) * 100);
       if (input.exercise) {
         const { summary } = await loadWritingExerciseProgress(
           this.prisma,
@@ -1227,6 +1276,9 @@ Task: ${instructions}`
     const submission = await this.persistAssessment({
       detail,
       exercise,
+      picture: isPictureTask(content)
+        ? { keywords: content.requiredKeywords }
+        : undefined,
       quizId,
       quizTitle: quiz.title,
       quizType: quiz.type,
