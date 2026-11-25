@@ -28,6 +28,8 @@ import {
 // draft was refused with 400 in every AI form.
 const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
+const TOEIC_PART5_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+export type ToeicPart5Difficulty = (typeof TOEIC_PART5_DIFFICULTIES)[number];
 
 export class SuggestVocabWordDto {
   @IsNotEmpty({ message: 'Từ vựng không được để trống' })
@@ -144,6 +146,13 @@ export class SuggestToeicPart5Dto {
   @IsString({ message: 'Trọng tâm từ vựng phải là chuỗi ký tự' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   vocabularyFocus?: string;
+
+  /** The exam's own difficulty, so new items match the test (owner 2026-11-25). */
+  @IsOptional()
+  @IsIn(TOEIC_PART5_DIFFICULTIES, {
+    message: 'Độ khó phải là easy, medium hoặc hard',
+  })
+  difficulty?: ToeicPart5Difficulty;
 
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })

@@ -1087,6 +1087,26 @@ describe('GeminiEvaluatorStrategy full drafts follow title, level and descriptio
         .properties.words.items;
     expect(word.required).toContain('ipaUs');
     expect(promptOf()).toContain(VOCAB_WORD_RULE);
+    // Each deck brings a CMS level the import keeps (owner 2026-11-25).
+    expect(
+      request().generationConfig.responseSchema.properties.decks.items
+        .properties.level.enum,
+    ).toEqual(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+  });
+
+  it('a Part 5 suggestion carries the exam difficulty', async () => {
+    const { strategy, promptOf } = capture({
+      candidates: [
+        {
+          prompt: 'The report ____ by Friday.',
+          options: ['is due', 'due', 'dues', 'dueing'],
+          correctIndex: 0,
+          explanation: 'Cần động từ.',
+        },
+      ],
+    });
+    await strategy.suggestToeicPart5({ difficulty: 'hard', count: 1 });
+    expect(promptOf()).toMatch(/Difficulty: hard: less common business words/);
   });
 
   it('Reading, Speaking and Grammar drafts labelled with another level keep the chosen one', async () => {

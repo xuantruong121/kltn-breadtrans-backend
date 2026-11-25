@@ -623,6 +623,7 @@ export class AiService {
     level?: string;
     grammarFocus?: string;
     vocabularyFocus?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
     count: number;
   }): Promise<ContextualToeicPart5Suggestion> {
     await this.checkAndIncrementDailyQuota();

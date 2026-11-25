@@ -280,6 +280,7 @@ export interface IAIEvaluator {
     level?: string;
     grammarFocus?: string;
     vocabularyFocus?: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
     count: number;
   }): Promise<ContextualToeicPart5Suggestion>;
 

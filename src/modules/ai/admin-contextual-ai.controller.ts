@@ -188,6 +188,7 @@ export class AdminContextualAiController {
         level: dto.level,
         grammarFocus: dto.grammarFocus,
         vocabularyFocus: dto.vocabularyFocus,
+        difficulty: dto.difficulty,
         count: dto.count || 5,
       });
     } catch (error: any) {

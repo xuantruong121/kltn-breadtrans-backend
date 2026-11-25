@@ -345,3 +345,28 @@ export function readingGroupIssue(part: number, group: BatchGroup) {
   }
   return null;
 }
+
+/**
+ * For each Listening/Reading Part of the request: the questions its plan
+ * needs and the questions the draft holds (owner 2026-11-25: a Part left
+ * short of questions showed no warning on the review page). Parts the
+ * request did not plan are not listed.
+ */
+export function lrPartCoverage(
+  plan: Record<number, Array<{ questionCount: number }>> | undefined,
+  groups: Array<{ part: number; questions: unknown[] }>,
+): Array<{ part: number; expected: number; drafted: number }> {
+  return Object.entries(plan ?? {})
+    .map(([part, planned]) => ({
+      part: Number(part),
+      expected: (Array.isArray(planned) ? planned : []).reduce(
+        (total, group) => total + (Number(group?.questionCount) || 0),
+        0,
+      ),
+      drafted: groups
+        .filter((group) => group.part === Number(part))
+        .reduce((total, group) => total + group.questions.length, 0),
+    }))
+    .filter((row) => row.expected > 0)
+    .sort((a, b) => a.part - b.part);
+}
