@@ -69,6 +69,14 @@ export class SuggestGrammarQuestionsDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   keyFormula?: string;
 
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
+
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })
   @Min(1, { message: 'Số lượng câu hỏi tối thiểu là 1' })
@@ -115,6 +123,14 @@ export class SuggestReadingQuestionsDto {
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
+
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
 
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })
@@ -493,6 +509,14 @@ export class SuggestWritingFullDraftDto {
   })
   kind: 'EMAIL' | 'TRANSLATION';
 
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
+
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -505,6 +529,14 @@ export class SuggestVocabFullDraftDto {
   @IsNotEmpty()
   @IsString()
   topic: string;
+
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
 
   @IsOptional()
   @IsIn(GRAMMAR_LEVELS)

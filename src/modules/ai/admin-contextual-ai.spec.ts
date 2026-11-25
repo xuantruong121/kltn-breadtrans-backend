@@ -379,7 +379,39 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         passage: editorPassage,
         level: 'B1',
         count: 1,
+        // No "Tạo câu khác" list: nothing to avoid.
+        avoid: [],
       });
+    });
+
+    it('"Tạo câu khác": passes the questions to avoid and drops a repeat the AI still sends', async () => {
+      mockAiService.suggestReadingQuestions!.mockResolvedValue({
+        candidates: [
+          {
+            prompt: 'What is the main idea?',
+            options: ['a', 'b', 'c', 'd'],
+            correctIndex: 0,
+            explanation: 'x',
+          },
+          {
+            prompt: 'Why did they leave early?',
+            options: ['a', 'b', 'c', 'd'],
+            correctIndex: 1,
+            explanation: 'y',
+          },
+        ],
+      } as any);
+      const result: any = await controller.suggestReadingQuestions({
+        passage: 'We left early because of the rain.',
+        count: 1,
+        avoid: ['  what is the MAIN idea '],
+      });
+      expect(mockAiService.suggestReadingQuestions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ avoid: ['what is the MAIN idea'] }),
+      );
+      expect(
+        result.candidates.map((c: { prompt: string }) => c.prompt),
+      ).toEqual(['Why did they leave early?']);
     });
   });
 

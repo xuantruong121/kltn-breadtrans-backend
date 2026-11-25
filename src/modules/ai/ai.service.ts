@@ -1,4 +1,5 @@
 import { recordAzureTts, spokenCharacters } from './azure-usage';
+import { withoutAvoidedItems } from './ai-avoid.logic';
 import { splitSpeakerTurns } from '../toeic/toeic-listening-audio';
 import {
   Injectable,
@@ -579,6 +580,7 @@ export class AiService {
     theory?: string;
     keyFormula?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualGrammarSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestGrammarQuestions) {
@@ -608,6 +610,7 @@ export class AiService {
     passage: string;
     level?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualReadingQuestionsSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestReadingQuestions) {
@@ -678,6 +681,7 @@ export class AiService {
     level: string;
     kind: 'EMAIL' | 'TRANSLATION';
     count: number;
+    avoid?: string[];
   }): Promise<WritingFullDraft> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestWritingFullDraft) {
@@ -685,11 +689,20 @@ export class AiService {
         'Chiến lược AI hiện tại không hỗ trợ soạn bài Writing',
       );
     }
-    const draft = cleanWritingFullDraft(
+    const cleaned = cleanWritingFullDraft(
       await this.aiEvaluator.suggestWritingFullDraft(input),
       input.kind,
       input.count,
     );
+    // A task the draft already holds is never offered again ("Tạo câu khác").
+    const draft = {
+      ...cleaned,
+      tasks: withoutAvoidedItems(
+        cleaned.tasks,
+        (task) => String(task.prompt ?? ''),
+        input.avoid ?? [],
+      ),
+    };
     if (!draft.tasks.length)
       throw new UnprocessableEntityException(
         'AI chưa soạn được câu nào đạt yêu cầu. Hãy thử lại hoặc đổi chủ đề.',
@@ -827,6 +840,7 @@ export class AiService {
     level?: string;
     context?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualVocabFullDraftSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestVocabFullDraft) {

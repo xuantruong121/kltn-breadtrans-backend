@@ -1094,6 +1094,75 @@ describe('GeminiEvaluatorStrategy full drafts follow title, level and descriptio
     ).toEqual(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
   });
 
+  it('"Tạo câu khác" sends the items to avoid, and a repeated word never comes back', async () => {
+    const reading = capture({ candidates: [] });
+    await reading.strategy
+      .suggestReadingQuestions({
+        passage: 'We travelled to Hue by train.',
+        count: 1,
+        avoid: ['How did they travel?'],
+      })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain('AVOID LIST');
+    expect(reading.promptOf()).toContain('"How did they travel?"');
+    const grammar = capture({ candidates: [] });
+    await grammar.strategy
+      .suggestGrammarQuestions({
+        topicTitle: 'Thì hiện tại hoàn thành',
+        level: 'BEGINNER',
+        count: 1,
+        avoid: ['She ____ here for years.'],
+      })
+      .catch(() => undefined);
+    expect(grammar.promptOf()).toMatch(
+      /already has the questions in the avoid list above/,
+    );
+    const writing = capture();
+    await writing.strategy
+      .suggestWritingFullDraft({
+        topic: 'Văn phòng',
+        level: 'B1',
+        kind: 'TRANSLATION',
+        count: 1,
+        avoid: ['Tôi đã gửi email.'],
+      })
+      .catch(() => undefined);
+    expect(writing.promptOf()).toContain('"avoid":["Tôi đã gửi email."]');
+    expect(writing.promptOf()).toMatch(
+      /already has the tasks in the avoid list/,
+    );
+    const vocab = capture({
+      title: 'Họp',
+      categoryName: 'Công sở',
+      words: [
+        {
+          word: 'Agenda',
+          pos: 'noun',
+          meaning: 'chương trình họp',
+          ipaUs: '/x/',
+          exampleEn: 'a',
+          exampleVi: 'b',
+        },
+        {
+          word: 'minutes',
+          pos: 'noun',
+          meaning: 'biên bản',
+          ipaUs: '/y/',
+          exampleEn: 'c',
+          exampleVi: 'd',
+        },
+      ],
+    });
+    const draft = await vocab.strategy.suggestVocabFullDraft({
+      topic: 'Office meetings',
+      count: 2,
+      avoid: ['agenda'],
+    });
+    expect(draft.words.map((word: { word: string }) => word.word)).toEqual([
+      'minutes',
+    ]);
+  });
+
   it('a Part 5 suggestion carries the exam difficulty', async () => {
     const { strategy, promptOf } = capture({
       candidates: [

@@ -257,6 +257,7 @@ export interface IAIEvaluator {
     theory?: string;
     keyFormula?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualGrammarSuggestion>;
 
   /** Phase 5A: Gợi ý đoạn văn đọc (Reading passage) nháp */
@@ -272,6 +273,7 @@ export interface IAIEvaluator {
     passage: string;
     level?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualReadingQuestionsSuggestion>;
 
   /** Phase 5A: Gợi ý câu hỏi TOEIC Part 5 nháp */
@@ -316,6 +318,7 @@ export interface IAIEvaluator {
     level: string;
     kind: 'EMAIL' | 'TRANSLATION';
     count: number;
+    avoid?: string[];
   }): Promise<unknown>;
 
   /** Phase 5B: Writing task candidates only, without media fabrication. */
@@ -394,6 +397,7 @@ export interface IAIEvaluator {
     level?: string;
     context?: string;
     count: number;
+    avoid?: string[];
   }): Promise<ContextualVocabFullDraftSuggestion>;
 
   suggestVocabDecksFromDocument?(input: {
