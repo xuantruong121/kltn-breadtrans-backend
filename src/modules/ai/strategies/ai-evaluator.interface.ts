@@ -310,6 +310,7 @@ export interface IAIEvaluator {
    */
   suggestWritingFullDraft?(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level: string;
     kind: 'EMAIL' | 'TRANSLATION';
@@ -691,6 +692,7 @@ export interface ContextualVocabDecksSuggestion {
       word: string;
       pos?: string;
       meaning: string;
+      ipaUs?: string;
       exampleEn?: string;
       exampleVi?: string;
     }>;

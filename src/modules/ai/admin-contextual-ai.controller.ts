@@ -262,6 +262,7 @@ export class AdminContextualAiController {
         kind: dto.kind,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
       });
     } catch (error: any) {
       if (

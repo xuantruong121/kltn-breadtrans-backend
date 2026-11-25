@@ -462,6 +462,12 @@ export class SuggestWritingFullDraftDto {
   @MaxLength(20000)
   sourceText?: string;
 
+  /** The admin's own description: the situation the tasks play out (owner 2026-11-25). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brief?: string;
+
   @IsNotEmpty({ message: 'Cần nhập chủ đề' })
   @IsString()
   @MaxLength(300)

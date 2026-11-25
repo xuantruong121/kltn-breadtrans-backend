@@ -1,8 +1,60 @@
 import {
+  briefRule,
   draftBrief,
+  draftRule,
+  levelLanguage,
   listeningDraftRule,
   situationRule,
 } from './lesson-copy.logic';
+
+describe('levelLanguage: CEFR codes, Speaking ranges and the three broad levels', () => {
+  it('describes a CEFR code, a range from its lower to its higher level, and a broad level', () => {
+    expect(levelLanguage('B1')).toMatch(
+      /^CEFR level B1: everyday and some work/,
+    );
+    expect(levelLanguage('A2-B1')).toMatch(
+      /^CEFR level A2 to B1: from common everyday words.*, up to everyday and some work/,
+    );
+    expect(levelLanguage('INTERMEDIATE')).toMatch(/^intermediate level: /);
+  });
+
+  it('gives nothing for no level or an unknown one', () => {
+    expect(levelLanguage(undefined)).toBeUndefined();
+    expect(levelLanguage('Z9')).toBeUndefined();
+    expect(levelLanguage('A1-Z9')).toBeUndefined();
+  });
+});
+
+describe('draftRule (owner 2026-11-25: every area follows the title and the level, like Listening)', () => {
+  it('ties each area to its title, with a level line naming the chosen level', () => {
+    expect(draftRule('READING', 'B2')).toMatch(
+      /the passage and every question are about the topic.*\(the lesson title\)/,
+    );
+    expect(draftRule('READING', 'B2')).toContain('CEFR level B2');
+    expect(draftRule('WRITING', 'A2')).toMatch(/every task is about the topic/);
+    expect(draftRule('SPEAKING', 'B1-B2')).toContain('CEFR level B1 to B2');
+    expect(draftRule('GRAMMAR', 'BEGINNER')).toMatch(
+      /practise exactly that structure, never another one/,
+    );
+    expect(draftRule('GRAMMAR', 'BEGINNER')).toContain('beginner level');
+  });
+
+  it('asks a vocabulary draft for Vietnamese meanings and US phonetics', () => {
+    const rule = draftRule('VOCAB', 'ADVANCED');
+    expect(rule).toMatch(/"meaning" is its Vietnamese meaning/);
+    expect(rule).toMatch(/"ipaUs" is the American IPA/);
+  });
+
+  it('adds no level line for an unknown level', () => {
+    expect(draftRule('READING', undefined)).not.toMatch(/Level:/);
+  });
+
+  it('briefRule speaks of a deck situation or a grammar focus, and is empty without a brief', () => {
+    expect(briefRule('VOCAB', 'Họp nhóm')).toMatch(/description of this deck/);
+    expect(briefRule('GRAMMAR', 'S + V3')).toMatch(/^Focus: /);
+    expect(briefRule('VOCAB', undefined)).toBe('');
+  });
+});
 
 describe('listeningDraftRule (owner 2026-11-25: the full draft follows the title and the level)', () => {
   it('ties the lesson to the title as its topic, and Vietnamese topics are not translated word for word', () => {

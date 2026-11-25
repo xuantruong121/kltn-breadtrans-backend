@@ -31,6 +31,7 @@ export type VocabDeckCandidate = {
     word?: string;
     pos?: string;
     meaning?: string;
+    ipaUs?: string;
     exampleEn?: string;
     exampleVi?: string;
   }>;
@@ -66,6 +67,8 @@ export function normalizeVocabDecks(
           word: row.word!.trim(),
           pos: (row.pos ?? '').trim(),
           meaning: row.meaning!.trim(),
+          // A deck is published only when every word has its phonetics.
+          ipaUs: (row.ipaUs ?? '').trim().slice(0, 80),
           exampleEn: (row.exampleEn ?? '').trim(),
           exampleVi: (row.exampleVi ?? '').trim(),
           known: known.has(key(row.word!)),

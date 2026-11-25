@@ -672,6 +672,7 @@ export class AiService {
   /** Email or "Dịch câu" tasks, each checked; none usable is a 422. */
   async suggestWritingFullDraft(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level: string;
     kind: 'EMAIL' | 'TRANSLATION';

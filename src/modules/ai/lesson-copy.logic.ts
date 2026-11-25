@@ -79,3 +79,101 @@ export function situationRule(brief: string | undefined): string {
     ? "Situation: the reference data also gives a situation, the admin's own description of this lesson. The lesson plays out exactly that situation within the topic: the same people, place and purpose. "
     : '';
 }
+
+/** Grammar and Vocabulary use three broad levels instead of CEFR codes. */
+const BROAD_LEVEL_LANGUAGE: Record<string, string> = {
+  BEGINNER:
+    'very common everyday words, present and simple past, short sentences of 4 to 12 words',
+  INTERMEDIATE:
+    'everyday, work and travel words, varied tenses, linked sentences of 8 to 18 words',
+  ADVANCED:
+    'a wide and precise vocabulary with fixed expressions, complex sentences and implied meaning',
+};
+
+/**
+ * What a CMS level asks of the English: a CEFR code ("B1"), a Speaking range
+ * ("B1-B2", from the lower level up to the higher one), or one of the three
+ * Grammar and Vocabulary levels. Undefined for no level or an unknown one.
+ */
+export function levelLanguage(level: string | undefined): string | undefined {
+  if (!level) return undefined;
+  if (LEVEL_LANGUAGE[level])
+    return `CEFR level ${level}: ${LEVEL_LANGUAGE[level]}`;
+  const range = /^([ABC][12])-([ABC][12])$/.exec(level);
+  if (range && LEVEL_LANGUAGE[range[1]] && LEVEL_LANGUAGE[range[2]])
+    return `CEFR level ${range[1]} to ${range[2]}: from ${LEVEL_LANGUAGE[range[1]]}, up to ${LEVEL_LANGUAGE[range[2]]}`;
+  if (BROAD_LEVEL_LANGUAGE[level])
+    return `${level.toLowerCase()} level: ${BROAD_LEVEL_LANGUAGE[level]}`;
+  return undefined;
+}
+
+/** The CMS areas whose full draft follows the title, the level and the brief. */
+export type DraftSubject =
+  'READING' | 'WRITING' | 'SPEAKING' | 'GRAMMAR' | 'VOCAB';
+
+const NO_TRANSLATION =
+  'A Vietnamese topic gives the subject; write new English for it, never a translation of its words.';
+
+const DRAFT_TOPIC: Record<DraftSubject, string> = {
+  READING: `Topic: the passage and every question are about the topic in the reference data (the lesson title). ${NO_TRANSLATION}`,
+  WRITING: `Topic: every task is about the topic in the reference data (the exercise title): its situations, people and purpose follow it. ${NO_TRANSLATION}`,
+  SPEAKING: `Topic: every exercise is about the topic in the reference data (the practice set title): its situations, roles and words follow it. ${NO_TRANSLATION}`,
+  GRAMMAR:
+    'Topic: topicTitle in the reference data names the grammar point. The theory, the key formula and every question practise exactly that structure, never another one.',
+  VOCAB:
+    'Topic: every word belongs to the topic in the reference data (the deck title): a word a learner meets or needs in that situation.',
+};
+
+const DRAFT_LEVEL: Record<DraftSubject, (language: string) => string> = {
+  READING: (language) =>
+    `Level: write the passage, the questions and every option for a learner at ${language}. The right answer needs only what the passage says.`,
+  WRITING: (language) =>
+    `Level: every task suits a learner at ${language}. The English a good answer needs, any Vietnamese sentence to translate and the word range all fit that level.`,
+  SPEAKING: (language) =>
+    `Level: write every targetText for a learner at ${language}.`,
+  GRAMMAR: (language) =>
+    `Level: explain the structure for a learner at ${language}, and write every English example, question and option at that level.`,
+  VOCAB: (language) =>
+    `Level: choose the words a learner at ${language} needs next, and write each exampleEn at that level.`,
+};
+
+/**
+ * How a vocabulary draft is written (owner 2026-11-25: a deck could not be
+ * published while a word had no phonetics, and the AI was never asked for
+ * them; meanings came back in English).
+ */
+export const VOCAB_WORD_RULE =
+  'Each word: "meaning" is its Vietnamese meaning with full diacritics, short like a dictionary entry ("chương trình họp"); "pos" is the part of speech in lowercase English (noun, verb, adjective, adverb, phrase); "ipaUs" is the American IPA between slashes, like "/əˈdʒendə/"; "exampleEn" is one original English sentence using the word; "exampleVi" is its Vietnamese translation.';
+
+/**
+ * The rule every Reading, Writing, Speaking, Grammar and Vocabulary full
+ * draft carries (owner 2026-11-25: as for Listening, these prompts only put
+ * the title and the level in the reference data, with nothing telling the AI
+ * to follow them). The topic sets what the draft is about, the level sets
+ * its language; an unknown level adds no level line.
+ */
+export function draftRule(
+  subject: DraftSubject,
+  level: string | undefined,
+): string {
+  const language = levelLanguage(level);
+  const parts = [DRAFT_TOPIC[subject]];
+  if (language) parts.push(DRAFT_LEVEL[subject](language));
+  if (subject === 'VOCAB') parts.push(VOCAB_WORD_RULE);
+  return parts.join(' ');
+}
+
+/**
+ * The admin's own description for areas where "situation" does not fit: a
+ * Vocabulary deck picks its words for it, a Grammar topic follows the
+ * admin's note or key formula. Empty when nothing was sent.
+ */
+export function briefRule(
+  subject: 'VOCAB' | 'GRAMMAR',
+  brief: string | undefined,
+): string {
+  if (!brief) return '';
+  return subject === 'VOCAB'
+    ? "Situation: the reference data also gives a situation, the admin's own description of this deck. Choose the words a learner needs in exactly that situation, within the topic. "
+    : "Focus: the reference data also gives focus, the admin's own note or key formula for this grammar point. The theory, the key formula and the questions follow it. ";
+}

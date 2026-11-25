@@ -1,5 +1,8 @@
 import {
   LESSON_COPY_RULE,
+  VOCAB_WORD_RULE,
+  briefRule,
+  draftRule,
   listeningDraftRule,
   situationRule,
 } from '../lesson-copy.logic';
@@ -971,6 +974,163 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
       .catch(() => undefined);
     expect(promptOf()).not.toContain('"situation"');
     expect(promptOf()).not.toContain('Situation:');
+  });
+});
+
+describe('GeminiEvaluatorStrategy full drafts follow title, level and description in every area (owner 2026-11-25)', () => {
+  const capture = (answer: unknown = {}) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest
+      .fn()
+      .mockResolvedValue({ response: { text: () => JSON.stringify(answer) } });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const request = () => generateContent.mock.calls[0][0];
+    const promptOf = () => request().contents[0].parts[0].text as string;
+    return { strategy, promptOf, request };
+  };
+  const BRIEF = 'Viết email cho đồng nghiệp để dời cuộc họp sang thứ Sáu.';
+
+  it('a Writing draft carries the topic and level rule, and the description as its situation', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestWritingFullDraft({
+        topic: 'Công việc văn phòng',
+        level: 'B1',
+        kind: 'EMAIL',
+        count: 3,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).toContain(draftRule('WRITING', 'B1'));
+    expect(promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('a Reading draft carries the rule; a Speaking draft turns its objective into the situation', async () => {
+    const reading = capture();
+    await reading.strategy
+      .suggestReadingFullDraft({ topic: 'Du lịch', level: 'B2', count: 3 })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain(draftRule('READING', 'B2'));
+    const speaking = capture();
+    await speaking.strategy
+      .suggestSpeakingFullDraft({
+        topic: 'Nhận phòng khách sạn',
+        level: 'A2-B1',
+        objective: BRIEF,
+        count: 3,
+      })
+      .catch(() => undefined);
+    expect(speaking.promptOf()).toContain(draftRule('SPEAKING', 'A2-B1'));
+    expect(speaking.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(speaking.promptOf()).not.toContain('"objective"');
+    expect(speaking.promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('a Grammar draft carries the rule and the typed key formula as its focus', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestGrammarFullDraft({
+        topicTitle: 'Thì hiện tại hoàn thành',
+        level: 'INTERMEDIATE',
+        objective: 'S + have/has + V3',
+        count: 5,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).toContain(draftRule('GRAMMAR', 'INTERMEDIATE'));
+    expect(promptOf()).toContain('"focus":"S + have/has + V3"');
+    expect(promptOf()).toContain(briefRule('GRAMMAR', 'x').trim());
+  });
+
+  it('a Vocabulary draft asks for Vietnamese meanings and US phonetics, and uses the description', async () => {
+    const { strategy, promptOf, request } = capture({
+      title: 'Họp',
+      categoryName: 'Công sở',
+      words: [
+        {
+          word: 'agenda',
+          pos: 'noun',
+          meaning: 'chương trình họp',
+          ipaUs: '/əˈdʒendə/',
+          exampleEn: 'Here is the agenda.',
+          exampleVi: 'Đây là chương trình họp.',
+        },
+      ],
+    });
+    const draft = await strategy.suggestVocabFullDraft({
+      topic: 'Office meetings',
+      level: 'BEGINNER',
+      context: 'Từ để họp nhóm.',
+      count: 1,
+    });
+    expect(draft.words[0].ipaUs).toBe('/əˈdʒendə/');
+    expect(promptOf()).toContain(draftRule('VOCAB', 'BEGINNER'));
+    expect(promptOf()).toContain('"situation":"Từ để họp nhóm."');
+    expect(promptOf()).not.toContain('"context"');
+    const word =
+      request().generationConfig.responseSchema.properties.words.items;
+    expect(word.required).toContain('ipaUs');
+  });
+
+  it('decks from a document must bring phonetics for every word', async () => {
+    const { strategy, promptOf, request } = capture({ decks: [] });
+    await strategy.suggestVocabDecksFromDocument({
+      text: 'The agenda for the meeting.',
+      maxDecks: 3,
+      maxWordsPerDeck: 10,
+    });
+    const word =
+      request().generationConfig.responseSchema.properties.decks.items
+        .properties.words.items;
+    expect(word.required).toContain('ipaUs');
+    expect(promptOf()).toContain(VOCAB_WORD_RULE);
+  });
+
+  it('Reading, Speaking and Grammar drafts labelled with another level keep the chosen one', async () => {
+    const reading = capture({
+      title: 'Du lịch',
+      description: 'Đọc thông tin về chuyến đi.',
+      level: 'B2',
+      passage: 'We travelled to Hue by train.',
+      questions: [
+        {
+          prompt: 'How did they travel?',
+          options: ['By train', 'By bus', 'By car', 'By plane'],
+          correctIndex: 0,
+          explanation: 'Đoạn văn nói họ đi tàu.',
+        },
+      ],
+    });
+    const draft = await reading.strategy.suggestReadingFullDraft({
+      topic: 'Du lịch',
+      level: 'B1',
+      count: 1,
+    });
+    expect(draft.level).toBe('B1');
+    const speaking = capture({
+      practiceSet: {
+        title: 'Nhận phòng',
+        description: 'Luyện nói khi nhận phòng khách sạn.',
+        level: 'B1',
+      },
+      exercises: [
+        {
+          title: 'Chào lễ tân',
+          targetText: 'Good evening, I have a reservation.',
+          difficulty: 'BEGINNER',
+          taskType: 'READ_ALOUD',
+        },
+      ],
+    });
+    const set = await speaking.strategy.suggestSpeakingFullDraft({
+      topic: 'Nhận phòng',
+      level: 'A2',
+      count: 1,
+    });
+    expect(set.practiceSet.level).toBe('A2');
   });
 });
 
