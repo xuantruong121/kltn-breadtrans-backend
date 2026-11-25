@@ -1,4 +1,8 @@
-import { LESSON_COPY_RULE, listeningDraftRule } from '../lesson-copy.logic';
+import {
+  LESSON_COPY_RULE,
+  listeningDraftRule,
+  situationRule,
+} from '../lesson-copy.logic';
 import {
   extractGeminiImage,
   GeminiEvaluatorStrategy,
@@ -895,5 +899,77 @@ describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
     await expect(
       vietnamese.strategy.suggestListeningContent({ mode: 'DICTATION' }),
     ).rejects.toThrow('AI không thể tạo câu nghe chép hợp lệ');
+  });
+});
+
+describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (owner 2026-11-25)', () => {
+  const capture = () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest
+      .fn()
+      .mockResolvedValue({ response: { text: () => '{}' } });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const promptOf = () =>
+      generateContent.mock.calls[0][0].contents[0].parts[0].text as string;
+    return { strategy, promptOf };
+  };
+  const BRIEF = 'Nghe hội thoại giữa khách du lịch và lễ tân khách sạn.';
+
+  it('a listening dialogue draft gets the description as its situation', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestListeningFullDraft({
+        topic: 'Du lịch lữ hành',
+        level: 'B2',
+        mode: 'DIALOGUE',
+        count: 5,
+        brief: `  ${BRIEF}  `,
+      })
+      .catch(() => undefined);
+    const text = promptOf();
+    expect(text).toContain(`"situation":"${BRIEF}"`);
+    expect(text).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('dictation and reading drafts get it too', async () => {
+    const dictation = capture();
+    await dictation.strategy
+      .suggestDictationLines({
+        topic: 'Du lịch',
+        level: 'A2',
+        count: 20,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(dictation.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(dictation.promptOf()).toContain(situationRule(BRIEF).trim());
+    const reading = capture();
+    await reading.strategy
+      .suggestReadingFullDraft({
+        topic: 'Du lịch',
+        level: 'B1',
+        count: 3,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(reading.promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('without a description the prompt has no situation at all', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestListeningFullDraft({
+        topic: 'Du lịch lữ hành',
+        level: 'B2',
+        mode: 'COMPREHENSION',
+        count: 3,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).not.toContain('"situation"');
+    expect(promptOf()).not.toContain('Situation:');
   });
 });

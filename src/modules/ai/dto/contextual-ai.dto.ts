@@ -385,6 +385,12 @@ export class SuggestListeningFullDraftDto {
   @MaxLength(20000)
   sourceText?: string;
 
+  /** The admin's own description: the situation the draft plays out (owner 2026-11-25). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brief?: string;
+
   @IsNotEmpty()
   @IsString()
   topic: string;
@@ -416,6 +422,12 @@ export class SuggestReadingFullDraftDto {
   @IsString()
   @MaxLength(20000)
   sourceText?: string;
+
+  /** The admin's own description: the situation the draft plays out (owner 2026-11-25). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brief?: string;
 
   @IsNotEmpty()
   @IsString()

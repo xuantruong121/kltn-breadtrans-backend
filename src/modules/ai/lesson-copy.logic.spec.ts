@@ -1,4 +1,8 @@
-import { listeningDraftRule } from './lesson-copy.logic';
+import {
+  draftBrief,
+  listeningDraftRule,
+  situationRule,
+} from './lesson-copy.logic';
 
 describe('listeningDraftRule (owner 2026-11-25: the full draft follows the title and the level)', () => {
   it('ties the lesson to the title as its topic, and Vietnamese topics are not translated word for word', () => {
@@ -34,5 +38,23 @@ describe('listeningDraftRule (owner 2026-11-25: the full draft follows the title
       'CEFR level A2',
     );
     expect(listeningDraftRule('Z9', 'DIALOGUE')).toContain('CEFR level A2');
+  });
+});
+
+describe('draftBrief and situationRule (owner 2026-11-25: the typed description goes to the AI)', () => {
+  it('sends the description as one trimmed line of at most 300 characters', () => {
+    expect(draftBrief('  Nghe hội thoại\n ở quầy lễ tân.  ')).toBe(
+      'Nghe hội thoại ở quầy lễ tân.',
+    );
+    expect(draftBrief('x'.repeat(400))).toHaveLength(300);
+  });
+
+  it('sends nothing for an empty box, and the prompt then has no situation rule', () => {
+    expect(draftBrief('   ')).toBeUndefined();
+    expect(draftBrief(undefined)).toBeUndefined();
+    expect(situationRule(undefined)).toBe('');
+    expect(situationRule('Lễ tân khách sạn')).toMatch(
+      /plays out exactly that situation within the topic/,
+    );
   });
 });

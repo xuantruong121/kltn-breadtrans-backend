@@ -422,6 +422,7 @@ export class AdminContextualAiController {
         mode: dto.mode,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
@@ -445,6 +446,7 @@ export class AdminContextualAiController {
         microSkill: dto.microSkill,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;

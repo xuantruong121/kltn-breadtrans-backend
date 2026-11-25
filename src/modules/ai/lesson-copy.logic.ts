@@ -57,3 +57,25 @@ export function listeningDraftRule(
     );
   return parts.join(' ');
 }
+
+/**
+ * The admin's own description sent with a lesson draft request (owner
+ * 2026-11-25: "gửi luôn mô tả cho AI"): one line, at most 300 characters;
+ * none when the box was empty, and the draft then follows the title alone.
+ */
+export function draftBrief(
+  brief: string | null | undefined,
+): string | undefined {
+  const text = (brief ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  return text || undefined;
+}
+
+/**
+ * Added to a draft prompt only when a brief was sent: the reference data then
+ * carries it as "situation", and the lesson plays that situation out.
+ */
+export function situationRule(brief: string | undefined): string {
+  return brief
+    ? "Situation: the reference data also gives a situation, the admin's own description of this lesson. The lesson plays out exactly that situation within the topic: the same people, place and purpose. "
+    : '';
+}

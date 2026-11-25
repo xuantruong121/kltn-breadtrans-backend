@@ -769,6 +769,7 @@ export class AiService {
 
   async suggestListeningFullDraft(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level?: string;
     mode: ListeningFullDraftMode;
@@ -789,6 +790,7 @@ export class AiService {
         level: input.level,
         count: dictationDraftCount(input.count),
         sourceText: input.sourceText,
+        brief: input.brief,
       });
       return dictationFullDraft(draft, input);
     }
@@ -802,6 +804,7 @@ export class AiService {
 
   async suggestReadingFullDraft(input: {
     sourceText?: string;
+    brief?: string;
     topic: string;
     level: string;
     targetLength?: number;
