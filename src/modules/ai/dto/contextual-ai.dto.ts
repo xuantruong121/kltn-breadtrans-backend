@@ -553,9 +553,10 @@ export class SuggestDictationLinesDto {
   @IsIn(CONTENT_LEVELS)
   level?: string;
 
+  /** From 1: one replacement for a dropped sentence, or the few a draft still needs (owner 2026-11-25). */
   @IsOptional()
   @IsInt()
-  @Min(20)
+  @Min(1)
   @Max(40)
   @Transform(({ value }) => (value !== undefined ? Number(value) : 20))
   count?: number = 20;
@@ -564,4 +565,18 @@ export class SuggestDictationLinesDto {
   @IsString()
   @MaxLength(20000)
   sourceText?: string;
+
+  /** Sentences the lesson already has: the new ones must not repeat them. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
+
+  /** The admin's own description: the situation the sentences belong to. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brief?: string;
 }

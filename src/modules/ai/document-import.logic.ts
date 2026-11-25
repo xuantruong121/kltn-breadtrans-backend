@@ -151,3 +151,36 @@ export function dictationFullDraft(
     questions: [],
   };
 }
+
+/**
+ * The sentences a dictation request must not repeat (owner 2026-11-25: a
+ * sentence dropped in the draft review gets a replacement, and a short draft
+ * is topped up, without repeating what the lesson already has): one line
+ * each, at most 40 lines of 200 characters, no blanks or repeats.
+ */
+export function dictationAvoidList(avoid: unknown): string[] {
+  const seen = new Set<string>();
+  return (Array.isArray(avoid) ? avoid : [])
+    .filter((line): line is string => typeof line === 'string')
+    .map((line) => line.replace(/\s+/g, ' ').trim().slice(0, 200))
+    .filter((line) => {
+      if (!line || seen.has(sentenceKey(line))) return false;
+      seen.add(sentenceKey(line));
+      return true;
+    })
+    .slice(0, 40);
+}
+
+/** The new sentences minus any that repeat one the lesson already has. */
+export function withoutAvoided(sentences: string[], avoid: string[]): string[] {
+  const taken = new Set(avoid.map(sentenceKey));
+  return sentences.filter((line) => !taken.has(sentenceKey(line)));
+}
+
+/** Two sentences are the same when they differ only in case, spacing or end punctuation. */
+const sentenceKey = (line: string) =>
+  line
+    .toLowerCase()
+    .replace(/[^a-z0-9' ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();

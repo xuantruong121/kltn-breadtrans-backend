@@ -973,3 +973,30 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
     expect(promptOf()).not.toContain('Situation:');
   });
 });
+
+describe('GeminiEvaluatorStrategy dictation replacements (owner 2026-11-25)', () => {
+  it('passes the sentences to avoid and tells the AI not to repeat them', async () => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest.fn().mockResolvedValue({
+      response: {
+        text: () =>
+          '{"title":"t","description":"d","sentences":["A new line here."]}',
+      },
+    });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    await strategy.suggestDictationLines({
+      topic: 'Gia đình',
+      level: 'A2',
+      count: 1,
+      avoid: ['We eat dinner at six.'],
+    });
+    const text = generateContent.mock.calls[0][0].contents[0].parts[0]
+      .text as string;
+    expect(text).toMatch(/Write exactly 1 original English sentences/);
+    expect(text).toContain('"avoid":["We eat dinner at six."]');
+    expect(text).toMatch(/never repeat or closely reword any of them/);
+  });
+});

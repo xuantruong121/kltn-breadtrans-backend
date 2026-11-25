@@ -53,6 +53,8 @@ import {
   isReadableDocument,
   limitDocumentText,
   normalizeDictationSentences,
+  dictationAvoidList,
+  withoutAvoided,
   normalizeVocabDecks,
 } from './document-import.logic';
 import { GrammarDraftRejected } from '../grammar/grammar-full-draft.logic';
@@ -517,15 +519,22 @@ export class AdminContextualAiController {
   @ApiOperation({ summary: 'Soạn các câu nghe chép nháp' })
   async suggestDictationLines(@Body() dto: SuggestDictationLinesDto) {
     try {
+      const avoid = dictationAvoidList(dto.avoid);
       const draft = await this.aiService.suggestDictationLines({
         topic: dto.topic,
         level: dto.level,
         count: dto.count || 20,
         sourceText: dto.sourceText,
+        avoid,
+        brief: dto.brief,
       });
       return {
         ...draft,
-        sentences: normalizeDictationSentences(draft.sentences),
+        // A sentence the lesson already has is never offered again.
+        sentences: withoutAvoided(
+          normalizeDictationSentences(draft.sentences),
+          avoid,
+        ),
       };
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;

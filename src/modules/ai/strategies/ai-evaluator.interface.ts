@@ -407,6 +407,7 @@ export interface IAIEvaluator {
     count: number;
     sourceText?: string;
     brief?: string;
+    avoid?: string[];
   }): Promise<ContextualDictationSuggestion>;
 
   suggestGrammarFullDraft?(input: {

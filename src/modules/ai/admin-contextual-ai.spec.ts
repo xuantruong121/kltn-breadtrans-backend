@@ -825,6 +825,33 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       ]);
     });
 
+    it('asks for one replacement that repeats nothing the lesson has (owner 2026-11-25)', async () => {
+      mockAiService.suggestDictationLines = jest.fn().mockResolvedValue({
+        title: 'Gia đình',
+        sentences: [
+          'We usually eat dinner together at six.',
+          'My aunt grows tomatoes in her small garden.',
+        ],
+      });
+      const draft = await controller.suggestDictationLines({
+        topic: 'Nói chuyện với người thân',
+        level: 'A2',
+        count: 1,
+        avoid: ['  We usually eat dinner together at six.  ', ''],
+        brief: 'Câu về gia đình',
+      });
+      expect(mockAiService.suggestDictationLines).toHaveBeenCalledWith(
+        expect.objectContaining({
+          count: 1,
+          avoid: ['We usually eat dinner together at six.'],
+          brief: 'Câu về gia đình',
+        }),
+      );
+      expect(draft.sentences).toEqual([
+        'My aunt grows tomatoes in her small garden.',
+      ]);
+    });
+
     it.each([
       ['429', '429 Too Many Requests'],
       ['503', '503 Service Unavailable'],

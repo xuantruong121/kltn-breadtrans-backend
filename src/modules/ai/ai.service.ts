@@ -855,6 +855,8 @@ export class AiService {
     level?: string;
     count: number;
     sourceText?: string;
+    avoid?: string[];
+    brief?: string;
   }): Promise<ContextualDictationSuggestion> {
     await this.checkAndIncrementDailyQuota();
     if (!this.aiEvaluator.suggestDictationLines) {
