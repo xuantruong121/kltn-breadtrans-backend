@@ -1,4 +1,4 @@
-import { LESSON_COPY_RULE } from '../lesson-copy.logic';
+import { LESSON_COPY_RULE, listeningDraftRule } from '../lesson-copy.logic';
 import {
   extractGeminiImage,
   GeminiEvaluatorStrategy,
@@ -504,6 +504,9 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
     // (owner 2026-11-24); only the lesson content is English.
     expect(text).toContain(LESSON_COPY_RULE);
     expect(text).not.toMatch(/title, description[^.;]*in English/i);
+    // Written about the title at the chosen level, with a dialogue length for B1 (owner 2026-11-25).
+    expect(text).toContain(listeningDraftRule('B1', 'DIALOGUE'));
+    expect(text).toMatch(/Dialogue: 8 to 12 turns/);
   });
 });
 
@@ -589,6 +592,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     expect(prompt).toMatch(/exactly 2 separate short listening items/);
     expect(prompt).toMatch(/answerable from its own audioText alone/);
     expect(prompt).toMatch(/explanationEn in English/);
+    expect(prompt).toContain(listeningDraftRule('A2', 'COMPREHENSION'));
   });
 
   it('drops a question whose sentence is missing, blank or too long, and caps the count', async () => {
