@@ -76,6 +76,8 @@ import {
   SENTENCE_TRANSLATION_TOPIC,
   translationTaskIssues,
 } from '../writing/sentence-translation.logic';
+// "Nghe chép" needs this many sentences to publish (the FE checklist agrees).
+import { DICTATION_MIN_SENTENCES } from '../ai/document-import.logic';
 
 type Domain = 'listening' | 'reading' | 'writing' | 'speaking';
 type Admin = { id: number; role: Role };
@@ -112,9 +114,6 @@ const SKILL_TITLE_LABEL: Record<string, string> = {
 
 /** The publish check's line for a choice question, in the checklist's words. */
 const CHOICES_INCOMPLETE = 'chưa đủ phương án hoặc chưa chọn đáp án đúng';
-
-/** "Nghe chép" needs this many sentences to publish (the FE checklist agrees). */
-const DICTATION_MIN_SENTENCES = 20;
 
 const EXAM_CONTENT_LOCKED =
   'Nội dung thuộc đề TOEIC đã có lượt làm; hãy nhân bản đề để sửa.';

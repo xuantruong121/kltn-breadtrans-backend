@@ -407,7 +407,7 @@ export class SuggestListeningFullDraftDto {
 
   /**
    * Questions (1-10) for DIALOGUE and COMPREHENSION; sentences for DICTATION,
-   * which the service keeps between 20 and 30.
+   * which the service keeps between 10 and 30.
    */
   @IsOptional()
   @IsInt()

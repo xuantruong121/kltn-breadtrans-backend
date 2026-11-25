@@ -62,6 +62,7 @@ import {
   isWritingQuizType,
   learnerVisibleTaskContent,
 } from '../writing/writing-task-visibility';
+import { DICTATION_MIN_SENTENCES } from '../ai/document-import.logic';
 
 /**
  * Compare learner dictation without penalising typography that does not change
@@ -1098,10 +1099,10 @@ export class QuizService {
       quiz.type === QuizType.LISTENING_PRACTICE &&
       quiz.questions.length > 0 &&
       quiz.questions.every((question) => question.type === 'DICTATION') &&
-      quiz.questions.length < 20
+      quiz.questions.length < DICTATION_MIN_SENTENCES
     ) {
       throw new BadRequestException(
-        'Bài nghe chép cần có ít nhất 20 câu trước khi xuất bản',
+        `Bài nghe chép cần có ít nhất ${DICTATION_MIN_SENTENCES} câu trước khi xuất bản`,
       );
     }
     return this.prisma.quiz.update({

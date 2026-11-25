@@ -118,11 +118,12 @@ describe('document import logic', () => {
     expect(normalizeDictationSentences(undefined)).toEqual([]);
   });
 
-  it('keeps a dictation draft between 20 and 30 sentences', () => {
+  it('keeps a dictation draft between 10 and 30 sentences', () => {
     expect(dictationDraftCount(5)).toBe(DICTATION_MIN_SENTENCES);
     expect(dictationDraftCount(25)).toBe(25);
     expect(dictationDraftCount(99)).toBe(DICTATION_MAX_SENTENCES);
-    expect(dictationDraftCount(undefined)).toBe(20);
+    expect(dictationDraftCount(undefined)).toBe(10);
+    expect(DICTATION_MIN_SENTENCES).toBe(10);
   });
 
   describe('dictationFullDraft', () => {

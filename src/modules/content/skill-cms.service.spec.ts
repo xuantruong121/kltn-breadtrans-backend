@@ -519,7 +519,7 @@ describe('SkillCmsService', () => {
       });
     });
 
-    it('asks a dictation quiz for 20 sentences, in Vietnamese', async () => {
+    it('asks a dictation quiz for 10 sentences, in Vietnamese', async () => {
       const sentence = (id: number) => ({
         id,
         type: 'DICTATION',
@@ -532,7 +532,7 @@ describe('SkillCmsService', () => {
         null,
       );
       expect(result.errors).toEqual([
-        'Bài nghe chép cần ít nhất 20 câu (đang có 3)',
+        'Bài nghe chép cần ít nhất 10 câu (đang có 3)',
         'Câu 3: chưa có câu cần chép',
       ]);
     });

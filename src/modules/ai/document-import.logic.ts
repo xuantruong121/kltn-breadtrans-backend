@@ -110,8 +110,11 @@ export function normalizeDictationSentences(sentences: unknown) {
     });
 }
 
-/** "Nghe chép" holds at least 20 sentences to publish; a draft asks for 20 to 30. */
-export const DICTATION_MIN_SENTENCES = 20;
+/**
+ * "Nghe chép" holds at least 10 sentences to publish; a draft asks for 10 to 30
+ * (owner 2026-11-25, was 20 since the first quiz module of 2026-09-20).
+ */
+export const DICTATION_MIN_SENTENCES = 10;
 export const DICTATION_MAX_SENTENCES = 30;
 
 export const dictationDraftCount = (count?: number) =>

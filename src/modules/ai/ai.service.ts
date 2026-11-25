@@ -778,7 +778,7 @@ export class AiService {
     await this.checkAndIncrementDailyQuota();
     // "Nghe chép" is a list of sentences, each its own item: a paragraph
     // plus MCQs could never be published (QA 2026-11-22). The sentences come
-    // from the dictation-lines writer, English only, 20 to 30 of them.
+    // from the dictation-lines writer, English only, 10 to 30 of them.
     if (input.mode === 'DICTATION') {
       if (!this.aiEvaluator.suggestDictationLines) {
         throw new BadRequestException(

@@ -198,7 +198,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         plainToInstance(SuggestListeningFullDraftDto, {
           topic: 'Getting around town',
           mode: 'VIDEO',
-          // Up to 30: "Nghe chép" asks for 20-30 sentences.
+          // Up to 30: "Nghe chép" asks for 10-30 sentences.
           count: 31,
         }),
       );
