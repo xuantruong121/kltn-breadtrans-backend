@@ -10,6 +10,7 @@ import { Prisma, QuizType } from '@prisma/client';
 import { createHash } from 'crypto';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
+import { assignDialogueGenders } from './listening-voice.logic';
 import {
   isPrivateListeningMediaKey,
   PRIVATE_LISTENING_MEDIA_PREFIX,
@@ -414,8 +415,19 @@ export class ListeningAudioAuthoringService {
           ? dedupeRepeatedDialogueBlocks(blocks)
           : blockQuestions.flatMap(({ source }) => source);
         const speakerSlotMap = new Map<string, number>();
+        const ordered = withSpeakerTurnIds(uniqueSegments);
+        // Voices for the whole dialogue at once, so two speakers never share
+        // one (listening-voice.logic.ts, owner 2026-11-25).
+        const firstVoiceKey = new Map<string, string | undefined>();
+        for (const segment of ordered) {
+          const id = segment.speakerId ?? segment.speaker ?? 'speaker-1';
+          if (!firstVoiceKey.has(id)) firstVoiceKey.set(id, segment.voiceKey);
+        }
+        const genders = assignDialogueGenders(
+          [...firstVoiceKey].map(([id, voiceKey]) => ({ id, voiceKey })),
+        );
         let turnIndex = 0;
-        for (const segment of withSpeakerTurnIds(uniqueSegments)) {
+        for (const segment of ordered) {
           const speakerId = segment.speakerId ?? segment.speaker ?? 'speaker-1';
           if (!speakerSlotMap.has(speakerId)) {
             speakerSlotMap.set(speakerId, speakerSlotMap.size);
@@ -423,7 +435,7 @@ export class ListeningAudioAuthoringService {
           const voice = resolveListeningVoice(
             speakerId,
             accent,
-            segment.voiceKey,
+            segment.voiceKey ?? `${genders.get(speakerId) ?? 'female'}-01`,
             speakerSlotMap.get(speakerId),
           );
           const expressive = resolveDeliveryStyle(
