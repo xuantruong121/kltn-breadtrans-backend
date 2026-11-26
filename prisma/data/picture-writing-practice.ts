@@ -2,8 +2,8 @@
  * "Viết câu theo tranh" — picture-based Writing practice (Checkpoint 58).
  *
  * Original BreadTrans material. The pictures are the project's own seed
- * assets (prisma/seed-assets, already published under
- * catalog/toeic/shared/images and used by Speaking "Describe a Picture"); no
+ * assets, published on R2 under catalog/toeic/shared/images and used by
+ * Speaking "Describe a Picture" (the local copies were removed 2026-11-26); no
  * third-party picture or question is copied. Each task has one picture, two
  * English cue words, a 40-word limit and an authored scene description that
  * the grader uses as the truth about the image (the grader does not see it).

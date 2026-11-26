@@ -5270,14 +5270,14 @@ async function main() {
   // conversation quizzes 23+ are appended above), so a fresh database gets
   // all audio on the first run.
   // Listening practice audio is materialized once in R2 and relinked on every
-  // canonical seed from prisma/seed-data/practice-media.json, a read-only
+  // canonical seed from prisma/data/practice-media.json, a read-only
   // export of the keys that really exist (scripts/export-seed-media-manifest.ts).
   // B1+ quizzes keep their audio under private `premium/` keys, served only as
   // signed URLs, so their stored url stays ''. The seed never invokes TTS and
   // never guesses a public key: a premium quiz that would end up with a public
   // active asset stops the seed instead of silently exposing the audio.
   const practiceMedia = JSON.parse(
-    readFileSync(join(__dirname, 'seed-data', 'practice-media.json'), 'utf8'),
+    readFileSync(join(__dirname, 'data', 'practice-media.json'), 'utf8'),
   ) as PracticeMediaManifest;
   const manifestAssetsByQuestion = new Map<
     number,
@@ -5313,7 +5313,7 @@ async function main() {
     const assets = manifestAssetsByQuestion.get(question.id) ?? [];
     if (assets.length === 0) {
       throw new Error(
-        `Listening question ${question.id} (quiz ${question.quizId}) has audio text but no entry in prisma/seed-data/practice-media.json`,
+        `Listening question ${question.id} (quiz ${question.quizId}) has audio text but no entry in prisma/data/practice-media.json`,
       );
     }
     for (const asset of assets) {
@@ -5687,7 +5687,7 @@ async function main() {
   // Speaking practice sets (Checkpoint 51 grouping, prisma/data/
   // speaking-practice-sets.ts): one task type and one level group per set, at
   // least five tasks, the original extra tasks at their fixed ids. Reference
-  // audio comes from prisma/seed-data/practice-media.json; a premium (B1+)
+  // audio comes from prisma/data/practice-media.json; a premium (B1+)
   // task must use a private premium/ key, so a public one stops the seed.
   await prisma.$executeRaw`
     SELECT setval(
@@ -5700,7 +5700,7 @@ async function main() {
     const key = practiceMedia.speakingAudio[String(id)];
     if (!key) {
       throw new Error(
-        `Speaking task ${id} has no reference audio in prisma/seed-data/practice-media.json`,
+        `Speaking task ${id} has no reference audio in prisma/data/practice-media.json`,
       );
     }
     const isPrivate = key.startsWith('premium/');

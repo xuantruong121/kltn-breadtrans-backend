@@ -143,7 +143,9 @@ src/
 prisma/
 ├── schema.prisma
 ├── migrations/
-├── seed.ts            # dữ liệu mẫu, kèm seed-data/, seed-assets/, data/
+├── seed.ts            # dữ liệu mẫu
+└── data/              # bộ nội dung seed.ts nạp (ngữ pháp, viết theo tranh, dịch câu, từ điển Nói)
+                       # và practice-media.json: khóa R2 của audio/ảnh luyện tập
 scripts/               # kiểm tra an toàn CSDL, sao lưu, kiểm toán, backfill (xem package.json)
 test/                  # e2e
 docs/                  # an toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD, khôi phục khóa học
