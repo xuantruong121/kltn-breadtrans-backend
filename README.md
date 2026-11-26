@@ -76,9 +76,9 @@ Có hai mẫu khác: `.env.production.example` cho máy chủ, `.env.test.exampl
 
 ## An toàn CSDL: đọc trước khi chạy lệnh Prisma
 
-Ngày 23/10/2026 toàn bộ dữ liệu phát triển bị mất. Nguyên nhân là `DATABASE_URL` được truyền vào
-`--shadow-database-url`, trong khi Prisma coi shadow là CSDL dùng một lần: nó xóa đi và dựng lại.
-Chi tiết: [docs/database-safety.md](docs/database-safety.md).
+Prisma coi CSDL shadow là CSDL dùng một lần: mỗi lần `migrate dev` hoặc `migrate diff` chạy, nó xóa
+shadow đi và dựng lại. Vì vậy shadow phải là một CSDL riêng (`kltn_shadow`, cổng 5433). Chi tiết:
+[docs/database-safety.md](docs/database-safety.md).
 
 ```
 KHÔNG BAO GIỜ đặt --shadow-database-url bằng DATABASE_URL.
