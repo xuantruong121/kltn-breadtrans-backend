@@ -201,6 +201,7 @@ model User {
   userQuizRewards                 UserQuizReward[]
   userQuestionRewards             UserQuestionReward[]
   learningActivities              LearningActivity[]
+  studyTimes                      StudyTime[]
   diagnosticAttempts              DiagnosticAttempt[]
   diagnosticSpeakingResponses     DiagnosticSpeakingResponse[]
   diagnosticWritingResponses      DiagnosticWritingResponse[]
@@ -1103,6 +1104,25 @@ model ContentTopic {
 
 /// Immutable learning timeline. Each business feature writes a factual activity
 /// after its own transaction succeeds; the UI never fabricates a history row.
+/// Time a learner spends in practice rooms, per learner day and skill
+/// (owner 2026-11-26: the dashboard's "Thời gian học" had no data behind it).
+/// The browser sends what it counted while the room was open and in use.
+model StudyTime {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Learner day "YYYY-MM-DD" (Vietnam time, turning at 00:01).
+  dayKey    String   @db.VarChar(10)
+  /// LISTENING | READING | WRITING | SPEAKING | VOCAB | GRAMMAR | EXAM | DIAGNOSTIC
+  skill     String   @db.VarChar(16)
+  seconds   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dayKey, skill])
+  @@index([userId, dayKey])
+}
+
 model LearningActivity {
   id          Int      @id @default(autoincrement())
   userId      Int
