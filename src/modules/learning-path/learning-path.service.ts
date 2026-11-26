@@ -30,12 +30,17 @@ import { loadCandidates, loadLearnerState } from './learning-path.catalog';
 import {
   GOAL_SKILLS,
   contentKey,
-  dailyPlan,
   moreChoices,
   recommend,
+  scoreCandidate,
   weakestSkill,
   type Recommendation,
 } from './recommendation.logic';
+import { dailyFrame, eventKey, skillDays } from './today-frame.logic';
+import {
+  getLearnerDayKey,
+  getLearnerDayStart,
+} from '../../common/time/business-time.util';
 import {
   PRACTICE_LEVEL_LABEL,
   PRACTICE_SKILLS,
@@ -106,17 +111,84 @@ export class LearningPathService {
   }
 
   /**
-   * "Nhiệm vụ hôm nay": open items filling the learner's daily minutes, plus
-   * other open items to choose from.
+   * "Bài luyện hôm nay": a frame of four items, one per skill (thesis
+   * supervisor 2026-11-26). A skill practised today keeps its slot as done;
+   * when one skill was practised a lot today, the untouched ones are
+   * suggested. Also other open items to choose from.
    */
-  async today(userId: number) {
+  async today(userId: number, now = new Date()) {
     const { catalog, learner } = await this.context(userId);
+    const dayKey = getLearnerDayKey(now);
+    const [events, time] = await Promise.all([
+      this.prisma.learnerProgressEvent.findMany({
+        where: { userId, createdAt: { gte: getLearnerDayStart(now) } },
+        select: {
+          skill: true,
+          contentType: true,
+          contentId: true,
+          scorePercent: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.studyTime.findMany({
+        where: { userId, dayKey },
+        select: { skill: true, seconds: true },
+      }),
+    ]);
+    const days = skillDays(events, time, catalog.setKeyOfExercise);
+    const picks: Partial<Record<PracticeSkill, Recommendation>> = {};
+    for (const skill of PRACTICE_SKILLS) {
+      const [first] = recommend(catalog.candidates, learner, {
+        limit: 1,
+        skill,
+        includeLocked: true,
+      });
+      if (first) picks[skill] = first;
+    }
+    const { slots, balance } = dailyFrame(picks, days);
+
+    const byKey = new Map(catalog.candidates.map((c) => [contentKey(c), c]));
+    const weakest = weakestSkill(learner);
+    const doneView = (key: string | null) => {
+      const candidate = key ? byKey.get(key) : undefined;
+      if (!candidate) return null;
+      const r = scoreCandidate(candidate, learner, weakest) ?? {
+        candidate,
+        status: 'OPEN' as const,
+        score: 0,
+        predictedSuccess: 0,
+        reasons: [],
+      };
+      return this.view(r, learner.saved);
+    };
+    // "Bài khác" never repeats the frame's picks or what was done today.
+    const taken = new Set<string>([
+      ...Object.values(picks).map((r) => contentKey(r.candidate)),
+      ...events.map((e) => eventKey(e, catalog.setKeyOfExercise)),
+    ]);
     const ranked = recommend(catalog.candidates, learner, { limit: 24 });
-    const plan = dailyPlan(ranked, learner.minutesPerDay);
+
     return {
+      dayKey,
       minutesPerDay: learner.minutesPerDay,
-      items: plan.map((r) => this.view(r, learner.saved)),
-      more: moreChoices(ranked, plan, MORE_CHOICES).map((r) =>
+      slots: slots.map((s) => ({
+        skill: s.skill,
+        state: s.state,
+        item:
+          s.state === 'DONE'
+            ? doneView(s.doneKey)
+            : s.pick
+              ? this.view(s.pick, learner.saved)
+              : null,
+        done: s.done,
+        nudged: s.nudged,
+      })),
+      balance,
+      // Open picks still to do, for clients that read the old list.
+      items: slots
+        .filter((s) => s.state === 'TODO' && s.pick?.status === 'OPEN')
+        .map((s) => this.view(s.pick!, learner.saved)),
+      more: moreChoices(ranked, taken, MORE_CHOICES).map((r) =>
         this.view(r, learner.saved),
       ),
       foundation: foundationPlan(

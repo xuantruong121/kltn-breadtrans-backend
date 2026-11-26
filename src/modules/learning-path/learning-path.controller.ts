@@ -157,9 +157,14 @@ export class LearningPathController {
 
   @Get('today')
   @ApiOperation({
-    summary: 'Nhiệm vụ hôm nay: bài luyện đề xuất vừa thời gian mỗi ngày',
+    summary: 'Bài luyện hôm nay: khung 4 bài, mỗi kỹ năng một bài',
+    description:
+      '`slots`: Nghe, Đọc, Nói, Viết; ô đã luyện trong ngày ghi DONE. `balance`: khi một kỹ năng được luyện nhiều trong ngày (từ 20 phút hoặc 3 bài) mà còn kỹ năng chưa luyện, gợi ý các kỹ năng đó.',
   })
-  @ApiResponse({ status: 200, description: 'Bài đang mở, kèm lý do đề xuất.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Khung 4 ô, gợi ý cân bằng, bài khác và từ vựng/ngữ pháp.',
+  })
   today(@Request() req: { user: { id: number } }) {
     return this.learningPath.today(req.user.id);
   }
