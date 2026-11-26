@@ -96,6 +96,54 @@ describe('GamificationService weekly cron hardening', () => {
     expect(updates.find((u) => u.where.id === 3).data.tier).toBe('Vàng');
     expect(tx.gameSettings.upsert).toHaveBeenCalled();
     expect(redis.set).toHaveBeenCalled();
+    // the ranking page's order, so its promotion places are the real ones
+    expect(tx.leaderboard.findMany.mock.calls[0][0].orderBy).toEqual([
+      { weeklyExp: 'desc' },
+      { totalPoints: 'desc' },
+      { userId: 'asc' },
+    ]);
+  });
+
+  it('keeps a learner alone in a tier with 0 XP where they are (owner 2026-11-26)', async () => {
+    const updates: any[] = [];
+    const tx: any = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([]),
+      gameSettings: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn(),
+      },
+      leaderboard: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 1, tier: 'Đồng', weeklyExp: 286 },
+          { id: 2, tier: 'Vàng', weeklyExp: 0 },
+          { id: 3, tier: 'Bạch Kim', weeklyExp: 0 },
+        ]),
+        update: jest.fn().mockImplementation((args) => {
+          updates.push(args);
+          return args;
+        }),
+      },
+    };
+    const prisma: any = {
+      $transaction: jest.fn((callback: (client: any) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = new GamificationService(
+      prisma,
+      {} as any,
+      { set: jest.fn() } as any,
+    );
+
+    await service.triggerWeeklyCron();
+
+    expect(updates.find((u) => u.where.id === 1).data.tier).toBe('Bạc');
+    expect(updates.find((u) => u.where.id === 2).data.tier).toBe('Vàng');
+    expect(updates.find((u) => u.where.id === 3).data.tier).toBe('Bạch Kim');
+    expect(updates.every((u) => u.data.weeklyExp === 0)).toBe(true);
   });
 
   it('returns no-op when the database advisory lock is unavailable', async () => {

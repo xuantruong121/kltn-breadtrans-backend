@@ -4,6 +4,7 @@ import {
   maskName,
   periodStart,
   streakMilestone,
+  weeklyNextTier,
   xpLevel,
 } from './ranking.logic';
 
@@ -152,5 +153,91 @@ describe('activityText', () => {
       text: 'vừa xuống tới tầng 12 Hầm Bánh Mì',
       kind: 'arena',
     });
+  });
+});
+
+describe('weeklyNextTier (owner 2026-11-26: no promotion without XP)', () => {
+  it('keeps a learner alone in a tier where they are with 0 XP that week', () => {
+    expect(
+      weeklyNextTier({
+        tier: 'Vàng',
+        indexInTier: 0,
+        tierSize: 1,
+        weeklyExp: 0,
+      }),
+    ).toBe('Vàng');
+  });
+
+  it('moves the same learner up with some XP', () => {
+    expect(
+      weeklyNextTier({
+        tier: 'Vàng',
+        indexInTier: 0,
+        tierSize: 1,
+        weeklyExp: 16,
+      }),
+    ).toBe('Bạch Kim');
+  });
+
+  it('still takes the bottom 20 % down, XP or not', () => {
+    // a tier of 10: places 0-1 go up, 8-9 go down
+    expect(
+      weeklyNextTier({
+        tier: 'Bạc',
+        indexInTier: 8,
+        tierSize: 10,
+        weeklyExp: 40,
+      }),
+    ).toBe('Đồng');
+    expect(
+      weeklyNextTier({
+        tier: 'Bạc',
+        indexInTier: 1,
+        tierSize: 10,
+        weeklyExp: 0,
+      }),
+    ).toBe('Bạc');
+    expect(
+      weeklyNextTier({
+        tier: 'Bạc',
+        indexInTier: 1,
+        tierSize: 10,
+        weeklyExp: 5,
+      }),
+    ).toBe('Vàng');
+  });
+
+  it('never goes below Đồng or above Kim Cương', () => {
+    expect(
+      weeklyNextTier({
+        tier: 'Đồng',
+        indexInTier: 4,
+        tierSize: 5,
+        weeklyExp: 0,
+      }),
+    ).toBe('Đồng');
+    expect(
+      weeklyNextTier({
+        tier: 'Kim Cương',
+        indexInTier: 0,
+        tierSize: 3,
+        weeklyExp: 900,
+      }),
+    ).toBe('Kim Cương');
+  });
+});
+
+describe('leagueStanding with no XP this week', () => {
+  it('says one XP is still needed in a promotion place', () => {
+    expect(
+      leagueStanding({
+        tier: 'Bạch Kim',
+        tierSize: 1,
+        rankInTier: 1,
+        myXp: 0,
+        cutoffXp: 0,
+        safeXp: null,
+      }).xpToPromotion,
+    ).toBe(1);
   });
 });

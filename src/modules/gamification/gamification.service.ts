@@ -35,7 +35,12 @@ import {
   vocabWordXpReason,
 } from '../vocab/vocab-xp.logic';
 import { arenaStats } from './arena-stats.logic';
-import { streakMilestone, xpLevel } from './ranking.logic';
+import {
+  streakMilestone,
+  xpLevel,
+  LEAGUE_TIERS,
+  weeklyNextTier,
+} from './ranking.logic';
 import {
   BADGE_DESCRIPTIONS,
   BADGE_RULES,
@@ -2444,7 +2449,7 @@ export class GamificationService {
     weekKeyOverride?: string,
     catchUp = false,
   ) {
-    const tiers = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
+    const tiers = LEAGUE_TIERS;
     const now = new Date();
     const weekKey = weekKeyOverride || getBusinessWeekKey(now);
     const maxAttempts = isManualTrigger ? 3 : 1;
@@ -2482,24 +2487,27 @@ export class GamificationService {
           return { acquired: true, noop: true };
         }
 
+        // The ranking page's order (week XP, then all-time points, then user),
+        // so who it shows in the promotion places is who goes up.
         const snapshot = await tx.leaderboard.findMany({
-          orderBy: [{ weeklyExp: 'desc' }, { id: 'asc' }],
+          orderBy: [
+            { weeklyExp: 'desc' },
+            { totalPoints: 'desc' },
+            { userId: 'asc' },
+          ],
         });
         const updates: Array<{ id: number; tier: string; weeklyExp: number }> =
           [];
         for (let i = 0; i < tiers.length; i++) {
           const currentTier = tiers[i];
           const users = snapshot.filter((u) => u.tier === currentTier);
-          const topCount = Math.max(1, Math.floor(users.length * 0.2));
-          const bottomStart = Math.max(
-            users.length - Math.floor(users.length * 0.2),
-            topCount,
-          );
           users.forEach((user, index) => {
-            let newTier = currentTier;
-            if (index < topCount && i < tiers.length - 1)
-              newTier = tiers[i + 1];
-            else if (index >= bottomStart && i > 0) newTier = tiers[i - 1];
+            const newTier = weeklyNextTier({
+              tier: currentTier,
+              indexInTier: index,
+              tierSize: users.length,
+              weeklyExp: user.weeklyExp,
+            });
             updates.push({ id: user.id, tier: newTier, weeklyExp: 0 });
           });
         }

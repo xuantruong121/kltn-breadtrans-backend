@@ -71,6 +71,33 @@ export function streakMilestone(before: number, after: number): number | null {
 export const LEAGUE_TIERS = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'];
 
 /**
+ * Where a learner goes at the Monday reset, from their place in their tier
+ * (0-based, ordered by week XP as the ranking page orders them). The top 20 %
+ * go up, but only with some XP that week (owner 2026-11-26: a learner alone in
+ * a tier went up every week with 0 XP, to Bạch Kim without studying); the
+ * bottom 20 % go down. Never below Đồng, never above Kim Cương.
+ */
+export function weeklyNextTier(input: {
+  tier: string;
+  indexInTier: number;
+  tierSize: number;
+  weeklyExp: number;
+}): string {
+  const i = Math.max(0, LEAGUE_TIERS.indexOf(input.tier));
+  const n = Math.max(0, Math.floor(input.tierSize));
+  const topCount = Math.max(1, Math.floor(n * 0.2));
+  const bottomStart = Math.max(n - Math.floor(n * 0.2), topCount);
+  if (
+    input.indexInTier < topCount &&
+    i < LEAGUE_TIERS.length - 1 &&
+    input.weeklyExp > 0
+  )
+    return LEAGUE_TIERS[i + 1];
+  if (input.indexInTier >= bottomStart && i > 0) return LEAGUE_TIERS[i - 1];
+  return LEAGUE_TIERS[i];
+}
+
+/**
  * A learner's place in the weekly league, as triggerWeeklyCron moves people:
  * the top 20 % of a tier go up, the bottom 20 % go down (never below Đồng,
  * never above Kim Cương). `cutoffXp` is the week's XP of the last learner in
@@ -95,11 +122,14 @@ export function leagueStanding(input: {
     Math.max(1, Math.floor(n * 0.2)),
   );
   const demoteFrom = index === 0 || bottomStart >= n ? null : bottomStart + 1;
+  // In the promotion places with 0 XP, one XP is still needed (weeklyNextTier).
   const xpToPromotion =
     promoteCount <= 0
       ? null
       : input.rankInTier <= promoteCount
-        ? 0
+        ? input.myXp > 0
+          ? 0
+          : 1
         : input.cutoffXp === null
           ? null
           : Math.max(1, input.cutoffXp - input.myXp + 1);
