@@ -156,88 +156,65 @@ describe('activityText', () => {
   });
 });
 
-describe('weeklyNextTier (owner 2026-11-26: no promotion without XP)', () => {
-  it('keeps a learner alone in a tier where they are with 0 XP that week', () => {
-    expect(
-      weeklyNextTier({
-        tier: 'Vàng',
-        indexInTier: 0,
-        tierSize: 1,
-        weeklyExp: 0,
-      }),
-    ).toBe('Vàng');
+const next = (
+  tier: string,
+  indexInTier: number,
+  tierSize: number,
+  weeklyExp: number,
+) => weeklyNextTier({ tier, indexInTier, tierSize, weeklyExp });
+
+describe('weeklyNextTier (owner 2026-11-26: up only with XP, down with none)', () => {
+  it('takes a learner with 0 XP that week down one tier, alone in it or not', () => {
+    expect(next('Vàng', 0, 1, 0)).toBe('Bạc');
+    expect(next('Bạch Kim', 3, 10, 0)).toBe('Vàng');
   });
 
-  it('moves the same learner up with some XP', () => {
-    expect(
-      weeklyNextTier({
-        tier: 'Vàng',
-        indexInTier: 0,
-        tierSize: 1,
-        weeklyExp: 16,
-      }),
-    ).toBe('Bạch Kim');
+  it('moves a lone learner up with some XP', () => {
+    expect(next('Vàng', 0, 1, 16)).toBe('Bạch Kim');
   });
 
-  it('still takes the bottom 20 % down, XP or not', () => {
+  it('keeps a learner with some XP in the middle of a tier where they are', () => {
+    expect(next('Bạch Kim', 3, 10, 12)).toBe('Bạch Kim');
+  });
+
+  it('still takes the bottom 20 % down with XP; the top goes up only with XP', () => {
     // a tier of 10: places 0-1 go up, 8-9 go down
-    expect(
-      weeklyNextTier({
-        tier: 'Bạc',
-        indexInTier: 8,
-        tierSize: 10,
-        weeklyExp: 40,
-      }),
-    ).toBe('Đồng');
-    expect(
-      weeklyNextTier({
-        tier: 'Bạc',
-        indexInTier: 1,
-        tierSize: 10,
-        weeklyExp: 0,
-      }),
-    ).toBe('Bạc');
-    expect(
-      weeklyNextTier({
-        tier: 'Bạc',
-        indexInTier: 1,
-        tierSize: 10,
-        weeklyExp: 5,
-      }),
-    ).toBe('Vàng');
+    expect(next('Bạc', 8, 10, 40)).toBe('Đồng');
+    expect(next('Bạc', 1, 10, 0)).toBe('Đồng');
+    expect(next('Bạc', 1, 10, 5)).toBe('Vàng');
   });
 
   it('never goes below Đồng or above Kim Cương', () => {
-    expect(
-      weeklyNextTier({
-        tier: 'Đồng',
-        indexInTier: 4,
-        tierSize: 5,
-        weeklyExp: 0,
-      }),
-    ).toBe('Đồng');
-    expect(
-      weeklyNextTier({
-        tier: 'Kim Cương',
-        indexInTier: 0,
-        tierSize: 3,
-        weeklyExp: 900,
-      }),
-    ).toBe('Kim Cương');
+    expect(next('Đồng', 4, 5, 0)).toBe('Đồng');
+    expect(next('Kim Cương', 0, 3, 900)).toBe('Kim Cương');
   });
 });
 
 describe('leagueStanding with no XP this week', () => {
-  it('says one XP is still needed in a promotion place', () => {
-    expect(
-      leagueStanding({
-        tier: 'Bạch Kim',
-        tierSize: 1,
-        rankInTier: 1,
-        myXp: 0,
-        cutoffXp: 0,
-        safeXp: null,
-      }).xpToPromotion,
-    ).toBe(1);
+  it('in a promotion place: one XP to go up, and in the drop zone until then', () => {
+    const s = leagueStanding({
+      tier: 'Bạch Kim',
+      tierSize: 1,
+      rankInTier: 1,
+      myXp: 0,
+      cutoffXp: 0,
+      safeXp: null,
+    });
+    expect(s.xpToPromotion).toBe(1);
+    expect(s.inDemotionZone).toBe(true);
+    expect(s.xpToLeaveDemotion).toBe(1);
+  });
+
+  it('in Đồng there is no lower tier, so no drop zone', () => {
+    const s = leagueStanding({
+      tier: 'Đồng',
+      tierSize: 1,
+      rankInTier: 1,
+      myXp: 0,
+      cutoffXp: 0,
+      safeXp: null,
+    });
+    expect(s.inDemotionZone).toBe(false);
+    expect(s.xpToLeaveDemotion).toBeNull();
   });
 });

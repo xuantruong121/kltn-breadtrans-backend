@@ -74,7 +74,9 @@ export const LEAGUE_TIERS = ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cư
  * Where a learner goes at the Monday reset, from their place in their tier
  * (0-based, ordered by week XP as the ranking page orders them). The top 20 %
  * go up, but only with some XP that week (owner 2026-11-26: a learner alone in
- * a tier went up every week with 0 XP, to Bạch Kim without studying); the
+ * a tier went up every week with 0 XP, to Bạch Kim without studying). A week
+ * with no XP takes a learner down one tier wherever they stand (owner
+ * 2026-11-26: alone in a tier, nobody was ever in its bottom 20 %), and the
  * bottom 20 % go down. Never below Đồng, never above Kim Cương.
  */
 export function weeklyNextTier(input: {
@@ -93,15 +95,17 @@ export function weeklyNextTier(input: {
     input.weeklyExp > 0
   )
     return LEAGUE_TIERS[i + 1];
-  if (input.indexInTier >= bottomStart && i > 0) return LEAGUE_TIERS[i - 1];
+  if (i > 0 && (input.weeklyExp <= 0 || input.indexInTier >= bottomStart))
+    return LEAGUE_TIERS[i - 1];
   return LEAGUE_TIERS[i];
 }
 
 /**
- * A learner's place in the weekly league, as triggerWeeklyCron moves people:
- * the top 20 % of a tier go up, the bottom 20 % go down (never below Đồng,
- * never above Kim Cương). `cutoffXp` is the week's XP of the last learner in
- * the promotion zone, `safeXp` that of the last learner above the demotion zone.
+ * A learner's place in the weekly league, as triggerWeeklyCron moves people
+ * (weeklyNextTier): the top 20 % of a tier go up with some XP, the bottom 20 %
+ * and anyone with no XP go down (never below Đồng, never above Kim Cương).
+ * `cutoffXp` is the week's XP of the last learner in the promotion zone,
+ * `safeXp` that of the last learner above the demotion zone.
  */
 export function leagueStanding(input: {
   tier: string;
@@ -133,7 +137,10 @@ export function leagueStanding(input: {
         : input.cutoffXp === null
           ? null
           : Math.max(1, input.cutoffXp - input.myXp + 1);
-  const inDemotionZone = demoteFrom !== null && input.rankInTier >= demoteFrom;
+  const inBottomPlaces = demoteFrom !== null && input.rankInTier >= demoteFrom;
+  // No XP yet this week: down one tier at the reset unless they earn some.
+  const idle = index > 0 && input.myXp <= 0;
+  const inDemotionZone = inBottomPlaces || idle;
   return {
     tier: LEAGUE_TIERS[index],
     rankInTier: input.rankInTier,
@@ -142,9 +149,12 @@ export function leagueStanding(input: {
     demoteFrom,
     xpToPromotion,
     inDemotionZone,
-    xpToLeaveDemotion:
-      inDemotionZone && input.safeXp !== null
+    xpToLeaveDemotion: inBottomPlaces
+      ? input.safeXp !== null
         ? Math.max(1, input.safeXp - input.myXp + 1)
+        : null
+      : idle
+        ? 1
         : null,
   };
 }

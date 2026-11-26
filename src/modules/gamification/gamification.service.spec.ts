@@ -104,7 +104,7 @@ describe('GamificationService weekly cron hardening', () => {
     ]);
   });
 
-  it('keeps a learner alone in a tier with 0 XP where they are (owner 2026-11-26)', async () => {
+  it('moves lone learners by their week: up with XP, down with none (owner 2026-11-26)', async () => {
     const updates: any[] = [];
     const tx: any = {
       $queryRaw: jest
@@ -141,8 +141,8 @@ describe('GamificationService weekly cron hardening', () => {
     await service.triggerWeeklyCron();
 
     expect(updates.find((u) => u.where.id === 1).data.tier).toBe('Bạc');
-    expect(updates.find((u) => u.where.id === 2).data.tier).toBe('Vàng');
-    expect(updates.find((u) => u.where.id === 3).data.tier).toBe('Bạch Kim');
+    expect(updates.find((u) => u.where.id === 2).data.tier).toBe('Bạc');
+    expect(updates.find((u) => u.where.id === 3).data.tier).toBe('Vàng');
     expect(updates.every((u) => u.data.weeklyExp === 0)).toBe(true);
   });
 
