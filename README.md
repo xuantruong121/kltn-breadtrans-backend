@@ -1,178 +1,187 @@
-<p align="center">
-  <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
-</p>
+# BreadTrans Backend
 
-<h1 align="center">BreadTrans E-Learning Backend 🚀</h1>
+API của BreadTrans, nền tảng tự học tiếng Anh (khóa luận tốt nghiệp). Học viên luyện Nghe, Nói, Đọc,
+Viết, từ vựng, ngữ pháp và làm đề mô phỏng cấu trúc TOEIC; có bài đánh giá đầu vào, gói Free/Plus/Pro,
+Bánh Mì, thú ảo, bảng xếp hạng theo hạng và đấu trường 1v1.
 
-<p align="center">
-  Hệ thống Backend cho nền tảng tự học tiếng Anh theo kỹ năng, cấp độ và chủ đề; luyện đề theo nhiều dạng chứng chỉ và học theo khóa học có lộ trình sẵn, tích hợp AI và Gamification — Khóa luận tốt nghiệp.<br/>
-  Xây dựng với <strong>NestJS 11</strong>, <strong>PostgreSQL (Prisma ORM)</strong>, <strong>Redis</strong>, <strong>Cloudflare R2</strong>, <strong>Azure AI Speech (F0)</strong>, <strong>Google Gemini</strong> và <strong>Daily.co</strong>.
-</p>
+- Hai vai trò: học viên (`STUDENT`) và quản trị viên (`ADMIN`).
+- Không có khóa học, giáo viên, lớp học hay học phí. Phần này được gỡ ngày 01/11/2026. Cách khôi phục
+  nằm ở [docs/courses-restore.md](docs/courses-restore.md).
+- Đề thi do BreadTrans tự soạn theo cấu trúc TOEIC. BreadTrans không phải ETS, không cấp chứng chỉ, và
+  điểm chỉ là chỉ số luyện tập nội bộ ([docs/toeic-product-contract.md](docs/toeic-product-contract.md)).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/NestJS-11-red?logo=nestjs" alt="NestJS" />
-  <img src="https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma" alt="Prisma" />
-  <img src="https://img.shields.io/badge/Redis-7-red?logo=redis" alt="Redis" />
-  <img src="https://img.shields.io/badge/Cloudflare_R2-Storage-F38020?logo=cloudflare" alt="Cloudflare R2" />
-  <img src="https://img.shields.io/badge/Azure_Speech-F0_Free-0089D6?logo=microsoftazure" alt="Azure AI Speech" />
-  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker" alt="Docker" />
-</p>
+## Công nghệ
 
----
-
-## 🌟 Tính Năng Chính
-
-| Phân hệ / Tính năng | Chi tiết & Công nghệ sử dụng |
+| Thành phần | Dùng cho |
 |---|---|
-| **Luyện đề theo format chứng chỉ** | Rèn luyện Nghe, Nói, Đọc, Viết theo các format đang hỗ trợ; runtime hiện có bộ TOEIC 4 kỹ năng theo cấu trúc ETS. |
-| **Azure AI Speech Grader** | Chấm điểm phát âm chuẩn mức **Âm vị (Phoneme-level)**, độ lưu loát (Fluency), độ chính xác (Accuracy), ngữ điệu (Prosody) qua Azure AI Speech SDK/REST (Gói F0 Free). |
-| **AI Writing Tutor (Gemini)** | Chấm bài luận, phân tích lỗi ngữ pháp, gợi ý cấu trúc câu và từ vựng nâng cao tự động. |
-| **AI Exam PDF Importer** | Tự động đọc file đề thi chứng chỉ PDF + file âm thanh, trích xuất cấu trúc câu hỏi đưa vào CSDL; hỗ trợ nguồn ETS hiện có. |
-| **Đấu Trường 1v1 (Arena)** | Matchmaking ngẫu nhiên qua Redis Queue, thi đấu đối kháng thời gian thực qua WebSocket (Socket.io). |
-| **Phòng Học Trực Tuyến (Daily.co)** | Tự động sinh link và quản lý phòng học video nhúng trực tiếp vào Web (10.000 phút/tháng miễn phí). |
-| **Vocabulary & Flashcard** | 4 bước học toàn diện (Flashcard 3D → Quiz → Typing → Speaking) tích hợp Text-To-Speech Neural. |
-| **Hệ Thống Gamification** | Tích lũy Bánh Mì, chuỗi Streak, Cửa hàng vật phẩm, Thú cưng (Pet) và Bảng xếp hạng học tập. |
-| **Lưu Trữ Đám Mây Cloudflare R2** | Lưu trữ vĩnh viễn Avatar, Audio luyện nói, file bài giảng PDF với chi phí băng thông egress 0đ. |
-| **Admin CMS** | Thống kê, quản lý người dùng, gói PLUS/PRO, khóa học tự học (Course Studio) và ngân hàng nội dung. Không có lớp học, giáo viên hay học phí lớp (đã ngừng ở CP60.1). |
+| Node.js 22, TypeScript, NestJS 11 | API dạng modular monolith |
+| PostgreSQL 15, Prisma 6 | Dữ liệu chính (`prisma/schema.prisma`, migration trong `prisma/migrations`) |
+| Redis 7, BullMQ | Cache, hàng đợi chấm bài Nói, ghép trận đấu trường |
+| Socket.io | Đấu trường 1v1 và sự kiện thời gian thực |
+| Cloudflare R2 | Ảnh, audio, PDF; một bucket riêng, không công khai, cho bản sao lưu CSDL |
+| Azure AI Speech | Chấm phát âm |
+| Google Gemini | Chấm bài Viết, soạn nháp đề, nhập đề từ PDF |
+| Cloudflare Workers AI, API chuẩn OpenAI (Groq) | Giải thử để kiểm định đáp án đề do AI soạn (tùy chọn) |
+| Web Push (VAPID), SMTP | Thông báo trên trình duyệt và email |
+| PayOS | Thanh toán gói Plus/Pro |
+| Passport-JWT, Google Identity Services | Đăng nhập: access token 1 giờ, refresh token 7 ngày |
 
----
+## Chạy ở máy
 
-## 🛠️ Kiến Trúc Công Nghệ (Tech Stack)
-
-- **Ngôn ngữ & Nền tảng:** Node.js (v20+), TypeScript 5.7
-- **Core Framework:** NestJS 11 (Modular Architecture, Dependency Injection, Strategy Pattern)
-- **Cơ sở dữ liệu & ORM:** PostgreSQL 15, Prisma ORM 6
-- **Bộ nhớ đệm & Realtime Queue:** Redis 7 (`ioredis`)
-- **Realtime Gateway:** `@nestjs/websockets`, `socket.io`
-- **Xác thực & Phân quyền:** Passport-JWT, Bcrypt, Role Guard (`STUDENT`, `ADMIN`)
-- **Lưu trữ đám mây:** Cloudflare R2 (`@aws-sdk/client-s3`)
-- **Trí tuệ nhân tạo (AI):** 
-  - Azure AI Speech (Pronunciation Assessment)
-  - Google Gemini Flash (`@google/generative-ai`)
-- **Tài liệu API:** Swagger / OpenAPI 3.0
-- **Ghi log hệ thống:** Winston Logger (`nest-winston`)
-- **Tự động hóa CI/CD:** GitHub Actions (Lint, Typecheck, Test, Prisma DB Push)
-
----
-
-## 🚀 Cài Đặt & Chạy Môi Trường Phát Triển
-
-### Yêu cầu tiên quyết
-- [Node.js](https://nodejs.org/) >= 20.x
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (cho PostgreSQL & Redis)
-- Git
-
-### 1. Clone Source Code & Cài Dependencies
+Cần Node.js 22, Docker Desktop và Git.
 
 ```bash
-git clone <repo-url>
-cd kltn-breadtrans-backend
 npm install
-```
-
-### 2. Cấu Hình Biến Môi Trường (`.env`)
-
-Sao chép file `.env.example` thành `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Cập nhật các thông số cần thiết trong `.env`:
-
-```env
-# 1. Database & Cache
-DATABASE_URL="postgresql://postgres:password@localhost:5432/kltn_db?schema=public"
-REDIS_HOST="localhost"
-REDIS_PORT=6379
-
-# 2. Authentication
-JWT_SECRET="your_jwt_super_secret_key"
-
-# 3. Google Gemini AI
-GEMINI_API_KEY="your_gemini_api_key"
-
-# 4. Cloudflare R2 Storage (Lưu trữ ảnh, audio, bài giảng)
-R2_ACCOUNT_ID="your_cloudflare_account_id"
-R2_ACCESS_KEY_ID="your_r2_access_key_id"
-R2_SECRET_ACCESS_KEY="your_r2_secret_access_key"
-R2_BUCKET_NAME="breadtrans-files"
-R2_PUBLIC_URL="https://pub-your_id.r2.dev"
-
-# 5. Azure AI Speech (Chấm phát âm F0)
-AZURE_SPEECH_KEY="your_azure_speech_f0_key"
-AZURE_SPEECH_REGION="southeastasia"
-
-# 6. Daily.co (Phòng học trực tuyến video nhúng)
-DAILY_DOMAIN="breadtrans-kltn.daily.co"
-DAILY_API_KEY="your_daily_api_key"
-```
-
-### 3. Khởi Chạy Cơ Sở Dữ Liệu & Backend
-
-```bash
-# Bước 1: Khởi động container PostgreSQL và Redis qua Docker Compose
-docker-compose up -d
-
-# Bước 2: Sinh mã Prisma Client và đồng bộ DB Schema
+cp .env.example .env          # rồi điền giá trị; không commit .env
+docker-compose up -d          # Postgres, shadow, backup, drill, Redis
 npx prisma generate
-npx prisma db push
-
-# Bước 3: Nạp dữ liệu mẫu ban đầu (Seed data: Tài khoản, Từ vựng, Ngữ pháp)
-npx ts-node prisma/seed.ts
-npx ts-node prisma/seed-grammar.ts
-
-# Bước 4: Chạy server ở chế độ Development (Watch Mode)
-npm run start:dev
+npm run db:migrate:deploy     # áp các migration
+npm run db:seed:safe          # chỉ cho CSDL mới, còn trống
+npm run dev:backend           # API ở http://localhost:3001
 ```
 
-Server sẽ khởi chạy tại: **http://localhost:3001**
-
----
-
-## 📖 Tài Liệu API (Swagger UI)
-
-Khi Backend đang chạy, bạn có thể xem và thực thi trực tiếp toàn bộ REST API tại:
-
-👉 **Swagger UI:** [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
-
----
-
-## 🧪 Kiểm Thử (Testing & Linting)
+`npm run dev:backend` chạy API ở chế độ watch, và chỉ bật worker bài Nói khi
+`SPEAKING_PIPELINE_MODE=bullmq`. Có thể chạy riêng từng phần:
 
 ```bash
-# Kiểm tra quy chuẩn mã nguồn (ESLint)
-npm run lint
+npm run start:dev                   # chỉ API, chế độ watch
+npm run start:speaking-worker:dev   # worker bài Nói, tiến trình riêng
+```
 
-# Chạy Unit Tests
-npm run test
+Worker là một tiến trình riêng. Sửa phần chấm bài Nói thì phải khởi động lại worker, không chỉ API.
 
-# Chạy Unit Tests ở chế độ Watch
-npm run test:watch
+Swagger: http://localhost:3001/api/docs
 
-# Báo cáo độ phủ kiểm thử (Test Coverage)
-npm run test:cov
+### Các container trong `docker-compose.yml`
 
-# Kiểm thử E2E (End-to-End)
+| Container | CSDL | Cổng | Vai trò |
+|---|---|---|---|
+| `kltn-postgres` | `kltn_db` | 5432 | Dữ liệu phát triển thật |
+| `kltn-postgres-shadow` | `kltn_shadow` | 5433 | Shadow cho Prisma, bị xóa và dựng lại mỗi lần chạy |
+| `kltn-postgres-backup` | – | – | Sao lưu định kỳ bằng `pg_dump -Fc` |
+| `kltn-postgres-drill` | – | – | Máy chủ dùng một lần cho diễn tập khôi phục, dữ liệu trên tmpfs |
+| `kltn-redis` | – | 6379 | Redis |
+
+### Biến môi trường
+
+Mẫu đầy đủ, có chú thích từng biến, nằm trong `.env.example`. Các nhóm chính:
+
+- CSDL và Redis: `DATABASE_URL`, `SHADOW_DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`
+- Đăng nhập: `JWT_SECRET`, `OTP_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
+- AI: `GEMINI_API_KEYS`, `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`
+- Lưu trữ: `R2_*` (media), `R2_BACKUP_*` (bản sao lưu CSDL)
+- Thông báo: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SMTP_*`
+- Thanh toán: `PAYOS_*`
+- Khác: `FRONTEND_URL`, `CRON_INTERNAL_ENABLED`, `SPEAKING_PIPELINE_MODE`
+
+Có hai mẫu khác: `.env.production.example` cho máy chủ, `.env.test.example` cho môi trường kiểm thử.
+
+## An toàn CSDL: đọc trước khi chạy lệnh Prisma
+
+Ngày 23/10/2026 toàn bộ dữ liệu phát triển bị mất. Nguyên nhân là `DATABASE_URL` được truyền vào
+`--shadow-database-url`, trong khi Prisma coi shadow là CSDL dùng một lần: nó xóa đi và dựng lại.
+Chi tiết: [docs/database-safety.md](docs/database-safety.md).
+
+```
+KHÔNG BAO GIỜ đặt --shadow-database-url bằng DATABASE_URL.
+KHÔNG BAO GIỜ trỏ CSDL shadow hay CSDL dùng một lần vào kltn_db.
+Có bản sao lưu KHÔNG có nghĩa là được phép liều với CSDL.
+```
+
+`schema.prisma` đọc `SHADOW_DATABASE_URL` từ môi trường, nên không cần truyền cờ shadow. Dùng các
+lệnh có bước kiểm tra (`scripts/db-safety-guard.ts`) chạy trước:
+
+```bash
+npm run db:safety-check          # chỉ chạy bước kiểm tra
+npm run db:migrate:dev:safe      # kiểm tra rồi prisma migrate dev
+npm run db:migrate:diff:safe
+npm run db:migrate:reset:safe
+npm run db:migrate:deploy        # không dùng shadow, an toàn với dữ liệu thật
+npm run db:seed:safe
+```
+
+Sao lưu và khôi phục ([docs/backup-and-media-architecture.md](docs/backup-and-media-architecture.md)):
+
+```bash
+npm run db:backup                # pg_dump ngay, trước mọi thao tác ghi vào kltn_db
+npm run db:backup:offsite        # đẩy bản sao lưu lên bucket R2 riêng
+npm run db:restore:verify        # khôi phục thử vào container riêng và đối chiếu
+npm run db:restore:drill:r2      # diễn tập khôi phục từ bản trên R2
+```
+
+## Kiểm thử
+
+```bash
+npm run ci:check     # lint:check, typecheck, build, toàn bộ Jest
+npm run lint:check
+npm run typecheck
+npx jest src/modules/diagnostic                  # một thư mục
+npx jest -t "grading stays correct"              # theo tên test
 npm run test:e2e
 ```
 
----
+Spec nằm cạnh mã nguồn (`*.spec.ts`). Khi không có `TEST_DATABASE_URL` và `TEST_REDIS_URL`, Jest bỏ
+qua các spec cần CSDL hoặc Redis. Muốn chạy đủ như CI thì đặt `TEST_DATABASE_URL`, `TEST_REDIS_URL`
+(và `DATABASE_URL`, `REDIS_URL` cùng giá trị) trỏ vào một CSDL test dùng một lần, rồi chạy
+`npx prisma migrate deploy` cho CSDL đó trước. Không bao giờ trỏ chúng vào `kltn_db`.
 
-## 🐳 Triển Khai Production (Deployment)
+GitHub Actions (`.github/workflows/ci.yml`) chạy `prisma generate`, `prisma validate`,
+`prisma migrate deploy` trên Postgres riêng của CI, rồi `lint:check`, `typecheck`, `build`, Jest và
+e2e.
 
-Dự án hỗ trợ triển khai bằng Docker Compose kèm Caddy Web Server (tự động cấu hình SSL/HTTPS miễn phí):
+## Cấu trúc thư mục
+
+```
+src/
+├── main.ts            # Swagger, ValidationPipe, CORS, bọc phản hồi
+├── app.module.ts      # đăng ký các module
+├── common/            # guard, decorator, interceptor, filter, email, cấu hình
+├── modules/           # mỗi tính năng một thư mục: controller, service, module, dto/, spec
+├── jobs/              # việc chạy định kỳ trong tiến trình API (đồng bộ sao lưu lên R2, bảo trì)
+├── worker/            # worker chấm bài Nói, tiến trình riêng
+└── prisma/            # PrismaService
+prisma/
+├── schema.prisma
+├── migrations/
+├── seed.ts            # dữ liệu mẫu, kèm seed-data/, seed-assets/, data/
+scripts/               # kiểm tra an toàn CSDL, sao lưu, kiểm toán, backfill (xem package.json)
+test/                  # e2e
+docs/                  # an toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD, khôi phục khóa học
+load-tests/            # kịch bản đo tải
+artifacts/             # bằng chứng kiểm thử và audio nguồn của đề Nghe
+docker/                # cấu hình container sao lưu và MinIO cục bộ
+```
+
+Module chính trong `src/modules/`: `auth`, `user`, `account`, `diagnostic`, `learning-path`,
+`learning-track`, `quiz`, `reading`, `writing`, `speaking`, `vocab`, `grammar`, `toeic`, `content`,
+`gamification`, `market`, `dungeon`, `word-blaster`, `events`, `notifications`, `mistakes`,
+`subscription`, `payment`, `support`, `suggestion`, `issue-report`, `upload`, `location`, `ai`,
+`admin`.
+
+Logic thuần, không có Prisma và không I/O (ví dụ `diagnostic.logic.ts`, `ranking.logic.ts`), được
+tách ra file riêng để kiểm thử mà không cần CSDL.
+
+## Quy ước
+
+- Mọi phản hồi được `TransformInterceptor` bọc thành `{ statusCode, message, data }`. Endpoint tải
+  file hoặc webhook dùng `@SkipResponseTransform()` để bỏ lớp bọc.
+- `ValidationPipe` chạy với `whitelist: true`. Trường không có decorator trong DTO bị bỏ đi mà không
+  báo lỗi.
+- Mỗi endpoint có Swagger (`@ApiOperation`, `@ApiResponse`, `@ApiBearerAuth`).
+- CORS mở hoàn toàn khi `NODE_ENV` khác `production`. Ở production chỉ nhận các origin trong
+  `CORS_ORIGIN`, phân tách bằng dấu phẩy.
+- Commit theo Conventional Commits (`feat(auth): …`). Nhánh `feature/*`, `bugfix/*`, `hotfix/*` tách
+  từ `develop`.
+
+## Triển khai
+
+`docker-compose.production.yml` chạy `postgres`, `redis`, `api`, `speaking-worker` và `caddy`. Caddy
+cấp HTTPS tự động; tên miền đặt trong `Caddyfile`. Biến môi trường lấy từ mẫu
+`.env.production.example`. Khi khởi động, container `api` chạy `scripts/entrypoint.sh`, áp migration
+trước khi mở API.
 
 ```bash
-# Build & Khởi chạy cụm production container
 docker compose -f docker-compose.production.yml up -d --build
 ```
 
----
-
-## 👨‍💻 Tác Giả & Bản Quyền
-
-Đồ án Khóa Luận Tốt Nghiệp — Nền tảng Giáo dục Trực tuyến BreadTrans E-Learning.  
-Phát triển bởi nhóm sinh viên Khoa Công nghệ Thông tin.
+Hướng dẫn CI/CD: [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md).

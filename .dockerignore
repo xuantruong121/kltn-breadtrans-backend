@@ -8,7 +8,6 @@ coverage
 .git
 artifacts
 backups
-content-assets
 docs
 load-tests
 test
