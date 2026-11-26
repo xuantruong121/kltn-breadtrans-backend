@@ -54,6 +54,11 @@ export class AdminController {
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'range 30d|6m|12m. Doanh thu (finance) va luot doi qua (gamification.totalOrders/approvedOrders) tinh trong khoang da chon; pendingOrders, totalBreads, activeSubscriptionsCount la hien tai. monthlyTrends.activityCount gom bai nop, bai noi, ngu phap, luyen de, noi dung, danh gia dau vao. contentBreakdown: vocabDecks, grammarTopics, listeningLessons, readingLessons, writingLessons, speakingSets (chi luyen ky nang), exams, mediaTopics.',
+  })
   getDashboardStats(@Query('range') range?: string) {
     return this.adminService.getDashboardStats(range);
   }

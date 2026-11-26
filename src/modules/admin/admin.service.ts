@@ -155,11 +155,14 @@ export class AdminService {
       totalStudents,
       activeStudents,
       pendingPayments,
-      totalVocabTopics,
-      totalGrammarTopics,
-      totalQuizzes,
-      totalSpeaking,
-      totalContentTopics,
+      vocabDecks,
+      grammarTopics,
+      listeningLessons,
+      readingLessons,
+      writingLessons,
+      speakingSets,
+      exams,
+      mediaTopics,
       marketOrdersCount,
       approvedOrdersCount,
       pendingOrdersCount,
@@ -211,13 +214,31 @@ export class AdminService {
           },
         },
       }),
-      this.prisma.vocabTopic.count(),
+      // Content by area, each in its own unit. Skill practice only: TOEIC
+      // quizzes and the Speaking copies inside exams are exam content, counted
+      // apart as exams (owner 2026-11-26: they were added to the practice).
+      this.prisma.vocabTopic.count({
+        where: { categoryName: { not: 'SYSTEM_DICTIONARY' } },
+      }),
       this.prisma.grammarTopic.count(),
-      this.prisma.quiz.count(),
-      this.prisma.speakingExercise.count(),
+      this.prisma.quiz.count({ where: { type: 'LISTENING_PRACTICE' } }),
+      this.prisma.quiz.count({ where: { type: 'BILINGUAL_READING' } }),
+      this.prisma.quiz.count({
+        where: { type: { in: ['WRITING_EMAIL', 'WRITING_PICTURE'] } },
+      }),
+      this.prisma.speakingPracticeSet.count({
+        where: { scope: 'SKILL_PRACTICE' },
+      }),
+      this.prisma.exam.count(),
       this.prisma.contentTopic.count(),
-      this.prisma.marketOrder.count(),
-      this.prisma.marketOrder.count({ where: { status: 'approved' } }),
+      // Orders placed in the chosen range; pending ones are counted whenever
+      // they were placed, since they still wait (owner 2026-11-26).
+      this.prisma.marketOrder.count({
+        where: { createdAt: { gte: rangeStart } },
+      }),
+      this.prisma.marketOrder.count({
+        where: { status: 'approved', createdAt: { gte: rangeStart } },
+      }),
       this.prisma.marketOrder.count({ where: { status: 'pending' } }),
       this.prisma.userStats.aggregate({
         where: { user: { role: Role.STUDENT } },
@@ -238,8 +259,13 @@ export class AdminService {
           status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] },
         },
       }),
+      // Revenue of the chosen range, like the chart beside it (owner
+      // 2026-11-26: the card summed every purchase whatever the range).
       this.prisma.planPurchase.aggregate({
-        where: { status: PlanPurchaseStatus.COMPLETED },
+        where: {
+          status: PlanPurchaseStatus.COMPLETED,
+          completedAt: { gte: rangeStart },
+        },
         _sum: { amountVnd: true },
         _count: { id: true },
       }),
@@ -253,14 +279,29 @@ export class AdminService {
       }),
     ]);
 
+    // Every kind of attempt a learner makes (owner 2026-11-26: grammar and
+    // exam attempts were missing, so a month with only those read 0).
     const monthlyTrends = await Promise.all(
       buckets.map(async ({ label, start, end }) => {
-        const [submissionCount, speakingCount, revenueAgg] = await Promise.all([
-          this.prisma.submission.count({
-            where: { submittedAt: { gte: start, lte: end } },
-          }),
+        const within = { gte: start, lte: end };
+        const [
+          submissionCount,
+          speakingCount,
+          grammarCount,
+          toeicCount,
+          contentCount,
+          diagnosticCount,
+          revenueAgg,
+        ] = await Promise.all([
+          this.prisma.submission.count({ where: { submittedAt: within } }),
           this.prisma.speakingSubmission.count({
-            where: { submittedAt: { gte: start, lte: end } },
+            where: { submittedAt: within },
+          }),
+          this.prisma.grammarAttempt.count({ where: { createdAt: within } }),
+          this.prisma.toeicAttempt.count({ where: { createdAt: within } }),
+          this.prisma.contentAttempt.count({ where: { submittedAt: within } }),
+          this.prisma.diagnosticAttempt.count({
+            where: { submittedAt: within },
           }),
           this.prisma.planPurchase.aggregate({
             where: {
@@ -273,18 +314,27 @@ export class AdminService {
 
         return {
           month: label,
-          activityCount: submissionCount + speakingCount,
+          activityCount:
+            submissionCount +
+            speakingCount +
+            grammarCount +
+            toeicCount +
+            contentCount +
+            diagnosticCount,
           revenueVnd: revenueAgg._sum.amountVnd ?? 0,
         };
       }),
     );
 
     const contentBreakdown = {
-      vocab: totalVocabTopics,
-      grammar: totalGrammarTopics,
-      quizzes: totalQuizzes,
-      speaking: totalSpeaking,
-      media: totalContentTopics,
+      vocabDecks,
+      grammarTopics,
+      listeningLessons,
+      readingLessons,
+      writingLessons,
+      speakingSets,
+      exams,
+      mediaTopics,
     };
 
     const gamification = {
