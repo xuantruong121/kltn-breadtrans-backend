@@ -1,187 +1,206 @@
-# BreadTrans Backend
+# BreadTrans Backend 🍞
 
-API của BreadTrans, nền tảng tự học tiếng Anh (khóa luận tốt nghiệp). Học viên luyện Nghe, Nói, Đọc,
-Viết, từ vựng, ngữ pháp và làm đề mô phỏng cấu trúc TOEIC; có bài đánh giá đầu vào, gói Free/Plus/Pro,
-Bánh Mì, thú ảo, bảng xếp hạng theo hạng và đấu trường 1v1.
+[![Node.js 22](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![NestJS 11](https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Prisma 6](https://img.shields.io/badge/Prisma-6-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Redis 7](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-- Hai vai trò: học viên (`STUDENT`) và quản trị viên (`ADMIN`).
-- Đề thi do BreadTrans tự soạn theo cấu trúc TOEIC; điểm là chỉ số luyện tập nội bộ
+**BreadTrans Backend** là API của BreadTrans, nền tảng tự học tiếng Anh. Học viên luyện Nghe, Nói, Đọc,
+Viết, từ vựng và ngữ pháp, làm đề mô phỏng cấu trúc TOEIC, được AI chấm bài Viết và chấm phát âm bài Nói,
+và giữ động lực học qua XP, Bánh Mì, bảng xếp hạng và thú ảo.
+
+---
+
+## 🏗️ Kiến trúc kỹ thuật
+
+Dự án theo kiến trúc **modular monolith** trên NestJS 11. Có 30 module tính năng trong `src/modules/`,
+mỗi module gồm controller, service, DTO và spec.
+
+- **PostgreSQL + Prisma:** dữ liệu chính, gồm người dùng, nội dung học, bài làm, gói thành viên, sổ
+  Bánh Mì và tiến độ.
+- **Redis + BullMQ:** cache, hàng đợi chấm bài Nói và ghép trận đấu trường.
+- **Socket.io:** đấu trường 1v1 và sự kiện thời gian thực.
+- **Cloudflare R2:** ảnh, audio và PDF. Bản sao lưu CSDL nằm ở một bucket riêng, không công khai.
+- **Worker chấm bài Nói:** chạy ở tiến trình riêng (`src/worker/`), nên việc chấm không làm chậm API.
+- **Logic thuần:** phần tính điểm, xếp hạng và ánh xạ nội dung nằm trong các file `*.logic.ts`, không
+  gọi CSDL, nên kiểm thử được mà không cần CSDL.
+
+---
+
+## ✨ Tính năng chính
+
+### 🎧 Luyện bốn kỹ năng
+- **Nghe:** audio theo từng câu, transcript, chép chính tả và giải thích đáp án.
+- **Đọc:** bài đọc song ngữ theo mức, phân tích theo kỹ năng con.
+- **Viết:** viết câu theo tranh, viết email, dịch câu; Google Gemini chấm và nhận xét.
+- **Nói:** Azure AI Speech chấm phát âm ở mức âm vị, độ trôi chảy, độ chính xác và ngữ điệu.
+
+### 🧭 Đánh giá đầu vào và lộ trình
+- Bài đánh giá đầu vào xếp học viên vào một trong bốn mức luyện tập: Mất gốc, Cơ bản, Trung cấp, Nâng cao.
+- Lộ trình mở mức theo từng kỹ năng, kế hoạch tuần theo mục tiêu và gợi ý bài luyện mỗi ngày.
+- Kết quả học tập theo kỳ: thời gian học, số câu, số từ đã thuộc và XP.
+
+### 📝 Luyện đề mô phỏng TOEIC
+- Đề Listening & Reading và Speaking & Writing theo cấu trúc TOEIC; luyện riêng từng Part với đề L&R.
+- AI soạn nháp đề, hai nhà cung cấp AI giải thử để kiểm định đáp án; nhập đề từ file PDF.
+- Đề do BreadTrans tự soạn; điểm là chỉ số luyện tập nội bộ
   ([docs/toeic-product-contract.md](docs/toeic-product-contract.md)).
 
-## Công nghệ
+### 📚 Từ vựng và ngữ pháp
+- Bộ từ theo lĩnh vực, flashcard, ôn từ đến hạn, kho từ điển.
+- Ngữ pháp theo chủ đề và mức; sổ lỗi sai để ôn lại câu đã làm sai.
 
-| Thành phần | Dùng cho |
-|---|---|
-| Node.js 22, TypeScript, NestJS 11 | API dạng modular monolith |
-| PostgreSQL 15, Prisma 6 | Dữ liệu chính (`prisma/schema.prisma`, migration trong `prisma/migrations`) |
-| Redis 7, BullMQ | Cache, hàng đợi chấm bài Nói, ghép trận đấu trường |
-| Socket.io | Đấu trường 1v1 và sự kiện thời gian thực |
-| Cloudflare R2 | Ảnh, audio, PDF; một bucket riêng, không công khai, cho bản sao lưu CSDL |
-| Azure AI Speech | Chấm phát âm |
-| Google Gemini | Chấm bài Viết, soạn nháp đề, nhập đề từ PDF |
-| Cloudflare Workers AI, API chuẩn OpenAI (Groq) | Giải thử để kiểm định đáp án đề do AI soạn (tùy chọn) |
-| Web Push (VAPID), SMTP | Thông báo trên trình duyệt và email |
-| PayOS | Thanh toán gói Plus/Pro |
-| Passport-JWT, Google Identity Services | Đăng nhập: access token 1 giờ, refresh token 7 ngày |
+### 🎮 Trò chơi hoá
+- XP, Bánh Mì, chuỗi ngày học và khiên giữ chuỗi, nhiệm vụ ngày.
+- Bảng xếp hạng theo hạng tuần (Đồng, Bạc, Vàng, Bạch Kim, Kim Cương).
+- Thú ảo, cửa hàng đổi quà, đấu trường 1v1 và hai trò chơi từ vựng chơi một mình.
 
-## Chạy ở máy
+### 💳 Gói thành viên
+- Gói Free, Plus và Pro, dùng thử Plus, mã giảm giá, thanh toán qua PayOS, giới thiệu bạn bè.
 
-Cần Node.js 22, Docker Desktop và Git.
+### 🔔 Thông báo và hỗ trợ
+- Chuông thông báo trên web, Web Push (VAPID) và email qua SMTP.
+- Trợ lý AI trả lời học viên; học viên chuyển được sang nhắn tin trực tiếp với quản trị viên.
+
+### 🛡️ Quản trị
+- Trang tổng quan vận hành, CMS cho nội dung từng kỹ năng và đề thi, quản lý người dùng, thanh toán, cửa
+  hàng, báo lỗi, góp ý, tin nhắn hỗ trợ, chi phí và hiệu năng.
+
+### 🔐 Bảo mật
+- JWT hai token: access token 1 giờ, refresh token 7 ngày, xoay vòng theo thiết bị; đăng nhập Google.
+- Phân quyền theo vai trò `STUDENT` và `ADMIN`, giới hạn tần suất gọi AI, mật khẩu băm bằng bcrypt, OTP.
+- Sao lưu CSDL hằng ngày bằng `pg_dump`, có bản sao trên R2 và diễn tập khôi phục.
+
+---
+
+## 🛠️ Công nghệ
+
+| Lớp | Công nghệ |
+| :--- | :--- |
+| **Ngôn ngữ** | TypeScript 5, Node.js 22 |
+| **Backend** | NestJS 11, Passport-JWT, class-validator, Swagger |
+| **CSDL** | PostgreSQL 15, Prisma 6 |
+| **Cache và hàng đợi** | Redis 7, BullMQ |
+| **Thời gian thực** | Socket.io |
+| **Lưu trữ** | Cloudflare R2 (S3) |
+| **AI** | Google Gemini, Azure AI Speech, Cloudflare Workers AI |
+| **Thanh toán và thông báo** | PayOS, Web Push, SMTP |
+| **DevOps** | Docker, Docker Compose, Caddy, GitHub Actions |
+
+---
+
+## 🚀 Chạy ở máy
+
+### Yêu cầu
+- Node.js 22
+- Docker Desktop
+
+### Cài đặt
 
 ```bash
+# 1. Cài thư viện
 npm install
-cp .env.example .env          # rồi điền giá trị; không commit .env
-docker-compose up -d          # Postgres, shadow, backup, drill, Redis
+
+# 2. Tạo file môi trường từ mẫu, rồi điền giá trị
+cp .env.example .env
+
+# 3. Bật PostgreSQL, PostgreSQL shadow, sao lưu và Redis
+docker-compose up -d
+
+# 4. Sinh Prisma Client, áp migration, nạp dữ liệu mẫu
 npx prisma generate
-npm run db:migrate:deploy     # áp các migration
-npm run db:seed:safe          # chỉ cho CSDL mới, còn trống
-npm run dev:backend           # API ở http://localhost:3001
-```
-
-`npm run dev:backend` chạy API ở chế độ watch, và chỉ bật worker bài Nói khi
-`SPEAKING_PIPELINE_MODE=bullmq`. Có thể chạy riêng từng phần:
-
-```bash
-npm run start:dev                   # chỉ API, chế độ watch
-npm run start:speaking-worker:dev   # worker bài Nói, tiến trình riêng
-```
-
-Worker là một tiến trình riêng. Sửa phần chấm bài Nói thì phải khởi động lại worker, không chỉ API.
-
-Swagger: http://localhost:3001/api/docs
-
-### Các container trong `docker-compose.yml`
-
-| Container | CSDL | Cổng | Vai trò |
-|---|---|---|---|
-| `kltn-postgres` | `kltn_db` | 5432 | Dữ liệu phát triển thật |
-| `kltn-postgres-shadow` | `kltn_shadow` | 5433 | Shadow cho Prisma, bị xóa và dựng lại mỗi lần chạy |
-| `kltn-postgres-backup` | – | – | Sao lưu định kỳ bằng `pg_dump -Fc` |
-| `kltn-postgres-drill` | – | – | Máy chủ dùng một lần cho diễn tập khôi phục, dữ liệu trên tmpfs |
-| `kltn-redis` | – | 6379 | Redis |
-
-### Biến môi trường
-
-Mẫu đầy đủ, có chú thích từng biến, nằm trong `.env.example`. Các nhóm chính:
-
-- CSDL và Redis: `DATABASE_URL`, `SHADOW_DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`
-- Đăng nhập: `JWT_SECRET`, `OTP_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
-- AI: `GEMINI_API_KEYS`, `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`
-- Lưu trữ: `R2_*` (media), `R2_BACKUP_*` (bản sao lưu CSDL)
-- Thông báo: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SMTP_*`
-- Thanh toán: `PAYOS_*`
-- Khác: `FRONTEND_URL`, `CRON_INTERNAL_ENABLED`, `SPEAKING_PIPELINE_MODE`
-
-Có hai mẫu khác: `.env.production.example` cho máy chủ, `.env.test.example` cho môi trường kiểm thử.
-
-## An toàn CSDL: đọc trước khi chạy lệnh Prisma
-
-Prisma coi CSDL shadow là CSDL dùng một lần: mỗi lần `migrate dev` hoặc `migrate diff` chạy, nó xóa
-shadow đi và dựng lại. Vì vậy shadow phải là một CSDL riêng (`kltn_shadow`, cổng 5433). Chi tiết:
-[docs/database-safety.md](docs/database-safety.md).
-
-```
-KHÔNG BAO GIỜ đặt --shadow-database-url bằng DATABASE_URL.
-KHÔNG BAO GIỜ trỏ CSDL shadow hay CSDL dùng một lần vào kltn_db.
-Có bản sao lưu KHÔNG có nghĩa là được phép liều với CSDL.
-```
-
-`schema.prisma` đọc `SHADOW_DATABASE_URL` từ môi trường, nên không cần truyền cờ shadow. Dùng các
-lệnh có bước kiểm tra (`scripts/db-safety-guard.ts`) chạy trước:
-
-```bash
-npm run db:safety-check          # chỉ chạy bước kiểm tra
-npm run db:migrate:dev:safe      # kiểm tra rồi prisma migrate dev
-npm run db:migrate:diff:safe
-npm run db:migrate:reset:safe
-npm run db:migrate:deploy        # không dùng shadow, an toàn với dữ liệu thật
+npm run db:migrate:deploy
 npm run db:seed:safe
+
+# 5. Chạy API (chế độ watch) và worker chấm bài Nói khi cần
+npm run dev:backend
 ```
 
-Sao lưu và khôi phục ([docs/backup-and-media-architecture.md](docs/backup-and-media-architecture.md)):
+### Điểm truy cập
+- **API:** http://localhost:3001
+- **Swagger:** http://localhost:3001/api/docs
+
+### Lệnh CSDL
+Lệnh migrate luôn dùng bản có bước kiểm tra (`scripts/db-safety-guard.ts`), vì Prisma xoá và dựng lại CSDL
+shadow mỗi lần chạy:
 
 ```bash
-npm run db:backup                # pg_dump ngay, trước mọi thao tác ghi vào kltn_db
-npm run db:backup:offsite        # đẩy bản sao lưu lên bucket R2 riêng
-npm run db:restore:verify        # khôi phục thử vào container riêng và đối chiếu
-npm run db:restore:drill:r2      # diễn tập khôi phục từ bản trên R2
+npm run db:migrate:dev:safe      # tạo migration mới
+npm run db:migrate:deploy        # áp migration
+npm run db:backup                # sao lưu ngay
+npm run db:restore:verify        # khôi phục thử vào container riêng
 ```
 
-## Kiểm thử
+Chi tiết: [docs/database-safety.md](docs/database-safety.md),
+[docs/backup-and-media-architecture.md](docs/backup-and-media-architecture.md).
+
+---
+
+## 🧪 Kiểm thử
 
 ```bash
-npm run ci:check     # lint:check, typecheck, build, toàn bộ Jest
-npm run lint:check
-npm run typecheck
-npx jest src/modules/diagnostic                  # một thư mục
-npx jest -t "grading stays correct"              # theo tên test
+# Lint, typecheck, build và toàn bộ Jest
+npm run ci:check
+
+# Một module hoặc một test
+npx jest src/modules/diagnostic
+npx jest -t "grading stays correct"
+
+# Kiểm thử end-to-end
 npm run test:e2e
 ```
 
-Spec nằm cạnh mã nguồn (`*.spec.ts`). Khi không có `TEST_DATABASE_URL` và `TEST_REDIS_URL`, Jest bỏ
-qua các spec cần CSDL hoặc Redis. Muốn chạy đủ như CI thì đặt `TEST_DATABASE_URL`, `TEST_REDIS_URL`
-(và `DATABASE_URL`, `REDIS_URL` cùng giá trị) trỏ vào một CSDL test dùng một lần, rồi chạy
-`npx prisma migrate deploy` cho CSDL đó trước. Không bao giờ trỏ chúng vào `kltn_db`.
+- **Unit test:** file `*.spec.ts` đặt cạnh mã nguồn, phần lớn kiểm các file logic thuần.
+- **Test cần CSDL:** chạy khi có `TEST_DATABASE_URL` và `TEST_REDIS_URL` trỏ vào một CSDL test riêng.
+- **E2E:** gọi API qua HTTP cho đăng ký, đăng nhập và mua gói (`test/`).
 
-GitHub Actions (`.github/workflows/ci.yml`) chạy `prisma generate`, `prisma validate`,
-`prisma migrate deploy` trên Postgres riêng của CI, rồi `lint:check`, `typecheck`, `build`, Jest và
-e2e.
+---
 
-## Cấu trúc thư mục
+## 📂 Cấu trúc dự án
 
-```
+```bash
 src/
-├── main.ts            # Swagger, ValidationPipe, CORS, bọc phản hồi
-├── app.module.ts      # đăng ký các module
-├── common/            # guard, decorator, interceptor, filter, email, cấu hình
-├── modules/           # mỗi tính năng một thư mục: controller, service, module, dto/, spec
-├── jobs/              # việc chạy định kỳ trong tiến trình API (đồng bộ sao lưu lên R2, bảo trì)
-├── worker/            # worker chấm bài Nói, tiến trình riêng
-└── prisma/            # PrismaService
+├── main.ts          # Swagger, ValidationPipe, CORS, bọc phản hồi { statusCode, message, data }
+├── app.module.ts    # Đăng ký các module
+├── common/          # Guard, decorator, interceptor, filter, email, cấu hình
+├── modules/         # 30 module tính năng (auth, diagnostic, toeic, speaking, gamification…)
+├── jobs/            # Việc định kỳ: đồng bộ bản sao lưu lên R2, bảo trì
+├── worker/          # Worker chấm bài Nói
+└── prisma/          # PrismaService
 prisma/
-├── schema.prisma
-├── migrations/
-├── seed.ts            # dữ liệu mẫu
-└── data/              # bộ nội dung seed.ts nạp (ngữ pháp, viết theo tranh, dịch câu, từ điển Nói)
-                       # và practice-media.json: khóa R2 của audio/ảnh luyện tập
-scripts/               # kiểm tra an toàn CSDL, sao lưu, kiểm toán, backfill (xem package.json)
-test/                  # e2e
-docs/                  # an toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD
-load-tests/            # kịch bản đo tải
-artifacts/             # bằng chứng kiểm thử và audio nguồn của đề Nghe
-docker/                # cấu hình container sao lưu và MinIO cục bộ
+├── schema.prisma    # Lược đồ CSDL
+├── migrations/      # Lịch sử migration
+├── seed.ts          # Dữ liệu mẫu
+└── data/            # Bộ nội dung mẫu và danh sách media trên R2
+scripts/             # Kiểm tra CSDL, sao lưu, kiểm toán dữ liệu
+test/                # E2E
+docs/                # An toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD
 ```
 
-Module chính trong `src/modules/`: `auth`, `user`, `account`, `diagnostic`, `learning-path`,
-`learning-track`, `quiz`, `reading`, `writing`, `speaking`, `vocab`, `grammar`, `toeic`, `content`,
-`gamification`, `market`, `dungeon`, `word-blaster`, `events`, `notifications`, `mistakes`,
-`subscription`, `payment`, `support`, `suggestion`, `issue-report`, `upload`, `location`, `ai`,
-`admin`.
+---
 
-Logic thuần, không có Prisma và không I/O (ví dụ `diagnostic.logic.ts`, `ranking.logic.ts`), được
-tách ra file riêng để kiểm thử mà không cần CSDL.
+## 🚢 CI/CD và triển khai
 
-## Quy ước
-
-- Mọi phản hồi được `TransformInterceptor` bọc thành `{ statusCode, message, data }`. Endpoint tải
-  file hoặc webhook dùng `@SkipResponseTransform()` để bỏ lớp bọc.
-- `ValidationPipe` chạy với `whitelist: true`. Trường không có decorator trong DTO bị bỏ đi mà không
-  báo lỗi.
-- Mỗi endpoint có Swagger (`@ApiOperation`, `@ApiResponse`, `@ApiBearerAuth`).
-- CORS mở hoàn toàn khi `NODE_ENV` khác `production`. Ở production chỉ nhận các origin trong
-  `CORS_ORIGIN`, phân tách bằng dấu phẩy.
-- Commit theo Conventional Commits (`feat(auth): …`). Nhánh `feature/*`, `bugfix/*`, `hotfix/*` tách
-  từ `develop`.
-
-## Triển khai
-
-`docker-compose.production.yml` chạy `postgres`, `redis`, `api`, `speaking-worker` và `caddy`. Caddy
-cấp HTTPS tự động; tên miền đặt trong `Caddyfile`. Biến môi trường lấy từ mẫu
-`.env.production.example`. Khi khởi động, container `api` chạy `scripts/entrypoint.sh`, áp migration
-trước khi mở API.
+- **GitHub Actions** (`.github/workflows/ci.yml`) chạy khi push lên `develop` hoặc `main`, khi mở Pull
+  Request vào `main`, hoặc khi bấm chạy tay ở tab Actions: dựng PostgreSQL và Redis riêng,
+  `prisma migrate deploy`, lint, typecheck, build, Jest và e2e.
+- **Triển khai** bằng `docker-compose.production.yml`: `postgres`, `redis`, `api`, `speaking-worker` và
+  `caddy` (HTTPS tự động). Biến môi trường theo mẫu `.env.production.example`; container `api` tự áp
+  migration khi khởi động.
 
 ```bash
 docker compose -f docker-compose.production.yml up -d --build
 ```
 
-Hướng dẫn CI/CD: [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md).
+---
+
+## 📝 Giấy phép
+
+Dự án khóa luận tốt nghiệp ngành Kỹ thuật Phần mềm tại IUH, dùng cho mục đích học tập.
+
+---
+
+*Thực hiện bởi nhóm BreadTrans.*
