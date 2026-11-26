@@ -37,6 +37,11 @@ import {
 } from './dto/user-skills-summary.dto';
 import { resolveSpeakingPracticeSet } from '../speaking/speaking-practice-set';
 import { studiedWeekdays, vietnamWeekStart } from './study-week.logic';
+import {
+  LISTENING_CATALOG_QUIZ,
+  SPEAKING_CATALOG_EXERCISE,
+  WRITING_CATALOG_QUIZ,
+} from './skill-catalog.where';
 
 const CROSS_SKILL_SAMPLE_SIZE = 3;
 
@@ -792,7 +797,7 @@ export class UserService {
       stats,
     ] = await Promise.all([
       this.prisma.submission.findMany({
-        where: { userId, quiz: { type: QuizType.LISTENING_PRACTICE } },
+        where: { userId, quiz: LISTENING_CATALOG_QUIZ },
         orderBy: { submittedAt: 'asc' },
         include: {
           quiz: {
@@ -809,7 +814,11 @@ export class UserService {
         },
       }),
       this.prisma.speakingSubmission.findMany({
-        where: { userId, status: 'COMPLETED' },
+        where: {
+          userId,
+          status: 'COMPLETED',
+          exercise: SPEAKING_CATALOG_EXERCISE,
+        },
         orderBy: { submittedAt: 'asc' },
         select: {
           id: true,
@@ -820,17 +829,7 @@ export class UserService {
         },
       }),
       this.prisma.submission.findMany({
-        where: {
-          userId,
-          quiz: {
-            type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
-            practiceTopic: {
-              category: {
-                in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
-              },
-            },
-          },
-        },
+        where: { userId, quiz: WRITING_CATALOG_QUIZ },
         orderBy: { submittedAt: 'asc' },
         include: {
           quiz: {
@@ -867,7 +866,7 @@ export class UserService {
     const speakingRowsRaw =
       typeof this.prisma.speakingExercise.findMany === 'function'
         ? await this.prisma.speakingExercise.findMany({
-            where: { title: { not: '' }, targetText: { not: '' } },
+            where: SPEAKING_CATALOG_EXERCISE,
             select: {
               id: true,
               title: true,
@@ -887,10 +886,7 @@ export class UserService {
       speakingRows.length > 0
         ? speakingSets.size
         : await this.prisma.speakingExercise.count({
-            where: {
-              title: { not: '' },
-              targetText: { not: '' },
-            },
+            where: SPEAKING_CATALOG_EXERCISE,
           });
     const speakingCatalogCount = Number.isFinite(speakingCatalogCountRaw)
       ? Math.max(0, Math.floor(speakingCatalogCountRaw))
@@ -898,14 +894,7 @@ export class UserService {
 
     // Each picture of "Viết câu theo tranh" is its own exercise (owner
     // 2026-11-24): the total counts pictures, not their sets.
-    const writingCatalogWhere = {
-      type: { in: [QuizType.WRITING_PICTURE, QuizType.WRITING_EMAIL] },
-      practiceTopic: {
-        category: {
-          in: [TopicCategory.WRITING_PART1, TopicCategory.WRITING_PART2],
-        },
-      },
-    };
+    const writingCatalogWhere = WRITING_CATALOG_QUIZ;
     const pictureTaskWhere = {
       path: ['taskType'],
       equals: 'PICTURE_SENTENCE',
@@ -928,7 +917,7 @@ export class UserService {
       pictureSetCount,
       pictureTaskCount,
     ] = await Promise.all([
-      countQuizSafely({ type: QuizType.LISTENING_PRACTICE }),
+      countQuizSafely(LISTENING_CATALOG_QUIZ),
       countQuizSafely({
         type: QuizType.BILINGUAL_READING,
         publicationStatus: QuizPublicationStatus.PUBLISHED,
