@@ -17,6 +17,7 @@ import {
   dungeonXp,
   floorIntroMs,
   RUN_INTRO_MS,
+  hardWordsOfRun,
   hitDamage,
   isBossFloor,
   issueQuestion,
@@ -451,5 +452,50 @@ describe('topping text (owner 2026-11-10: plain words, real numbers)', () => {
     expect(held[1].line).toContain('Đã dùng');
     expect(held[2].line).toBe('Đã tăng 50 máu tối đa.');
     expect(toppingsHeld(newRun(1, 'free'))).toEqual([]);
+  });
+});
+
+describe("the learner's hard words in a free run (thesis supervisor 2026-11-26)", () => {
+  const flaggedBank = () => {
+    const bank = bankFor(7);
+    bank[0] = { ...bank[0], oftenForgotten: true };
+    return bank;
+  };
+
+  it('marks the question for the browser, and only that one', () => {
+    const bank = flaggedBank();
+    const first = issueQuestion(newRun(7, 'free'), bank);
+    expect(first.publicView.oftenForgotten).toBe(true);
+    expect(JSON.stringify(first.publicView)).not.toMatch(/answers|display/);
+    const plain = issueQuestion(newRun(7, 'free'), bankFor(7));
+    expect(plain.publicView).not.toHaveProperty('oftenForgotten');
+  });
+
+  it('counts the first answer of a hard word, right or wrong, once', () => {
+    const bank = flaggedBank();
+    const run = newRun(7, 'free');
+    const issued = issueQuestion(run, bank);
+    const q = issued.question;
+    if (q.type !== 'choice') throw new Error('expected a choice question');
+    const right = applyAnswer(issued.run, q, 0, q.correct, 1000, true);
+    expect(hardWordsOfRun(right.run)).toEqual({ hit: 1, total: 1 });
+    const wrong = applyAnswer(
+      issued.run,
+      q,
+      0,
+      (q.correct + 1) % 4,
+      1000,
+      true,
+    );
+    expect(hardWordsOfRun(wrong.run)).toEqual({ hit: 0, total: 1 });
+    // The word comes back after a miss: answering it right then changes nothing.
+    const again = applyAnswer(wrong.run, q, 0, q.correct, 1000, true);
+    expect(hardWordsOfRun(again.run)).toEqual({ hit: 0, total: 1 });
+  });
+
+  it('an ordinary question counts nothing, and an old run reads as zero', () => {
+    const { run } = answer(newRun(7, 'free'), bankFor(7), true);
+    expect(hardWordsOfRun(run)).toEqual({ hit: 0, total: 0 });
+    expect(hardWordsOfRun({})).toEqual({ hit: 0, total: 0 });
   });
 });

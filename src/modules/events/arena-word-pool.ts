@@ -1,4 +1,5 @@
 import { levelRank, type ArenaWord } from './arena-questions.logic';
+import type { HardWordRow } from './hard-words.logic';
 
 /**
  * The words both Arena games draw from (the 1v1 duel and Pháo Bánh Mì):
@@ -66,4 +67,50 @@ export async function loadAllReviewedWords(
 ): Promise<ArenaWord[]> {
   const rows = await prisma.dictionaryEntry.findMany({ where: REVIEWED });
   return rows.map(toArenaWord);
+}
+
+type ProgressRow = {
+  lapses: number;
+  easeFactor: number;
+  nextReviewAt: Date | null;
+  word: { entryId: number | null } | null;
+};
+
+// The rows are shaped by the `select` below; Prisma's own return type is
+// generic over the arguments, so the reader is kept loose here.
+type ProgressReader = {
+  userVocabWordProgress: { findMany: (args: any) => Promise<unknown[]> };
+};
+
+/**
+ * The learner's hard flashcard words (a lapse or a lowered ease), as
+ * dictionary entries: the single-player games ask some of them again
+ * (thesis supervisor 2026-11-26). Read only.
+ */
+export async function loadHardWords(
+  prisma: ProgressReader,
+  userId: number,
+): Promise<HardWordRow[]> {
+  const rows = (await prisma.userVocabWordProgress.findMany({
+    where: {
+      userId,
+      OR: [{ lapses: { gt: 0 } }, { easeFactor: { lt: 2.5 } }],
+    },
+    select: {
+      lapses: true,
+      easeFactor: true,
+      nextReviewAt: true,
+      word: { select: { entryId: true } },
+    },
+    orderBy: { nextReviewAt: 'asc' },
+    take: 200,
+  })) as ProgressRow[];
+  return rows
+    .filter((r) => typeof r.word?.entryId === 'number')
+    .map((r) => ({
+      entryId: r.word!.entryId!,
+      lapses: r.lapses,
+      easeFactor: r.easeFactor,
+      nextReviewAt: r.nextReviewAt,
+    }));
 }

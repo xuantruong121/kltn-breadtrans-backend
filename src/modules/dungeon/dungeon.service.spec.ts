@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DungeonService } from './dungeon.service';
 import {
   monsterHit,
+  type BankEntry,
   type DungeonQuestion,
   type RunState,
 } from './dungeon.logic';
@@ -64,7 +65,8 @@ const entries = Array.from({ length: 120 }, (_, i) => ({
 
 type Stored = {
   run: RunState;
-  question: { q: DungeonQuestion; issuedAt: number } | null;
+  bank: BankEntry[];
+  question: { q: DungeonQuestion; bankIndex: number; issuedAt: number } | null;
 };
 
 describe('DungeonService', () => {
@@ -79,6 +81,7 @@ describe('DungeonService', () => {
   let service: DungeonService;
   let now: number;
   let findMany: jest.Mock;
+  let hardWords: jest.Mock;
 
   beforeEach(() => {
     redis = new FakeRedis();
@@ -104,8 +107,11 @@ describe('DungeonService', () => {
         ),
     };
     findMany = jest.fn().mockResolvedValue(entries);
+    // The learner's hard flashcard words; none unless a test says so.
+    hardWords = jest.fn().mockResolvedValue([]);
     const prisma = {
       dictionaryEntry: { findMany },
+      userVocabWordProgress: { findMany: hardWords },
       pointHistory: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { points: 0 } }),
       },
@@ -343,6 +349,71 @@ describe('DungeonService', () => {
     expect(await service.sweepIdle(now + 4 * 60_000)).toBe(1);
     expect(stored(view.sessionId)).toMatchObject({
       result: expect.objectContaining({ floor: 1 }),
+    });
+  });
+
+  describe("the learner's hard flashcard words (thesis supervisor 2026-11-26)", () => {
+    const hardRow = (entryId: number) => ({
+      lapses: 1,
+      easeFactor: 2.3,
+      nextReviewAt: new Date(0),
+      word: { entryId },
+    });
+
+    it('a free run asks them within the first 20 questions', async () => {
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17), hardRow(33)]);
+      const view = await service.start(1, 'free');
+      const bank = stored(view.sessionId).bank;
+      const flagged = bank
+        .map((entry, i) => (entry.oftenForgotten ? i : -1))
+        .filter((i) => i >= 0);
+      expect(flagged).toEqual([3, 10, 16]);
+      expect(
+        flagged
+          .map((i) => (bank[i].choice as { wordId: number }).wordId)
+          .sort(),
+      ).toEqual([17, 33, 5].sort());
+      // Each of the three is asked once in the bank.
+      const ids = bank.map((e) => (e.choice as { wordId: number }).wordId);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(JSON.stringify(view)).not.toMatch(/answers|bank|"display"/);
+    });
+
+    it('the day dungeon stays the same for everyone and reads no hard words', async () => {
+      const plain = await service.start(1, 'daily');
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17)]);
+      const other = await service.start(2, 'daily');
+      expect(hardWords).not.toHaveBeenCalled();
+      expect(other.question).toEqual(plain.question);
+      expect(
+        stored(other.sessionId).bank.some((entry) => entry.oftenForgotten),
+      ).toBe(false);
+      expect(stored(other.sessionId).bank).toEqual(
+        stored(plain.sessionId).bank,
+      );
+    });
+
+    it('the result counts the hard words answered right the first time', async () => {
+      const view = await service.start(1, 'free');
+      const id = view.sessionId;
+      // Make the question now out one of the learner's hard words.
+      patch(id, (s) => {
+        const at = (s.question as { bankIndex: number }).bankIndex;
+        s.bank[at].oftenForgotten = true;
+      });
+      now += 5000;
+      await service.answer(1, id, rightAnswer(id));
+      const end = await service.finish(1, id, true);
+      expect(end.result?.hardWords).toEqual({ hit: 1, total: 1 });
+    });
+
+    it('still opens a free run when the hard words cannot be read', async () => {
+      hardWords.mockRejectedValue(new Error('db busy'));
+      const view = await service.start(1, 'free');
+      expect(view.phase).toBe('fight');
+      expect(
+        stored(view.sessionId).bank.some((entry) => entry.oftenForgotten),
+      ).toBe(false);
     });
   });
 });

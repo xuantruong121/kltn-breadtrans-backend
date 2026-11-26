@@ -279,4 +279,42 @@ describe('buildArenaQuestions', () => {
       buildArenaQuestions(pool.slice(0, 5), 10, seeded(3)).length,
     ).toBeLessThan(10);
   });
+
+  describe('pinned rounds (hard words in the free Hầm Bánh Mì, 2026-11-26)', () => {
+    // Two B2 nouns: by level alone they would come in the last rounds only.
+    const first = pool.find((w) => w.headword === 'nounccxa')!;
+    const second = pool.find((w) => w.headword === 'nounccxb')!;
+
+    it('asks the pinned word in its round and nowhere else', () => {
+      for (let seed = 1; seed <= 20; seed += 1) {
+        const qs = buildArenaQuestions(pool, ARENA_ROUNDS, seeded(seed), {
+          pinned: new Map([
+            [1, first.id],
+            [4, second.id],
+          ]),
+        });
+        expect(qs).toHaveLength(ARENA_ROUNDS);
+        expect(qs[1].id).toBe(first.id);
+        expect(qs[4].id).toBe(second.id);
+        expect(new Set(qs.map((q) => q.id)).size).toBe(ARENA_ROUNDS);
+        // Still a fair question: four options, the right one among them.
+        expect(qs[1].options).toHaveLength(4);
+        expect(qs[1].options).toContain(qs[1].correctAnswer);
+      }
+    });
+
+    it('ignores a pin on a word that is not in the pool', () => {
+      const plain = buildArenaQuestions(pool, ARENA_ROUNDS, seeded(6));
+      const pinned = buildArenaQuestions(pool, ARENA_ROUNDS, seeded(6), {
+        pinned: new Map([[2, 999_999]]),
+      });
+      expect(pinned).toEqual(plain);
+    });
+
+    it('without pins the questions are what they always were (the duel)', () => {
+      expect(buildArenaQuestions(pool, ARENA_ROUNDS, seeded(8), {})).toEqual(
+        buildArenaQuestions(pool, ARENA_ROUNDS, seeded(8)),
+      );
+    });
+  });
 });

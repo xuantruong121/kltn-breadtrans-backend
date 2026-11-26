@@ -19,7 +19,18 @@ import {
   vietnamDayStart,
   type ArenaWord,
 } from '../events/arena-questions.logic';
-import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
+import {
+  loadAllReviewedWords,
+  loadDeckWords,
+  loadHardWords,
+} from '../events/arena-word-pool';
+import {
+  HARD_WORDS_SPAN,
+  hardWordOrder,
+  pickHardWords,
+  spreadIndexes,
+  type HardTally,
+} from '../events/hard-words.logic';
 import {
   BANK_SIZE,
   DUNGEON_MODES,
@@ -35,6 +46,7 @@ import {
   dungeonXp,
   floorIntroMs,
   RUN_INTRO_MS,
+  hardWordsOfRun,
   hashSeed,
   issueQuestion,
   newRun,
@@ -88,6 +100,12 @@ export type DungeonResult = {
   record: boolean;
   /** Place on today's board (day's dungeon only). */
   dailyRank: number | null;
+  /**
+   * The learner's hard flashcard words asked in this run: right the first
+   * time out of asked (free dungeon only; counts, never the words). Missing
+   * on results stored before 2026-11-26.
+   */
+  hardWords?: HardTally;
 };
 
 export type DungeonView = {
@@ -210,7 +228,12 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         'Hôm nay bạn đã vào Hầm hôm nay rồi. Mai quay lại nhé, hoặc thử Hầm tự do.',
       );
     const seed = daily?.seed ?? hashSeed(randomUUID());
-    const bank = await this.buildBank(seed);
+    // The day's dungeon asks everyone the same (its board compares floors);
+    // only a free run brings in the learner's own hard words (owner 2026-11-26).
+    const bank = await this.buildBank(
+      seed,
+      daily ? [] : await this.hardWordIds(userId),
+    );
     if (bank.length < MIN_BANK)
       throw new BadRequestException(
         'Chưa đủ từ vựng để mở hầm. Vui lòng thử lại sau.',
@@ -317,6 +340,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         bankIndex,
         value,
         Math.max(0, Date.now() - issuedAt),
+        Boolean(session.bank[bankIndex]?.oftenForgotten),
       );
       session.run = step.run;
       session.last = step.outcome;
@@ -444,19 +468,49 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
   // ------------------------------------------------------------------ inside
 
   /**
+   * The learner's hard flashcard words, due ones first (thesis supervisor
+   * 2026-11-26). A run never fails to open because this read failed.
+   */
+  private async hardWordIds(userId: number): Promise<number[]> {
+    try {
+      const rows = await loadHardWords(this.prisma, userId);
+      return hardWordOrder(rows, new Date(), Math.random);
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] hard words of user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return [];
+    }
+  }
+
+  /**
    * The run's questions. Words are sorted by id first: the database returns
    * them in no set order, and the day's dungeon must ask everyone the same.
+   * `hardIds` (free runs only): up to six of the learner's hard words are
+   * asked within the first 20 questions; without them the bank is unchanged.
    */
-  private async buildBank(seed: number): Promise<BankEntry[]> {
+  private async buildBank(
+    seed: number,
+    hardIds: readonly number[] = [],
+  ): Promise<BankEntry[]> {
     const make = (pool: ArenaWord[]) => {
       const words = [...pool].sort((a, b) => a.id - b.id);
       const byId = new Map(words.map((w) => [w.id, w]));
       const rng = seededRng(seed);
-      return buildArenaQuestions(words, BANK_SIZE, rng)
+      const hard = pickHardWords(words, hardIds);
+      const places = spreadIndexes(hard.length, HARD_WORDS_SPAN);
+      const hardSet = new Set(hard.map((w) => w.id));
+      const questions = hard.length
+        ? buildArenaQuestions(words, BANK_SIZE, rng, {
+            pinned: new Map(places.map((place, k) => [place, hard[k].id])),
+          })
+        : buildArenaQuestions(words, BANK_SIZE, rng);
+      return questions
         .filter((q) => byId.has(q.id))
         .map((q) => ({
           choice: choiceQuestion(q, rng),
           typed: typedQuestion(byId.get(q.id)!, words),
+          ...(hardSet.has(q.id) ? { oftenForgotten: true } : {}),
         }));
     };
     let bank = make(await loadDeckWords(this.prisma));
@@ -573,6 +627,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       xp,
       record: before === null || run.floor > before,
       dailyRank,
+      hardWords: hardWordsOfRun(run),
     };
     session.question = null;
     await this.save(session, RESULT_TTL_S);

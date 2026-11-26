@@ -15,6 +15,7 @@ import {
   blasterPayout,
   blasterXp,
   buildBlasterRound,
+  hardWordTally,
   landsAt,
   matchShot,
   missingLetters,
@@ -163,9 +164,66 @@ describe('buildBlasterRound', () => {
       'id',
       'kind',
       'lane',
+      'oftenForgotten',
       'prompt',
       'spawnAtMs',
     ]);
+    expect(view.every((b) => b.oftenForgotten === false)).toBe(true);
+  });
+});
+
+describe("buildBlasterRound with the learner's hard words (2026-11-26)", () => {
+  // Level 4 words: by level alone they would only come in the last blocks.
+  const hard = pool.filter((w) => w.level === 4).slice(0, 8);
+  const hardIds = hard.map((w) => w.id);
+
+  it.each(BLASTER_MODES)(
+    '%s: six hard words at spread places, the rest chosen as before',
+    (mode) => {
+      const blocks = buildBlasterRound(pool, seeded(5), mode, { hardIds });
+      expect(blocks).toHaveLength(BLASTER_BLOCKS);
+      expect(new Set(blocks.map((b) => b.word.id)).size).toBe(20);
+      const flagged = blocks
+        .map((b, i) => (b.oftenForgotten ? i : -1))
+        .filter((i) => i >= 0);
+      expect(flagged).toEqual([1, 5, 8, 11, 15, 18]);
+      // In the order given: the first six of the list.
+      expect(flagged.map((i) => blocks[i].word.id)).toEqual(
+        hardIds.slice(0, 6),
+      );
+      // The two left over are not asked as ordinary blocks before their stage.
+      for (const b of blocks.filter((x) => !x.oftenForgotten))
+        expect(hardIds.slice(0, 6)).not.toContain(b.word.id);
+      expect(publicBlocks(blocks).filter((b) => b.oftenForgotten)).toHaveLength(
+        6,
+      );
+    },
+  );
+
+  it('skips ids that are unknown or do not suit the mode', () => {
+    const short = pool.find((w) => w.headword === 'the')!;
+    const blocks = buildBlasterRound(pool, seeded(2), 'missing', {
+      hardIds: [999_999, short.id, hardIds[0]],
+    });
+    const flagged = blocks.filter((b) => b.oftenForgotten);
+    expect(flagged.map((b) => b.word.id)).toEqual([hardIds[0]]);
+    expect(blocks.indexOf(flagged[0])).toBe(10);
+  });
+
+  it('no hard words: the game is exactly what it was', () => {
+    expect(buildBlasterRound(pool, seeded(9), 'copy', { hardIds: [] })).toEqual(
+      buildBlasterRound(pool, seeded(9), 'copy'),
+    );
+  });
+
+  it('counts the hard words broken, never the words themselves', () => {
+    const blocks = buildBlasterRound(pool, seeded(5), 'copy', { hardIds });
+    const flagged = blocks.filter((b) => b.oftenForgotten);
+    const hits = { [flagged[0].id]: 5000, [flagged[2].id]: 9000, 1: 4000 };
+    expect(hardWordTally(blocks, hits)).toEqual({ hit: 2, total: 6 });
+    expect(
+      hardWordTally(buildBlasterRound(pool, seeded(5), 'copy'), hits),
+    ).toEqual({ hit: 0, total: 0 });
   });
 });
 

@@ -253,9 +253,23 @@ export function buildArenaQuestions(
   pool: readonly ArenaWord[],
   count: number,
   rng: () => number,
+  /**
+   * Round index → word id: that round asks this word (the learner's hard
+   * words in the free Hầm Bánh Mì, 2026-11-26). The other rounds do not
+   * take these words. Without it the output is what it always was.
+   */
+  opts: { pinned?: ReadonlyMap<number, number> } = {},
 ): ArenaQuestion[] {
   const words = pool.filter(isDuelWord);
   const kinds = kindsFor(count, rng);
+  const pinnedWord = new Map<number, ArenaWord>();
+  for (const [round, id] of opts.pinned ?? []) {
+    const w = words.find((x) => x.id === id);
+    if (w) pinnedWord.set(round, w);
+  }
+  const reserved = new Set(
+    [...pinnedWord.values()].map((w) => w.headword.toLowerCase()),
+  );
 
   // 1. Targets, round by round, distinct headwords.
   const usedHeadwords = new Set<string>();
@@ -263,20 +277,28 @@ export function buildArenaQuestions(
   for (let round = 0; round < count; round += 1) {
     let kind = kinds[round];
     let picked: ArenaWord | undefined;
-    // No word left for this kind (e.g. no usable example): any other kind.
-    const tryKinds = [kind, ...kindsFor(3, rng).filter((k) => k !== kind)];
-    search: for (const accepts of widen(stageLevels(round, count))) {
-      for (const k of tryKinds) {
-        const candidates = words.filter(
-          (w) =>
-            accepts(w) &&
-            fitsKind(w, k) &&
-            !usedHeadwords.has(w.headword.toLowerCase()),
-        );
-        if (candidates.length) {
-          picked = candidates[Math.floor(rng() * candidates.length)];
-          kind = k;
-          break search;
+    const pin = pinnedWord.get(round);
+    if (pin && !usedHeadwords.has(pin.headword.toLowerCase())) {
+      picked = pin;
+      if (!fitsKind(pin, kind))
+        kind = kind === 'fill_blank' ? 'meaning_to_word' : kind;
+    } else {
+      // No word left for this kind (e.g. no usable example): any other kind.
+      const tryKinds = [kind, ...kindsFor(3, rng).filter((k) => k !== kind)];
+      search: for (const accepts of widen(stageLevels(round, count))) {
+        for (const k of tryKinds) {
+          const candidates = words.filter(
+            (w) =>
+              accepts(w) &&
+              fitsKind(w, k) &&
+              !usedHeadwords.has(w.headword.toLowerCase()) &&
+              !reserved.has(w.headword.toLowerCase()),
+          );
+          if (candidates.length) {
+            picked = candidates[Math.floor(rng() * candidates.length)];
+            kind = k;
+            break search;
+          }
         }
       }
     }

@@ -13,7 +13,12 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ARENA_XP_REASON } from '../events/arena-questions.logic';
-import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
+import {
+  loadAllReviewedWords,
+  loadDeckWords,
+  loadHardWords,
+} from '../events/arena-word-pool';
+import { hardWordOrder, type HardTally } from '../events/hard-words.logic';
 import {
   BLASTER_BLOCKS,
   BLASTER_MODES,
@@ -24,6 +29,7 @@ import {
   blasterPayout,
   blasterXp,
   buildBlasterRound,
+  hardWordTally,
   matchShot,
   publicBlocks,
   pullForward,
@@ -59,6 +65,12 @@ export type BlasterResult = {
   /** Part of the bonus withheld by the 150 a day cap. */
   bonusCapped: number;
   xp: number;
+  /**
+   * The learner's hard flashcard words in this game: broken out of asked.
+   * Counts only; the result never lists words (owner 2026-11-08). Missing
+   * on results stored before 2026-11-26.
+   */
+  hardWords?: HardTally;
 };
 
 export type BlasterView = {
@@ -147,11 +159,12 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
     const open = await this.current(userId);
     if (open) return open;
 
+    const hardIds = await this.hardWordIds(userId);
     let words = await loadDeckWords(this.prisma);
-    let blocks = buildBlasterRound(words, Math.random, mode);
+    let blocks = buildBlasterRound(words, Math.random, mode, { hardIds });
     if (blocks.length < BLASTER_BLOCKS) {
       words = await loadAllReviewedWords(this.prisma);
-      blocks = buildBlasterRound(words, Math.random, mode);
+      blocks = buildBlasterRound(words, Math.random, mode, { hardIds });
     }
     if (blocks.length < BLASTER_BLOCKS)
       throw new BadRequestException(
@@ -206,6 +219,22 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       );
     }
     return this.view(session);
+  }
+
+  /**
+   * The learner's hard flashcard words, due ones first (thesis supervisor
+   * 2026-11-26). A game never fails to open because this read failed.
+   */
+  private async hardWordIds(userId: number): Promise<number[]> {
+    try {
+      const rows = await loadHardWords(this.prisma, userId);
+      return hardWordOrder(rows, new Date(), Math.random);
+    } catch (err) {
+      this.logger.warn(
+        `[Blaster] hard words of user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return [];
+    }
   }
 
   /** The learner's open game, if any (e.g. after a page reload). */
@@ -360,6 +389,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       net: outcome === 'win' ? bonusGranted : -session.stake,
       bonusCapped: bonus - bonusGranted,
       xp,
+      hardWords: hardWordTally(session.blocks, session.hits),
     };
     await this.save(session, RESULT_TTL_S);
     await this.redis.zrem(KEY.open, session.id);

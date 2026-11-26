@@ -20,6 +20,7 @@ import {
   meaningsClash,
   POS_VI,
 } from '../events/arena-questions.logic';
+import type { HardTally } from '../events/hard-words.logic';
 import {
   letterHint,
   normalizeAnswer,
@@ -396,8 +397,12 @@ export const typedIsRight = (
   text: string,
 ) => q.answers.includes(normalizeAnswer(text));
 
-/** What the browser sees of a question: no answer. `removed`: options a topping struck out. */
-export type PublicQuestion =
+/**
+ * What the browser sees of a question: no answer. `removed`: options a topping
+ * struck out. `oftenForgotten`: one of the learner's hard flashcard words
+ * (free dungeon only, thesis supervisor 2026-11-26).
+ */
+export type PublicQuestion = (
   | {
       type: 'choice';
       kind: ArenaQuestion['kind'];
@@ -412,7 +417,8 @@ export type PublicQuestion =
       pos: string | null;
       hint: string;
       revealed: string;
-    };
+    }
+) & { oftenForgotten?: boolean };
 
 export function publicQuestion(
   q: DungeonQuestion,
@@ -492,7 +498,12 @@ export function dungeonXp(correct: number, earnedToday: number): number {
 // ---------------------------------------------------------------- a run
 
 /** Each word of the run, as a monster question and as a boss question. */
-export type BankEntry = { choice: DungeonQuestion; typed: DungeonQuestion };
+export type BankEntry = {
+  choice: DungeonQuestion;
+  typed: DungeonQuestion;
+  /** One of the learner's hard flashcard words (free dungeon only). */
+  oftenForgotten?: boolean;
+};
 
 export type Monster = {
   kind: MonsterKind;
@@ -524,7 +535,21 @@ export type RunState = {
   bossesDown: number;
   bankCursor: number;
   retries: Retry[];
+  /**
+   * Bank places of the learner's hard words already asked, and how many of
+   * them were answered right the first time. Missing on runs stored before
+   * 2026-11-26.
+   */
+  hardSeen?: number[];
+  hardRight?: number;
 };
+
+/** "Đúng 3/4 từ bạn hay quên": first answers only, a retry does not count again. */
+export function hardWordsOfRun(
+  run: Pick<RunState, 'hardSeen' | 'hardRight'>,
+): HardTally {
+  return { hit: run.hardRight ?? 0, total: (run.hardSeen ?? []).length };
+}
 
 function enterFloor(run: RunState, floor: number): RunState {
   const hp = monsterHp(floor);
@@ -605,11 +630,10 @@ export function issueQuestion(
     },
     bankIndex,
     question,
-    publicView: publicQuestion(
-      question,
-      removed,
-      bossHintLetters(run.toppings),
-    ),
+    publicView: {
+      ...publicQuestion(question, removed, bossHintLetters(run.toppings)),
+      ...(entry.oftenForgotten ? { oftenForgotten: true } : {}),
+    },
   };
 }
 
@@ -630,6 +654,8 @@ export type AnswerOutcome = {
 /**
  * Applies one answer. `given` is the option index or the typed text; null is
  * a timeout. `elapsedMs` is the server's time since the question went out.
+ * `oftenForgotten`: the question asks one of the learner's hard words; its
+ * first answer is counted for the result.
  */
 export function applyAnswer(
   run: RunState,
@@ -637,6 +663,7 @@ export function applyAnswer(
   bankIndex: number,
   given: number | string | null,
   elapsedMs: number,
+  oftenForgotten = false,
 ): { run: RunState; outcome: AnswerOutcome } {
   const limit = questionTimeMs(run.floor, run.monster.boss, run.toppings);
   const timedOut = given === null || elapsedMs > limit + ANSWER_GRACE_MS;
@@ -654,6 +681,11 @@ export function applyAnswer(
     answered: run.answered + 1,
     retries: [...run.retries],
   };
+  const seen = run.hardSeen ?? [];
+  if (oftenForgotten && !seen.includes(bankIndex)) {
+    next.hardSeen = [...seen, bankIndex];
+    next.hardRight = (run.hardRight ?? 0) + (right ? 1 : 0);
+  }
   const outcome: AnswerOutcome = {
     right,
     timedOut,
