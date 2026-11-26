@@ -314,10 +314,6 @@ async function main() {
         planFree: Number(q('SELECT count(*) FROM "Plan" WHERE code=\'FREE\'')),
         planPlus: Number(q('SELECT count(*) FROM "Plan" WHERE code=\'PLUS\'')),
         planPro: Number(q('SELECT count(*) FROM "Plan" WHERE code=\'PRO\'')),
-        courses: Number(q('SELECT count(*) FROM "Course"')),
-        ipaCourseLessons: Number(
-          q('SELECT count(*) FROM "CourseLesson" WHERE "courseId"=12'),
-        ),
         vocabWords: Number(q('SELECT count(*) FROM "VocabWord"')),
         toeicExamSets: Number(q('SELECT count(*) FROM "ToeicExamSet"')),
         toeicAssessments: Number(q('SELECT count(*) FROM "ToeicAssessment"')),
@@ -335,7 +331,8 @@ async function main() {
       if (assertions.migrations <= 0) failures.push('_prisma_migrations empty');
       if (!assertions.planFree || !assertions.planPlus || !assertions.planPro)
         failures.push('FREE/PLUS/PRO plan missing');
-      if (assertions.courses <= 0) failures.push('no courses');
+      // No course check: Course and CourseLesson went with the courses
+      // (2026-11-01), so the drill failed on every dump made since.
       if (assertions.toeicExamSets <= 0) failures.push('no TOEIC exam sets');
       result.remoteRestoreFailures = failures;
       result.remoteValid = failures.length === 0;
