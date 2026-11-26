@@ -54,61 +54,13 @@ import {
   deckStatsFromEntries,
   vocabDeckProblems,
 } from './vocab-deck-readiness';
-
-export const DASHBOARD_RANGES = ['30d', '6m', '12m'] as const;
-export type DashboardRange = (typeof DASHBOARD_RANGES)[number];
-
-export function normalizeDashboardRange(value?: string): DashboardRange {
-  return DASHBOARD_RANGES.includes(value as DashboardRange)
-    ? (value as DashboardRange)
-    : '6m';
-}
-
-export function buildDashboardBuckets(range: DashboardRange, now = new Date()) {
-  if (range === '30d') {
-    return Array.from({ length: 30 }, (_, index) => {
-      const start = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() - (29 - index),
-        0,
-        0,
-        0,
-        0,
-      );
-      const end = new Date(
-        start.getFullYear(),
-        start.getMonth(),
-        start.getDate(),
-        23,
-        59,
-        59,
-        999,
-      );
-      return {
-        label: `${start.getDate()}/${start.getMonth() + 1}`,
-        start,
-        end,
-      };
-    });
-  }
-
-  const monthCount = range === '12m' ? 12 : 6;
-  return Array.from({ length: monthCount }, (_, index) => {
-    const offset = monthCount - 1 - index;
-    const start = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const end = new Date(
-      start.getFullYear(),
-      start.getMonth() + 1,
-      0,
-      23,
-      59,
-      59,
-      999,
-    );
-    return { label: `T${start.getMonth() + 1}`, start, end };
-  });
-}
+import {
+  buildDashboardBuckets,
+  learnedWithin,
+  normalizeDashboardRange,
+  previousDashboardStart,
+} from './admin-dashboard.logic';
+import { ACTIVE_ACCOUNT } from '../account/account-deletion.logic';
 
 const SYSTEM_DICTIONARY_CATEGORY = 'SYSTEM_DICTIONARY';
 
@@ -147,9 +99,16 @@ export class AdminService {
   ) {}
 
   async getDashboardStats(requestedRange?: string) {
+    const now = new Date();
     const range = normalizeDashboardRange(requestedRange);
-    const buckets = buildDashboardBuckets(range);
+    const buckets = buildDashboardBuckets(range, now);
     const rangeStart = buckets[0].start;
+    // The period before, for the "Kỳ trước" figures beside the main ones.
+    const previousStart = previousDashboardStart(range, now);
+    const inRange = { gte: rangeStart };
+    const inPrevious = { gte: previousStart, lt: rangeStart };
+    const weekAhead = new Date(now.getTime() + 7 * 86_400_000);
+    const paidPlan = { planVersion: { plan: { code: { not: 'FREE' } } } };
 
     const [
       totalStudents,
@@ -172,40 +131,21 @@ export class AdminService {
       openIssueReports,
       completedRevenueAgg,
       activeSubscriptionsCount,
+      previousActiveStudents,
+      newStudents,
+      previousNewStudents,
+      newStudentsWithDiagnostic,
+      previousRevenueAgg,
+      plansEndingSoon,
+      oldestPayment,
+      oldestOrder,
+      oldestIssueReport,
+      oldestSupportMessage,
+      oldestSuggestion,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
       this.prisma.user.count({
-        where: {
-          role: Role.STUDENT,
-          OR: [
-            { lastLoginAt: { gte: rangeStart } },
-            {
-              learningActivities: {
-                some: { occurredAt: { gte: rangeStart } },
-              },
-            },
-            { submissions: { some: { submittedAt: { gte: rangeStart } } } },
-            {
-              speakingSubmissions: {
-                some: { submittedAt: { gte: rangeStart } },
-              },
-            },
-            {
-              diagnosticAttempts: {
-                some: { submittedAt: { gte: rangeStart } },
-              },
-            },
-            {
-              contentAttempts: {
-                some: { submittedAt: { gte: rangeStart } },
-              },
-            },
-            {
-              grammarAttempts: { some: { createdAt: { gte: rangeStart } } },
-            },
-            { toeicAttempts: { some: { createdAt: { gte: rangeStart } } } },
-          ],
-        },
+        where: { role: Role.STUDENT, OR: learnedWithin(inRange) },
       }),
       this.prisma.planPayment.count({
         where: {
@@ -274,8 +214,92 @@ export class AdminService {
       this.prisma.subscription.count({
         where: {
           status: SubscriptionStatus.ACTIVE,
-          endsAt: { gt: new Date() },
+          endsAt: { gt: now },
         },
+      }),
+      this.prisma.user.count({
+        where: { role: Role.STUDENT, OR: learnedWithin(inPrevious) },
+      }),
+      this.prisma.user.count({
+        where: { role: Role.STUDENT, createdAt: inRange },
+      }),
+      this.prisma.user.count({
+        where: { role: Role.STUDENT, createdAt: inPrevious },
+      }),
+      // New learners who finished the entry assessment; only the completion
+      // is counted, never a level or a score.
+      this.prisma.user.count({
+        where: {
+          role: Role.STUDENT,
+          createdAt: inRange,
+          diagnosticAttempts: { some: { status: 'COMPLETED' } },
+        },
+      }),
+      this.prisma.planPurchase.aggregate({
+        where: {
+          status: PlanPurchaseStatus.COMPLETED,
+          completedAt: inPrevious,
+        },
+        _sum: { amountVnd: true },
+        _count: { id: true },
+      }),
+      // Learners whose paid plan ends within 7 days with nothing after it:
+      // no queued renewal and no other paid plan running past the week, the
+      // same rule as the expiry reminder.
+      this.prisma.user.count({
+        where: {
+          role: Role.STUDENT,
+          ...ACTIVE_ACCOUNT,
+          subscriptions: {
+            some: {
+              status: SubscriptionStatus.ACTIVE,
+              startsAt: { lte: now },
+              endsAt: { gt: now, lte: weekAhead },
+              ...paidPlan,
+            },
+            none: {
+              status: SubscriptionStatus.ACTIVE,
+              endsAt: { gt: weekAhead },
+              ...paidPlan,
+            },
+          },
+        },
+      }),
+      // The oldest item of each "Cần xử lý" row, for how long it has waited.
+      this.prisma.planPayment.findFirst({
+        where: {
+          status: {
+            in: [PlanPaymentStatus.REPORTED, PlanPaymentStatus.REVIEW_REQUIRED],
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true, reportedAt: true },
+      }),
+      this.prisma.marketOrder.findFirst({
+        where: { status: 'pending' },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+      this.prisma.issueReport.findFirst({
+        where: {
+          status: { in: [IssueReportStatus.NEW, IssueReportStatus.IN_REVIEW] },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+      this.prisma.supportMessage.findFirst({
+        where: { senderRole: 'STUDENT', isRead: false },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+      this.prisma.suggestion.findFirst({
+        where: {
+          status: {
+            in: [SuggestionStatus.PENDING, SuggestionStatus.REVIEWING],
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
       }),
     ]);
 
@@ -348,6 +372,20 @@ export class AdminService {
       totalRevenueVnd: completedRevenueAgg?._sum?.amountVnd ?? 0,
       completedPurchasesCount: completedRevenueAgg?._count?.id ?? 0,
       activeSubscriptionsCount: activeSubscriptionsCount ?? 0,
+      plansEndingSoon,
+      previous: {
+        totalRevenueVnd: previousRevenueAgg?._sum?.amountVnd ?? 0,
+        completedPurchasesCount: previousRevenueAgg?._count?.id ?? 0,
+      },
+    };
+
+    const waitingSince = {
+      pendingPayments:
+        oldestPayment?.reportedAt ?? oldestPayment?.createdAt ?? null,
+      pendingOrders: oldestOrder?.createdAt ?? null,
+      openIssueReports: oldestIssueReport?.createdAt ?? null,
+      unreadSupportMessages: oldestSupportMessage?.createdAt ?? null,
+      pendingSuggestions: oldestSuggestion?.createdAt ?? null,
     };
 
     return {
@@ -355,11 +393,18 @@ export class AdminService {
       stats: {
         totalStudents,
         activeStudents,
+        newStudents,
+        newStudentsWithDiagnostic,
         pendingPayments,
         unreadSupportMessages,
         pendingSuggestions,
         openIssueReports,
+        previous: {
+          activeStudents: previousActiveStudents,
+          newStudents: previousNewStudents,
+        },
       },
+      waitingSince,
       finance,
       monthlyTrends,
       contentBreakdown,

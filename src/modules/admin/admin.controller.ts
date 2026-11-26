@@ -57,7 +57,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description:
-      'range 30d|6m|12m. Doanh thu (finance) va luot doi qua (gamification.totalOrders/approvedOrders) tinh trong khoang da chon; pendingOrders, totalBreads, activeSubscriptionsCount la hien tai. monthlyTrends.activityCount gom bai nop, bai noi, ngu phap, luyen de, noi dung, danh gia dau vao. contentBreakdown: vocabDecks, grammarTopics, listeningLessons, readingLessons, writingLessons, speakingSets (chi luyen ky nang), exams, mediaTopics.',
+      'range 30d|6m|12m (mac dinh 30d), theo ngay/thang gio Viet Nam. activeStudents chi dem hoc vien co lam bai hoac hoat dong hoc trong khoang, khong dem dang nhap. stats.previous va finance.previous la cung so do cua ky truoc (30 ngay / 6 / 12 thang truoc do). newStudentsWithDiagnostic: hoc vien moi da hoan thanh bai danh gia dau vao (chi dem, khong co trinh do). finance.plansEndingSoon: hoc vien co goi tra phi het han trong 7 ngay ma khong co goi nao sau do. waitingSince: thoi diem cua muc cho lau nhat moi hang Can xu ly. Doanh thu (finance) va luot doi qua (gamification.totalOrders/approvedOrders) tinh trong khoang da chon; pendingOrders, totalBreads, activeSubscriptionsCount la hien tai. monthlyTrends.activityCount gom bai nop, bai noi, ngu phap, luyen de, noi dung, danh gia dau vao. contentBreakdown: vocabDecks, grammarTopics, listeningLessons, readingLessons, writingLessons, speakingSets (chi luyen ky nang), exams, mediaTopics.',
   })
   getDashboardStats(@Query('range') range?: string) {
     return this.adminService.getDashboardStats(range);
