@@ -13,13 +13,16 @@ import {
 } from '@nestjs/common';
 import { VocabService } from './vocab.service';
 import { isSrsGrade } from './srs.logic';
+import { parseReviewEvidence } from './review-grade.logic';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiBody,
   ApiQuery,
+  ApiResponse,
 } from '@nestjs/swagger';
 
 @ApiTags('Vocab')
@@ -118,11 +121,38 @@ export class VocabController {
   @Post('words/:id/review')
   @ApiOperation({
     summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm',
+    description:
+      'Phòng flashcard gửi `evidence` (kết quả trắc nghiệm, gõ từ, số gợi ý, phát âm, kiểm tra nhanh); máy chủ tự xếp mức nhớ và trả về `grade`. `grade` hoặc `isCorrect` vẫn được nhận cho các nơi gọi cũ.',
   })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        evidence: {
+          type: 'object',
+          properties: {
+            quiz: { enum: ['CORRECT', 'WRONG', 'SKIPPED'] },
+            typing: { enum: ['CORRECT', 'WRONG', 'SKIPPED'] },
+            typingHints: { type: 'integer', minimum: 0, maximum: 50 },
+            speaking: { enum: ['PASSED', 'FAILED', 'UNAVAILABLE', 'SKIPPED'] },
+            quickCheck: { type: 'boolean' },
+          },
+        },
+        grade: { enum: ['AGAIN', 'HARD', 'GOOD', 'EASY'] },
+        isCorrect: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tiến độ mới của từ, kèm `grade` và `xpEarned`.',
+  })
+  @ApiResponse({ status: 400, description: 'Kết quả các bước không hợp lệ.' })
   submitReview(
     @Param('id', ParseIntPipe) wordId: number,
     @Body('isCorrect') isCorrect: boolean,
     @Body('grade') grade: unknown,
+    @Body('evidence') rawEvidence: unknown,
     @Request() req: any,
   ) {
     if (grade !== undefined && grade !== null && !isSrsGrade(grade)) {
@@ -130,11 +160,19 @@ export class VocabController {
         'grade phải là AGAIN, HARD, GOOD hoặc EASY',
       );
     }
+    const evidence =
+      rawEvidence === undefined || rawEvidence === null
+        ? undefined
+        : parseReviewEvidence(rawEvidence);
+    if (evidence === null) {
+      throw new BadRequestException('Kết quả các bước học không hợp lệ.');
+    }
     return this.vocabService.submitReview(
       req.user.id,
       wordId,
       isCorrect,
       isSrsGrade(grade) ? grade : undefined,
+      evidence,
     );
   }
 }

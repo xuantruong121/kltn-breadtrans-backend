@@ -1,7 +1,8 @@
 /**
  * Review schedule of one vocabulary word for one learner: an SM-2 variant
- * with the four self-ratings of the flashcard room. Pure: no I/O, no clock
- * of its own.
+ * with four grades. The flashcard room no longer asks the learner for them:
+ * review-grade.logic decides the grade from the room's steps (2026-11-26).
+ * Pure: no I/O, no clock of its own.
  *
  * A word carries an interval (days until the next review) and an ease factor
  * (how fast that interval grows). A right answer multiplies the interval by

@@ -1,12 +1,14 @@
 /**
  * Adaptive vocabulary review on the disposable harness (owner 2026-11-11).
  *
- * API: a deck word starts with the preview of a new word; each self-rating
- * stores the word's own interval and ease and moves the preview; "Học lại"
- * brings the word back in ten minutes; a caller that only sends isCorrect
- * still works; a bad grade is refused.
- * Browser: the four rating buttons of the flashcard room show the server's
- * intervals, and pressing one stores that rating.
+ * API: a deck word starts with the preview of a new word; each grade stores
+ * the word's own interval and ease and moves the preview; "Học lại" brings the
+ * word back in ten minutes; a caller that only sends isCorrect still works; a
+ * bad grade is refused. Since 2026-11-26 the room sends `evidence` (its steps)
+ * and the server decides the grade; bad evidence is refused.
+ * Browser: the room shows no rating buttons. A word learned through the steps
+ * and a word on "Kiểm tra nhanh" get the system's grade, the interval the
+ * server previewed for it, and that row in the database.
  *
  *   HARNESS_DB=<db> [SHOTS=<dir>] npx ts-node --transpile-only scripts/qa/finalization-vocab-srs.ts
  */
@@ -137,6 +139,43 @@ async function main() {
     `${res.status}`,
   );
 
+  // The room's steps decide the grade (thesis supervisor 2026-11-26).
+  const steps = {
+    quiz: 'CORRECT',
+    typing: 'CORRECT',
+    typingHints: 0,
+    speaking: 'SKIPPED',
+    quickCheck: false,
+  };
+  res = await call('POST', `/vocab/words/${c.id}/review`, token, {
+    evidence: { ...steps, quickCheck: true },
+  });
+  r = row(userId, c.id);
+  check(
+    'a clean quick check is graded "Dễ": 4 days, known',
+    res.status < 300 &&
+      res.data?.grade === 'EASY' &&
+      r?.intervalDays === 4 &&
+      r.isMastered,
+    `${res.data?.grade} ${JSON.stringify(r)}`,
+  );
+  res = await call('POST', `/vocab/words/${c.id}/review`, token, {
+    evidence: { ...steps, typing: 'WRONG' },
+  });
+  check(
+    'a wrong typing is graded "Khó"',
+    res.status < 300 && res.data?.grade === 'HARD',
+    `${res.status} ${res.data?.grade}`,
+  );
+  res = await call('POST', `/vocab/words/${c.id}/review`, token, {
+    evidence: { ...steps, quiz: 'RIGHT' },
+  });
+  check(
+    'steps the server cannot read are refused with 400',
+    res.status === 400,
+    `${res.status}`,
+  );
+
   res = await call('POST', `/vocab/words/${b.id}/master`, token, {
     isMastered: true,
   });
@@ -147,7 +186,7 @@ async function main() {
     JSON.stringify(r),
   );
 
-  // ---- Browser: the rating buttons of the flashcard room
+  // ---- Browser: the room grades the word itself
   await page.goto(`${FE}/flashcard/${topicId}`, {
     waitUntil: 'networkidle',
     timeout: 120_000,
@@ -161,18 +200,6 @@ async function main() {
     await startButton.click();
     await sleep(2500);
   }
-  await page
-    .getByRole('button', { name: /Phát âm/ })
-    .first()
-    .click({ timeout: 20_000 });
-  await sleep(600);
-  await page.getByText('Bỏ qua phần phát âm').click({ timeout: 20_000 });
-  await sleep(600);
-  const wordShown = (await page.locator('h2,h1').allInnerTexts())
-    .map((t) => t.trim())
-    .find((t) => words.some((w) => w.word === t));
-  const shown = words.find((w) => w.word === wordShown) ?? c;
-  const expected = await preview(shown.id);
   const says = (days: number) =>
     days < 1
       ? '10 phút'
@@ -181,33 +208,68 @@ async function main() {
         : days < 365
           ? `${Math.round(days / 30)} tháng`
           : '1 năm';
-  const buttons = await page
-    .locator('button')
-    .filter({ hasText: 'Ôn lại sau' })
-    .allInnerTexts();
-  const flat = buttons.map((t) => t.replace(/\s+/g, ' ').trim());
-  check(
-    'four rating buttons show the server intervals of the word on screen',
-    flat.length === 4 &&
-      flat[0].includes(`Ôn lại sau ${says(expected.AGAIN)}`) &&
-      flat[1].includes(`Ôn lại sau ${says(expected.HARD)}`) &&
-      flat[2].includes(`Ôn lại sau ${says(expected.GOOD)}`) &&
-      flat[3].includes(`Ôn lại sau ${says(expected.EASY)}`),
-    `${shown.word}: ${flat.join(' | ')} vs ${JSON.stringify(expected)}`,
-  );
-  await page.screenshot({ path: `${SHOTS}/vocab-srs-ratings.png` });
+  const wordOnScreen = async () => {
+    const texts = (await page.locator('h2,h1').allInnerTexts()).map((t) =>
+      t.trim(),
+    );
+    return words.find((w) => texts.includes(w.word));
+  };
+  // One word through the room: quiz and typing right, then the grade.
+  const learnWord = async (quick: boolean) => {
+    const shown = await wordOnScreen();
+    if (!shown) return null;
+    const expected = await preview(shown.id);
+    const before = row(userId, shown.id);
+    await page.keyboard.press(quick ? 'Tab' : 'Enter');
+    await sleep(900);
+    await page
+      .locator('button')
+      .filter({ hasText: shown.meaning })
+      .first()
+      .click({ timeout: 20_000 });
+    await sleep(1600);
+    await page.locator('input[type="text"]').first().fill(shown.word);
+    await page.keyboard.press('Enter');
+    await sleep(1800);
+    if (!quick) {
+      await page.getByText('Bỏ qua phần phát âm').click({ timeout: 20_000 });
+    }
+    await sleep(2000);
+    const body = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
+    const after = row(userId, shown.id);
+    return { shown, expected, before, after, body };
+  };
 
-  const before = row(userId, shown.id);
-  await page.locator('button').filter({ hasText: 'Ôn lại sau' }).nth(1).click();
-  await sleep(2000);
-  const after = row(userId, shown.id);
+  const steps1 = await learnWord(false);
   check(
-    'pressing "Khó" stores that rating for the word',
-    after !== null &&
-      after.intervalDays === expected.HARD &&
-      after.isMastered &&
-      after.reviewCount === (before?.reviewCount ?? 0) + 1,
-    `${JSON.stringify(before)} -> ${JSON.stringify(after)}`,
+    'no rating buttons anywhere in the room',
+    (await page.locator('button').filter({ hasText: 'Ôn lại sau' }).count()) ===
+      0,
+    '',
+  );
+  check(
+    'a word learned through the steps (speaking skipped) is "Tốt", with the previewed interval',
+    steps1 !== null &&
+      steps1.body.includes(`Tốt · ôn lại sau ${says(steps1.expected.GOOD)}`) &&
+      steps1.after?.intervalDays === steps1.expected.GOOD &&
+      steps1.after?.reviewCount === (steps1.before?.reviewCount ?? 0) + 1,
+    steps1
+      ? `${steps1.shown.word}: ${JSON.stringify(steps1.after)} | ${steps1.body.slice(0, 160)}`
+      : 'no word on screen',
+  );
+  await page.screenshot({ path: `${SHOTS}/vocab-srs-verdict.png` });
+  await page.keyboard.press('Enter');
+  await sleep(1500);
+
+  const steps2 = await learnWord(true);
+  check(
+    'a word on "Kiểm tra nhanh" answered right is "Dễ"',
+    steps2 !== null &&
+      steps2.body.includes(`Dễ · ôn lại sau ${says(steps2.expected.EASY)}`) &&
+      steps2.after?.intervalDays === steps2.expected.EASY,
+    steps2
+      ? `${steps2.shown.word}: ${JSON.stringify(steps2.after)} | ${steps2.body.slice(0, 160)}`
+      : 'no word on screen',
   );
 
   check(

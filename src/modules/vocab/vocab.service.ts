@@ -20,6 +20,7 @@ import {
   type SrsGrade,
   type SrsState,
 } from './srs.logic';
+import { gradeFromEvidence, type ReviewEvidence } from './review-grade.logic';
 
 /** "Đã thuộc" on a card: the word is next reviewed after this many days. */
 const MASTERED_INTERVAL_DAYS = 7;
@@ -255,7 +256,7 @@ export class VocabService {
         collocations: w.collocations,
         isStarred: prog.isStarred,
         isMastered: prog.isMastered,
-        // Days until the next review for each self-rating (0 = ten minutes).
+        // Days until the next review for each grade the room may decide (0 = ten minutes).
         reviewPreview: previewSrs(prog.srs),
       };
     });
@@ -410,9 +411,11 @@ export class VocabService {
   }
 
   /**
-   * One review of a word. `grade` is the learner's self-rating in the
-   * flashcard room and marks the word as known unless it is "Học lại"; a
-   * caller that only knows right or wrong sends `isCorrect`, which counts as
+   * One review of a word. The flashcard room sends `evidence`, what happened
+   * in its steps, and the grade is decided here by gradeFromEvidence (thesis
+   * supervisor 2026-11-26: the learner no longer rates themselves). A graded
+   * review marks the word as known unless the grade is "Học lại". Older
+   * callers may still send a `grade`, or only `isCorrect`, which counts as
    * "Tốt" or "Học lại" and needs two right answers before the word is known.
    */
   async submitReview(
@@ -420,9 +423,10 @@ export class VocabService {
     wordId: number,
     isCorrect: boolean,
     grade?: SrsGrade,
+    evidence?: ReviewEvidence,
   ) {
     return this.progressWrite(() =>
-      this.submitReviewOnce(userId, wordId, isCorrect, grade),
+      this.submitReviewOnce(userId, wordId, isCorrect, grade, evidence),
     );
   }
 
@@ -431,18 +435,22 @@ export class VocabService {
     wordId: number,
     isCorrect: boolean,
     grade?: SrsGrade,
+    evidence?: ReviewEvidence,
   ) {
     await this.assertLearnerWordAccess(userId, wordId);
     const existing = await this.prisma.userVocabWordProgress.findUnique({
       where: { userId_wordId: { userId, wordId } },
     });
 
-    const rating: SrsGrade = grade ?? (isCorrect ? 'GOOD' : 'AGAIN');
+    const graded = Boolean(evidence ?? grade);
+    const rating: SrsGrade = evidence
+      ? gradeFromEvidence(evidence)
+      : (grade ?? (isCorrect ? 'GOOD' : 'AGAIN'));
     const newReviewCount = (existing?.reviewCount || 0) + 1;
     const isMastered =
       rating === 'AGAIN'
         ? false
-        : grade
+        : graded
           ? true
           : existing?.isMastered || newReviewCount >= 2;
     const srs = rateSrs(srsStateOf(existing), rating);
@@ -467,14 +475,14 @@ export class VocabService {
         await this.emitVocabLearned(userId, wordId);
         xpEarned = await this.wordXp(userId, wordId);
       }
-      return { ...updated, xpEarned };
+      return { ...updated, xpEarned, grade: rating };
     } else {
       const created = await this.prisma.userVocabWordProgress.create({
         data: {
           userId,
           wordId,
           reviewCount: 1,
-          isMastered: grade ? rating !== 'AGAIN' : isCorrect,
+          isMastered: graded ? rating !== 'AGAIN' : isCorrect,
           lastReviewedAt: now,
           nextReviewAt,
           remindedAt: null,
@@ -487,7 +495,7 @@ export class VocabService {
         await this.emitVocabLearned(userId, wordId);
         xpEarned = await this.wordXp(userId, wordId);
       }
-      return { ...created, xpEarned };
+      return { ...created, xpEarned, grade: rating };
     }
   }
 
