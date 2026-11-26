@@ -5,10 +5,8 @@ Viết, từ vựng, ngữ pháp và làm đề mô phỏng cấu trúc TOEIC; c
 Bánh Mì, thú ảo, bảng xếp hạng theo hạng và đấu trường 1v1.
 
 - Hai vai trò: học viên (`STUDENT`) và quản trị viên (`ADMIN`).
-- Không có khóa học, giáo viên, lớp học hay học phí. Phần này được gỡ ngày 01/11/2026. Cách khôi phục
-  nằm ở [docs/courses-restore.md](docs/courses-restore.md).
-- Đề thi do BreadTrans tự soạn theo cấu trúc TOEIC. BreadTrans không phải ETS, không cấp chứng chỉ, và
-  điểm chỉ là chỉ số luyện tập nội bộ ([docs/toeic-product-contract.md](docs/toeic-product-contract.md)).
+- Đề thi do BreadTrans tự soạn theo cấu trúc TOEIC; điểm là chỉ số luyện tập nội bộ
+  ([docs/toeic-product-contract.md](docs/toeic-product-contract.md)).
 
 ## Công nghệ
 
@@ -148,7 +146,7 @@ prisma/
                        # và practice-media.json: khóa R2 của audio/ảnh luyện tập
 scripts/               # kiểm tra an toàn CSDL, sao lưu, kiểm toán, backfill (xem package.json)
 test/                  # e2e
-docs/                  # an toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD, khôi phục khóa học
+docs/                  # an toàn CSDL, sao lưu, hợp đồng TOEIC, CI/CD
 load-tests/            # kịch bản đo tải
 artifacts/             # bằng chứng kiểm thử và audio nguồn của đề Nghe
 docker/                # cấu hình container sao lưu và MinIO cục bộ
