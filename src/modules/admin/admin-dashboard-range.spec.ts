@@ -1,4 +1,5 @@
 import {
+  banhFlow,
   buildDashboardBuckets,
   normalizeDashboardRange,
   previousDashboardStart,
@@ -121,6 +122,14 @@ describe('getDashboardStats figures (owner 2026-11-26)', () => {
         .mockResolvedValue({ _sum: { amountVnd: 0 }, _count: { id: 0 } }),
     },
     subscription: { count: count(1) },
+    banhTransaction: {
+      groupBy: jest.fn().mockResolvedValue([
+        { source: 'QUIZ_FIRST_COMPLETION', _sum: { amount: 336 } },
+        { source: 'MARKET_PURCHASE', _sum: { amount: -1050 } },
+        { source: 'ADMIN_ADJUSTMENT', _sum: { amount: 1360 } },
+        { source: 'PET_FEED', _sum: { amount: null } },
+      ]),
+    },
     submission: { count: count(5) },
     speakingSubmission: { count: count(1) },
     grammarAttempt: { count: count(2) },
@@ -256,5 +265,68 @@ describe('getDashboardStats figures (owner 2026-11-26)', () => {
       unreadSupportMessages: null,
       pendingSuggestions: new Date('2026-11-10T08:00:00Z'),
     });
+  });
+
+  it("sums the learners' Bánh Mì ledger of the range per source, admin top-ups apart", async () => {
+    const db = prisma();
+    const stats = await build(db).getDashboardStats('30d');
+    const args = db.banhTransaction.groupBy.mock.calls[0][0];
+    expect(args.by).toEqual(['source']);
+    expect(args.where.user).toEqual({ role: 'STUDENT' });
+    expect(args.where.createdAt.gte).toBeInstanceOf(Date);
+    expect(stats.gamification.flow).toEqual({
+      issued: 336,
+      spent: 1050,
+      adminAdjusted: 1360,
+    });
+  });
+});
+
+describe('banhFlow (owner 2026-11-26: issued and spent, admin adjustments apart)', () => {
+  it('nets each game and the shop before splitting issued from spent', () => {
+    // The 30 days before 26/11 on kltn_db, learners only.
+    const flow = banhFlow([
+      { source: 'ADMIN_ADJUSTMENT', total: 1360 },
+      { source: 'MARKET_PURCHASE', total: -1050 },
+      { source: 'ARENA_STAKE', total: -700 },
+      { source: 'ARENA_WIN', total: 660 },
+      { source: 'PET_FEED', total: -560 },
+      { source: 'BLASTER_STAKE', total: -540 },
+      { source: 'QUIZ_FIRST_COMPLETION', total: 336 },
+      { source: 'BLASTER_RETURN', total: 220 },
+      { source: 'DUNGEON_STAKE', total: -160 },
+      { source: 'BLASTER_WIN', total: 133 },
+      { source: 'DAILY_QUEST', total: 116 },
+      { source: 'DUNGEON_RETURN', total: 100 },
+      { source: 'DUNGEON_WIN', total: 80 },
+      { source: 'ARENA_REFUND', total: 40 },
+      { source: 'SPEAKING_SUBMISSION', total: 30 },
+    ]);
+    // arena -700+660+40 = 0; blaster -187; dungeon +20; market -1050; pet -560
+    expect(flow).toEqual({
+      issued: 336 + 116 + 30 + 20,
+      spent: 1050 + 560 + 187,
+      adminAdjusted: 1360,
+    });
+  });
+
+  it('counts a refunded purchase as nothing spent', () => {
+    expect(
+      banhFlow([
+        { source: 'MARKET_PURCHASE', total: -300 },
+        { source: 'MARKET_REFUND', total: 300 },
+      ]),
+    ).toEqual({ issued: 0, spent: 0, adminAdjusted: 0 });
+  });
+
+  it('keeps a negative admin adjustment apart and never counts seed or reconciliation entries', () => {
+    expect(
+      banhFlow([
+        { source: 'ADMIN_ADJUSTMENT', total: -50 },
+        { source: 'SEED_FIXTURE', total: 5000 },
+        { source: 'LEGACY_RECONCILIATION', total: -40 },
+        { source: 'VOCAB_MASTERY', total: 12 },
+      ]),
+    ).toEqual({ issued: 12, spent: 0, adminAdjusted: -50 });
   });
 });

@@ -55,6 +55,7 @@ import {
   vocabDeckProblems,
 } from './vocab-deck-readiness';
 import {
+  banhFlow,
   buildDashboardBuckets,
   learnedWithin,
   normalizeDashboardRange,
@@ -142,6 +143,7 @@ export class AdminService {
       oldestIssueReport,
       oldestSupportMessage,
       oldestSuggestion,
+      banhBySource,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
       this.prisma.user.count({
@@ -301,6 +303,12 @@ export class AdminService {
         orderBy: { createdAt: 'asc' },
         select: { createdAt: true },
       }),
+      // Learners' Bánh Mì ledger of the range, summed per source for banhFlow.
+      this.prisma.banhTransaction.groupBy({
+        by: ['source'],
+        where: { createdAt: inRange, user: { role: Role.STUDENT } },
+        _sum: { amount: true },
+      }),
     ]);
 
     // Every kind of attempt a learner makes (owner 2026-11-26: grammar and
@@ -366,6 +374,13 @@ export class AdminService {
       totalOrders: marketOrdersCount,
       approvedOrders: approvedOrdersCount,
       pendingOrders: pendingOrdersCount,
+      // Issued, spent and adjusted by an admin in the chosen range.
+      flow: banhFlow(
+        banhBySource.map((row) => ({
+          source: row.source,
+          total: row._sum.amount ?? 0,
+        })),
+      ),
     };
 
     const finance = {

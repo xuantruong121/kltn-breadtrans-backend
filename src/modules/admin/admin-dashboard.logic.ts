@@ -81,6 +81,56 @@ export function previousDashboardStart(
   return vnDayStart(year, monthIndex - (2 * monthCount - 1), 1).start;
 }
 
+/** Ledger entries that are bookkeeping, not Bánh Mì moving: never counted. */
+export const BANH_FLOW_EXCLUDED = ['SEED_FIXTURE', 'LEGACY_RECONCILIATION'];
+export const BANH_ADMIN_SOURCE = 'ADMIN_ADJUSTMENT';
+
+/**
+ * Sources netted together: a stake and what comes back from the same game,
+ * a purchase and its refund. Arena stakes go from one learner to the other,
+ * so a fully paid match nets to 0 instead of counting as both spent and issued.
+ */
+const BANH_FAMILIES: Record<string, string> = {
+  ARENA_STAKE: 'arena',
+  ARENA_WIN: 'arena',
+  ARENA_REFUND: 'arena',
+  BLASTER_STAKE: 'blaster',
+  BLASTER_RETURN: 'blaster',
+  BLASTER_WIN: 'blaster',
+  DUNGEON_STAKE: 'dungeon',
+  DUNGEON_RETURN: 'dungeon',
+  DUNGEON_WIN: 'dungeon',
+  MARKET_PURCHASE: 'market',
+  MARKET_REFUND: 'market',
+};
+
+/**
+ * Bánh Mì issued to and spent by learners in a range (2026-11-26), from the
+ * ledger's sum per source: each family above nets first, then a positive net
+ * counts as issued and a negative one as spent. Admin adjustments are kept
+ * apart, since they are top-ups by hand, not something learners earned.
+ */
+export function banhFlow(rows: { source: string; total: number }[]) {
+  const nets = new Map<string, number>();
+  let adminAdjusted = 0;
+  for (const { source, total } of rows) {
+    if (BANH_FLOW_EXCLUDED.includes(source)) continue;
+    if (source === BANH_ADMIN_SOURCE) {
+      adminAdjusted += total;
+      continue;
+    }
+    const family = BANH_FAMILIES[source] ?? source;
+    nets.set(family, (nets.get(family) ?? 0) + total);
+  }
+  let issued = 0;
+  let spent = 0;
+  for (const net of nets.values()) {
+    if (net > 0) issued += net;
+    else spent -= net;
+  }
+  return { issued, spent, adminAdjusted };
+}
+
 /**
  * A learner who learned in the window: an attempt or a learning activity.
  * Signing in alone does not count (2026-11-26: "Hoạt động" counted learners
