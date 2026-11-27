@@ -20,7 +20,7 @@ describe('SpeakingService set summaries carry their tracks', () => {
     imageUrl: null,
     audioUrl: null,
     isPremiumContent: false,
-    difficulty: 'BEGINNER',
+    difficulty: 'BASIC',
     stimulus: null,
     order: id,
     practiceSetId: (practiceSet as { id?: string } | null)?.id ?? null,
@@ -30,7 +30,7 @@ describe('SpeakingService set summaries carry their tracks', () => {
     id: 'practice-question-response-b1-b2',
     title: 'Phản hồi câu hỏi',
     description: 'Học tập và công việc',
-    level: 'B1-B2',
+    level: 'INTERMEDIATE',
     scope: 'SKILL_PRACTICE',
     tracks: [
       track('HOSPITALITY_TOURISM', 'Nhà hàng – Khách sạn – Du lịch', 40, false),

@@ -97,6 +97,7 @@ describe('StarterRoadmapService', () => {
                 : title.startsWith('Reading')
                   ? 'BILINGUAL_READING'
                   : 'LISTENING_PRACTICE',
+              practiceLevel: title.includes('tranh') ? 'BASIC' : 'STARTER',
               submissions: [],
             })),
           ),
@@ -106,7 +107,7 @@ describe('StarterRoadmapService', () => {
           Promise.resolve([
             {
               id: 'practice-read-aloud-a1-a2',
-              level: 'A1-A2',
+              level: 'STARTER',
               exercises: [{ id: 7, submissions: [{ id: 1 }] }],
             },
           ]),

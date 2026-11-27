@@ -196,9 +196,10 @@ export class QuizContentAccessService {
     unlocked: UnlockedLevels | null,
     exempt: boolean,
   ) {
+    // No lock to decide, but the card still names the item's level.
     if (!this.levelAccess || !unlocked)
       return {
-        practiceLevel: null,
+        practiceLevel: this.practiceLevel(quiz),
         unlockedLevel: UNPLACED_UNLOCKED,
         isLevelLocked: false,
       };

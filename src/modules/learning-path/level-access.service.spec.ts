@@ -1,15 +1,19 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { QuizType, Role } from '@prisma/client';
+import { PracticeLevel, QuizType, Role } from '@prisma/client';
 
+import { legacyPracticeLevel } from '../subscription/practice-level';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
-import { SpeakingContentAccessService } from '../speaking/speaking-content-access.service';
+import {
+  SpeakingContentAccessService,
+  type SpeakingContentAccessSubject,
+} from '../speaking/speaking-content-access.service';
 import { LevelAccessService } from './level-access.service';
 
-const ALL_TITLES = [
-  'Reading A1 — a',
-  'Reading A2 — b',
-  'Reading B1 — c',
-  'Reading C1 — d',
+const ALL_QUIZZES = [
+  { title: 'Reading A1 — a', practiceLevel: 'STARTER' },
+  { title: 'Reading A2 — b', practiceLevel: 'BASIC' },
+  { title: 'Reading B1 — c', practiceLevel: 'INTERMEDIATE' },
+  { title: 'Reading C1 — d', practiceLevel: 'ADVANCED' },
 ];
 
 function setup(skillRows: Array<Record<string, unknown>> = []) {
@@ -24,7 +28,7 @@ function setup(skillRows: Array<Record<string, unknown>> = []) {
               'BILINGUAL_READING',
               'LISTENING_PRACTICE',
               'WRITING_EMAIL',
-            ].flatMap((type) => ALL_TITLES.map((title) => ({ type, title }))),
+            ].flatMap((type) => ALL_QUIZZES.map((item) => ({ type, ...item }))),
           );
         return Promise.resolve(prisma.exemptQuizzes ?? []);
       }),
@@ -33,10 +37,10 @@ function setup(skillRows: Array<Record<string, unknown>> = []) {
       findMany: jest
         .fn()
         .mockResolvedValue([
-          { level: 'A1' },
-          { level: 'A2' },
-          { level: 'B1' },
-          { level: 'C1' },
+          { level: 'STARTER' },
+          { level: 'BASIC' },
+          { level: 'INTERMEDIATE' },
+          { level: 'ADVANCED' },
         ]),
     },
     speakingExercise: { findMany: jest.fn().mockResolvedValue([]) },
@@ -55,6 +59,7 @@ const reading = (title: string, overrides: Record<string, unknown> = {}) => ({
   id: 10,
   type: QuizType.BILINGUAL_READING,
   title,
+  practiceLevel: legacyPracticeLevel(title),
   isPremiumContent: false,
   ...overrides,
 });
@@ -84,7 +89,11 @@ describe('LevelAccessService', () => {
   it('passes over a level with nothing published', async () => {
     const { level, prisma } = setup([row('WRITING', 'STARTER')]);
     prisma.quiz.findMany.mockResolvedValue([
-      { type: 'WRITING_EMAIL', title: 'Writing A2 — b' },
+      {
+        type: 'WRITING_EMAIL',
+        title: 'Writing A2 — b',
+        practiceLevel: 'BASIC',
+      },
     ]);
     expect((await level.unlockedLevels(7)).WRITING).toBe('BASIC');
   });
@@ -159,9 +168,9 @@ describe('quiz access with level locks', () => {
 
 describe('speaking access with level locks', () => {
   const exercise = (
-    level: string,
-    overrides: Record<string, unknown> = {},
-  ) => ({
+    level: PracticeLevel,
+    overrides: Partial<SpeakingContentAccessSubject> = {},
+  ): SpeakingContentAccessSubject & { title?: string } => ({
     id: 20,
     isPremiumContent: false,
     title: 'Giới thiệu',
@@ -172,7 +181,7 @@ describe('speaking access with level locks', () => {
   it('refuses a set above the open level', async () => {
     const { speakingAccess } = setup([row('SPEAKING', 'BASIC')]);
     const err: ForbiddenException = await speakingAccess
-      .assertAccess(exercise('B1'), 7)
+      .assertAccess(exercise('INTERMEDIATE'), 7)
       .catch((e) => e);
     expect(err.getResponse()).toMatchObject({
       error: { code: 'LEVEL_LOCKED', skill: 'SPEAKING', level: 'INTERMEDIATE' },
@@ -183,8 +192,8 @@ describe('speaking access with level locks', () => {
     const { speakingAccess } = setup();
     await expect(
       speakingAccess.assertAccess(
-        exercise('C1', {
-          practiceSet: { scope: 'EXAM_INTERNAL', level: 'C1' },
+        exercise('ADVANCED', {
+          practiceSet: { scope: 'EXAM_INTERNAL', level: 'ADVANCED' },
         }),
         7,
       ),

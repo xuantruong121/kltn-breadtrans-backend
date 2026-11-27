@@ -97,9 +97,10 @@ export class SpeakingContentAccessService {
     role: Role | undefined,
     unlocked: UnlockedLevels | null,
   ) {
+    // No lock to decide, but the card still names the item's level.
     if (!this.levelAccess || !unlocked)
       return {
-        practiceLevel: null,
+        practiceLevel: this.practiceLevel(exercise),
         unlockedLevel: UNPLACED_UNLOCKED,
         isLevelLocked: false,
       };

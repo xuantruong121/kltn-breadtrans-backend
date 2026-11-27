@@ -1,6 +1,5 @@
 import {
   fitScore,
-  itemLevel,
   seedDifficulty,
   successProbability,
   updateAfterAttempt,
@@ -59,11 +58,10 @@ describe('ability model', () => {
     expect(fitScore(0.99)).toBeLessThan(0.1);
   });
 
-  it('item level and difficulty come from the content tag', () => {
-    expect(itemLevel({ min: 'A1', max: 'A2' })).toBe('STARTER');
-    expect(itemLevel({ min: 'A2', max: 'A2' })).toBe('BASIC');
-    expect(itemLevel({ min: 'B2', max: 'C1' })).toBe('INTERMEDIATE');
-    expect(itemLevel({ min: 'C1', max: 'C1' })).toBe('ADVANCED');
-    expect(seedDifficulty({ min: 'A1', max: 'A1' })).toBe(-1.25);
+  it('seeds difficulty from the practice level', () => {
+    expect(seedDifficulty('STARTER')).toBe(-1.25);
+    expect(seedDifficulty('BASIC')).toBe(-0.5);
+    expect(seedDifficulty('INTERMEDIATE')).toBe(0.55);
+    expect(seedDifficulty('ADVANCED')).toBe(1.6);
   });
 });

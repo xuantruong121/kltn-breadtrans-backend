@@ -314,9 +314,10 @@ export function speakingSetFacets(rows: SpeakingSetRow[]) {
     total: rows.length,
     published: rows.filter((row) => row.publicationStatus === 'PUBLISHED')
       .length,
-    levels: [
-      ...new Set(rows.map((row) => row.level).filter(Boolean) as string[]),
-    ].sort(),
+    // In level order, as the quiz lists give theirs.
+    levels: PRACTICE_LEVELS.filter((level) =>
+      rows.some((row) => row.level === level),
+    ),
   };
 }
 

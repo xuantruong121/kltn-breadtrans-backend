@@ -37,7 +37,7 @@ describe('grammarPublishProblems: the checklist the editor shows', () => {
 const topic = (id: number, extra: Record<string, unknown> = {}) => ({
   id,
   title: `Topic ${id}`,
-  level: 'BEGINNER',
+  level: 'BASIC',
   publicationStatus: 'DRAFT',
   totalQuestions: 10,
   learnerAttemptCount: 0,
@@ -48,7 +48,7 @@ describe('admin grammar topic list sort', () => {
   const topics = [
     topic(1, { title: 'Câu bị động', level: 'ADVANCED', totalQuestions: 4 }),
     topic(2, { title: 'Ảnh hưởng', level: 'INTERMEDIATE', totalQuestions: 12 }),
-    topic(3, { title: 'Bàn về thì', level: 'BEGINNER', totalQuestions: 4 }),
+    topic(3, { title: 'Bàn về thì', level: 'BASIC', totalQuestions: 4 }),
   ];
   const ids = (sort?: string) =>
     filterGrammarTopics([...topics], { sort }).map((t) => t.id);

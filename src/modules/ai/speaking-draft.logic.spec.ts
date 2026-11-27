@@ -15,7 +15,7 @@ import {
 const candidate = (over: Record<string, unknown> = {}) => ({
   title: ' Greeting ',
   targetText: ' Hello, nice to meet you. ',
-  difficulty: 'BEGINNER',
+  difficulty: 'STARTER',
   taskType: 'READ_ALOUD',
   ...over,
 });
@@ -68,7 +68,7 @@ describe('Speaking AI drafts write only task types the CMS can save', () => {
       {
         title: 'Greeting',
         targetText: 'Hello, nice to meet you.',
-        difficulty: 'BEGINNER',
+        difficulty: 'STARTER',
         taskType: 'READ_ALOUD',
       },
     ]);
@@ -92,7 +92,7 @@ describe('Speaking AI drafts write only task types the CMS can save', () => {
     const errors = await validate(
       plainToInstance(SuggestSpeakingFullDraftDto, {
         topic: 'Văn phòng',
-        level: 'B1-B2',
+        level: 'INTERMEDIATE',
         taskType: 'DESCRIBE_PICTURE',
       }),
     );
@@ -104,7 +104,7 @@ describe('Speaking AI drafts write only task types the CMS can save', () => {
       validate(
         plainToInstance(SuggestSpeakingFullDraftDto, {
           topic: 'Văn phòng',
-          level: 'B1-B2',
+          level: 'INTERMEDIATE',
           taskType: 'READ_ALOUD',
         }),
       ),

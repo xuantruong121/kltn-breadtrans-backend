@@ -5,7 +5,7 @@ import {
 
 const published = {
   text: 'What does the customer order?',
-  level: 'A2',
+  level: 'BASIC',
   skill: 'LISTENING',
   accent: 'US',
   options: ['A', 'B', 'C', 'D'],
@@ -30,7 +30,7 @@ describe('mergeListeningContent', () => {
     });
     expect(merged).toMatchObject({
       text: 'What does the customer ask for?',
-      level: 'A2',
+      level: 'BASIC',
       skill: 'LISTENING',
       accent: 'US',
       imageUrl: 'https://cdn/x.png',

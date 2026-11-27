@@ -15,11 +15,11 @@ describe('buildLevelRoadmap', () => {
       level: 'BASIC',
       skills: [skill({ skill: 'LISTENING', nextRoute: '/listening/9' })],
       grammar: [
-        { id: 1, title: 'A', level: 'BEGINNER', best: 90 },
-        { id: 2, title: 'B', level: 'BEGINNER', best: null },
+        { id: 1, title: 'A', level: 'BASIC', best: 90 },
+        { id: 2, title: 'B', level: 'BASIC', best: null },
         { id: 3, title: 'C', level: 'ADVANCED', best: null },
       ],
-      decks: [{ id: 7, title: 'D', level: 'A2', total: 10, mastered: 5 }],
+      decks: [{ id: 7, title: 'D', level: 'BASIC', total: 10, mastered: 5 }],
     });
     expect(r.title).toBe('Lộ trình mức Cơ bản');
     expect(r.steps.map((s) => s.key)).toEqual([
@@ -57,7 +57,7 @@ describe('buildLevelRoadmap', () => {
     const r = buildLevelRoadmap({
       level: 'ADVANCED',
       skills: [skill({ unlockedLevel: 'ADVANCED', done: 3, average: 80 })],
-      grammar: [{ id: 1, title: 'A', level: 'BEGINNER', best: null }],
+      grammar: [{ id: 1, title: 'A', level: 'BASIC', best: null }],
       decks: [],
     });
     expect(r.steps).toHaveLength(1);

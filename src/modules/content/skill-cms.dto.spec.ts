@@ -18,7 +18,7 @@ describe('ListeningQuestionDto content', () => {
       dto({
         text: 'What does she order?',
         accent: 'US',
-        level: 'A2',
+        level: 'BASIC',
         skill: 'LISTENING',
         imageUrl: 'https://cdn/picture.png',
         explanation: { vi: 'Cô ấy gọi cà phê.', en: 'She orders coffee.' },

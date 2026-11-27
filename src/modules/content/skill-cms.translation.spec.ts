@@ -7,11 +7,11 @@ import { SkillCmsService } from './skill-cms.service';
 
 const admin = { id: 7, role: Role.ADMIN };
 
-const translationDto = {
+const translationDto: WritingQuestionDto = {
   type: 'WRITING',
   taskType: 'SENTENCE_TRANSLATION',
   prompt: 'Mẹ tôi là giáo viên.',
-  level: 'A1',
+  level: 'STARTER',
   acceptedAnswers: [' My mother is a teacher. ', 'My mom is a teacher.', ''],
   hints: [
     { vi: 'giáo viên', en: 'teacher' },
@@ -45,7 +45,7 @@ describe('Dịch câu in the skill CMS', () => {
           skill: 'WRITING',
           taskType: 'SENTENCE_TRANSLATION',
           prompt: 'Mẹ tôi là giáo viên.',
-          level: 'A1',
+          level: 'STARTER',
           acceptedAnswers: ['My mother is a teacher.', 'My mom is a teacher.'],
           hints: [{ vi: 'giáo viên', en: 'teacher' }],
           grammarTip: 'Nghề nghiệp cần "a/an".',
@@ -111,7 +111,11 @@ describe('Dịch câu in the skill CMS', () => {
     };
     await new SkillCmsService(prisma as any).create(
       'writing',
-      { title: 'Dịch câu: Nhà hàng', level: 'A2', writingKind: 'TRANSLATION' },
+      {
+        title: 'Dịch câu: Nhà hàng',
+        level: 'BASIC',
+        writingKind: 'TRANSLATION',
+      },
       admin,
     );
     expect(prisma.practiceTopic.create).toHaveBeenCalledWith({
@@ -144,7 +148,7 @@ describe('Dịch câu in the skill CMS', () => {
     };
     await new SkillCmsService(prisma as any).create(
       'writing',
-      { title: 'Tranh: Văn phòng', level: 'A2', type: 'WRITING_PICTURE' },
+      { title: 'Tranh: Văn phòng', level: 'BASIC', type: 'WRITING_PICTURE' },
       admin,
     );
     expect(prisma.quiz.create).toHaveBeenCalledWith(
@@ -160,6 +164,7 @@ describe('Dịch câu in the skill CMS', () => {
         findFirst: jest.fn().mockResolvedValue({
           id: 91,
           type: QuizType.WRITING_PICTURE,
+          practiceLevel: 'STARTER',
           title: 'Writing A1 — Dịch câu: Gia đình',
           questions: [
             {

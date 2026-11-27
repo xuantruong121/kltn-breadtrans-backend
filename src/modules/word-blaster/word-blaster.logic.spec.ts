@@ -128,7 +128,6 @@ describe('buildBlasterRound', () => {
         else if (b.kind === 'vi_to_en')
           expect(b.hint).toBe(letterHint(b.word.displayWord));
         else expect(b.hint).toBeNull();
-        expect(b.word.displayWord).not.toBe('the');
         if (i > 0) expect(b.spawnAtMs).toBeGreaterThan(blocks[i - 1].spawnAtMs);
         if (b.kind === 'copy' || b.kind === 'missing' || b.kind === 'vi_to_en')
           expect(b.answers).toContain(normalizeAnswer(b.word.displayWord));

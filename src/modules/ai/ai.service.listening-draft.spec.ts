@@ -27,14 +27,14 @@ describe('AiService.suggestListeningFullDraft', () => {
     ]);
     const draft = await service.suggestListeningFullDraft({
       topic: 'xe buýt',
-      level: 'A2',
+      level: 'BASIC',
       mode: 'DICTATION',
       count: 20,
     });
     expect(evaluator.suggestListeningFullDraft).not.toHaveBeenCalled();
     expect(evaluator.suggestDictationLines).toHaveBeenCalledWith({
       topic: 'xe buýt',
-      level: 'A2',
+      level: 'BASIC',
       count: 20,
       sourceText: undefined,
     });

@@ -44,7 +44,7 @@ describe('SkillCmsService', () => {
     ['DICTATION', 'Nghe chép A2 — Giao tiếp hằng ngày'],
     ['DIALOGUE', 'Hội thoại A2 — Giao tiếp hằng ngày'],
   ])(
-    'stores a %s Listening title under the form chosen (owner 2026-11-24)',
+    'keeps an untagged %s Listening title untagged on create and relabels a legacy-headed one',
     async (mode, stored) => {
       const prisma = {
         quiz: { create: jest.fn().mockResolvedValue({ id: 12 }) },
@@ -54,12 +54,25 @@ describe('SkillCmsService', () => {
         'listening',
         {
           title: 'Giao tiếp hằng ngày',
-          level: 'A2',
+          level: 'BASIC',
           bilingualContent: { mode },
         },
         admin,
       );
-      expect(prisma.quiz.create.mock.calls[0][0].data.title).toBe(stored);
+      expect(prisma.quiz.create.mock.calls[0][0].data).toMatchObject({
+        title: 'Giao tiếp hằng ngày',
+        practiceLevel: 'BASIC',
+      });
+      await service.create(
+        'listening',
+        {
+          title: 'Listening A2 — Giao tiếp hằng ngày',
+          level: 'BASIC',
+          bilingualContent: { mode },
+        },
+        admin,
+      );
+      expect(prisma.quiz.create.mock.calls[1][0].data.title).toBe(stored);
     },
   );
 
@@ -69,6 +82,7 @@ describe('SkillCmsService', () => {
         findFirst: jest.fn().mockResolvedValue({
           id: 12,
           title: 'Reading A2 — Notices',
+          practiceLevel: 'BASIC',
           theoryContent: 'Passage',
           questions: [
             {
@@ -81,6 +95,7 @@ describe('SkillCmsService', () => {
           _count: { submissions: 0 },
         }),
       },
+      toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
     };
     const service = new SkillCmsService(prisma as any);
     const result = await service.validate('reading', '12', admin);
@@ -161,11 +176,13 @@ describe('SkillCmsService', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 58,
             title: 'Hội thoại C1 — A visit',
+            practiceLevel: 'ADVANCED',
             ...(mode ? { bilingualContent: { mode } } : {}),
             questions,
             _count: { submissions: 0 },
           }),
         },
+        toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
       };
       const authoring = {
         getCurrentPublishedArtifact: jest.fn().mockResolvedValue(recording),
@@ -335,6 +352,7 @@ describe('SkillCmsService', () => {
             findFirst: jest.fn().mockResolvedValue({
               id: 58,
               title: 'Hội thoại B1 — A visit',
+              practiceLevel: 'INTERMEDIATE',
               bilingualContent: draft,
               questions: [mcq(1, { transcriptSegments: turns })],
               _count: { submissions: 0 },
@@ -541,12 +559,15 @@ describe('SkillCmsService', () => {
   it('does not let a content PATCH bypass publish preflight', async () => {
     const prisma = {
       quiz: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ id: 13, type: QuizType.BILINGUAL_READING }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 13,
+          title: 'Reading B1',
+          type: QuizType.BILINGUAL_READING,
+        }),
         update: jest.fn().mockResolvedValue({ id: 13 }),
       },
       submission: { count: jest.fn().mockResolvedValue(0) },
+      toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
     };
     const service = new SkillCmsService(prisma as any);
     await service.update(
@@ -587,7 +608,7 @@ describe('SkillCmsService', () => {
         }),
         findUnique: jest.fn().mockResolvedValue({
           id: 'speaking-qa',
-          level: 'BEGINNER',
+          level: 'BASIC',
         }),
       },
       $transaction: jest.fn((callback: (value: typeof tx) => unknown) =>
@@ -640,12 +661,16 @@ describe('SkillCmsService', () => {
       },
     };
     const service = new SkillCmsService(prisma as any);
-    await service.create('speaking', { title: 'Bộ mới', level: 'B1' }, admin);
+    await service.create(
+      'speaking',
+      { title: 'Bộ mới', level: 'INTERMEDIATE' },
+      admin,
+    );
     const data = prisma.speakingPracticeSet.create.mock.calls[0][0].data;
     expect(data).toEqual(
       expect.objectContaining({
         title: 'Bộ mới',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         publicationStatus: QuizPublicationStatus.DRAFT,
       }),
     );
@@ -667,12 +692,12 @@ describe('SkillCmsService', () => {
     await service.update(
       'speaking',
       'practice-question-response-a2',
-      { title: ' Phản hồi câu hỏi ', description: 'Mô tả', level: 'A2' },
+      { title: ' Phản hồi câu hỏi ', description: 'Mô tả', level: 'BASIC' },
       admin,
     );
     expect(prisma.speakingPracticeSet.update).toHaveBeenCalledWith({
       where: { id: 'practice-question-response-a2' },
-      data: { title: 'Phản hồi câu hỏi', description: 'Mô tả', level: 'A2' },
+      data: { title: 'Phản hồi câu hỏi', description: 'Mô tả', level: 'BASIC' },
     });
   });
 
@@ -757,7 +782,7 @@ describe('SkillCmsService', () => {
       speakingPracticeSet: {
         findUnique: jest.fn().mockResolvedValue({
           id: 's1',
-          level: 'BEGINNER',
+          level: 'BASIC',
           publicationStatus: QuizPublicationStatus.DRAFT,
         }),
       },
@@ -832,6 +857,7 @@ describe('SkillCmsService', () => {
         quiz: {
           findFirst: jest.fn().mockResolvedValue({
             id: 4,
+            title: 'Reading A2 — Notices',
             type: QuizType.BILINGUAL_READING,
           }),
           update: jest.fn().mockResolvedValue({ id: 4 }),
@@ -1013,7 +1039,7 @@ describe('SkillCmsService', () => {
         type: 'WRITING',
         taskType: 'EMAIL',
         prompt: 'Write an email.',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         keywords: ['reply', 'confirm'],
         wordRange: [100, 130],
         sampleSentences: ['Dear team,'],
@@ -1028,7 +1054,7 @@ describe('SkillCmsService', () => {
           skill: 'WRITING',
           taskType: 'EMAIL',
           prompt: 'Write an email.',
-          level: 'B1',
+          level: 'INTERMEDIATE',
           keywords: ['reply', 'confirm'],
           // The grader reads requiredKeywords (owner 2026-11-19).
           requiredKeywords: ['reply', 'confirm'],
@@ -1293,7 +1319,7 @@ describe('Speaking reference audio follows the sample sentence', () => {
     return { prisma, upload };
   };
 
-  it.each(['B1', 'B1-B2', 'C1-C2'])(
+  it.each(['INTERMEDIATE', 'ADVANCED'])(
     'stores the clip of a %s set privately, as access reads it',
     async (level) => {
       const { prisma, upload } = await storeFor(level);
@@ -1306,7 +1332,7 @@ describe('Speaking reference audio follows the sample sentence', () => {
     },
   );
 
-  it.each(['A1', 'A1-A2'])(
+  it.each(['STARTER', 'BASIC'])(
     'keeps the clip of a free %s set public',
     async (level) => {
       const { upload } = await storeFor(level);
@@ -1318,7 +1344,7 @@ describe('Speaking reference audio follows the sample sentence', () => {
   );
 
   it('loads the set level the rule needs', async () => {
-    const { prisma } = await storeFor('B1-B2');
+    const { prisma } = await storeFor('INTERMEDIATE');
     expect(prisma.speakingExercise.findFirst).toHaveBeenCalledWith({
       where: { id: 30, practiceSetId: 'set-1' },
       include: { practiceSet: { select: { scope: true, level: true } } },
@@ -1329,7 +1355,7 @@ describe('Speaking reference audio follows the sample sentence', () => {
     const prisma = prismaWith();
     prisma.speakingExercise.findFirst.mockResolvedValue({
       ...exercise,
-      practiceSet: { scope: 'SKILL_PRACTICE', level: 'B2' },
+      practiceSet: { scope: 'SKILL_PRACTICE', level: 'INTERMEDIATE' },
     });
     const speaking = { generateTts: jest.fn() };
     const service = new SkillCmsService(

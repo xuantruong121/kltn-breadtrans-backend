@@ -95,7 +95,7 @@ export class SuggestReadingPassageDto {
 
   @IsNotEmpty({ message: 'Cấp độ bài đọc không được để trống' })
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level: string;
@@ -121,7 +121,7 @@ export class SuggestReadingQuestionsDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
@@ -150,7 +150,7 @@ export class SuggestToeicPart5Dto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
@@ -200,7 +200,7 @@ export class SuggestListeningContentDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -230,7 +230,7 @@ export class SuggestListeningQuestionsDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -254,7 +254,7 @@ export class SuggestWritingTaskDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -424,7 +424,7 @@ export class SuggestListeningFullDraftDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -502,7 +502,7 @@ export class SuggestWritingFullDraftDto {
 
   @IsNotEmpty()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level: string;
 

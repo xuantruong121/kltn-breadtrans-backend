@@ -91,7 +91,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     it('rejects grammar question request with invalid count (> 5 or < 1)', async () => {
       const tooHigh = plainToInstance(SuggestGrammarQuestionsDto, {
         topicTitle: 'Tenses',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         count: 10,
       });
       const errorsHigh = await validate(tooHigh);
@@ -99,7 +99,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
       const tooLow = plainToInstance(SuggestGrammarQuestionsDto, {
         topicTitle: 'Tenses',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         count: 0,
       });
       const errorsLow = await validate(tooLow);
@@ -109,7 +109,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
     it('rejects reading passage request with target length out of bounds', async () => {
       const tooShort = plainToInstance(SuggestReadingPassageDto, {
         topic: 'Tech',
-        level: 'B2',
+        level: 'INTERMEDIATE',
         targetLength: 20,
       });
       const errors = await validate(tooShort);
@@ -170,7 +170,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const speakingExerciseErrors = await validate(
         plainToInstance(SuggestSpeakingExercisesDto, {
           practiceSetTitle: '',
-          level: 'BEGINNER',
+          level: 'BASIC',
           count: 6,
         }),
       );
@@ -187,7 +187,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         const errors = await validate(
           plainToInstance(SuggestListeningFullDraftDto, {
             topic: 'Getting around town',
-            level: 'A2',
+            level: 'BASIC',
             mode,
             count: 10,
           }),
@@ -210,7 +210,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const draft = {
         title: 'Getting around town',
         description: 'Short sentences.',
-        level: 'A2',
+        level: 'BASIC',
         mode: 'COMPREHENSION',
         questions: [],
       };
@@ -220,14 +220,14 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestListeningFullDraft({
           topic: 'Getting around town',
-          level: 'A2',
+          level: 'BASIC',
           mode: 'COMPREHENSION',
           count: 3,
         }),
       ).resolves.toBe(draft);
       expect(mockAiService.suggestListeningFullDraft).toHaveBeenCalledWith({
         topic: 'Getting around town',
-        level: 'A2',
+        level: 'BASIC',
         mode: 'COMPREHENSION',
         count: 3,
         sourceText: undefined,
@@ -270,7 +270,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
       const result = await controller.suggestGrammarQuestions({
         topicTitle: 'Past Simple',
-        level: 'A2',
+        level: 'BASIC',
         count: 1,
       });
       expect(result).toEqual(grammarResult);
@@ -319,7 +319,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestGrammarQuestions({
           topicTitle: 'Tenses',
-          level: 'A2',
+          level: 'BASIC',
           count: 3,
         }),
       ).rejects.toThrow(BadRequestException);
@@ -342,13 +342,13 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         title: 'Modern Workplaces',
         passage: 'Remote work has transformed communication across teams...',
         topic: 'Workplace',
-        level: 'B1',
+        level: 'INTERMEDIATE',
       };
       mockAiService.suggestReadingPassage!.mockResolvedValue(passageResult);
 
       const result = await controller.suggestReadingPassage({
         topic: 'Workplace',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         targetLength: 200,
       });
       expect(result).toEqual(passageResult);
@@ -371,13 +371,13 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
 
       const result = await controller.suggestReadingQuestions({
         passage: editorPassage,
-        level: 'B1',
+        level: 'INTERMEDIATE',
         count: 1,
       });
       expect(result).toEqual(questionResult);
       expect(mockAiService.suggestReadingQuestions).toHaveBeenCalledWith({
         passage: editorPassage,
-        level: 'B1',
+        level: 'INTERMEDIATE',
         count: 1,
         // No "Tạo câu khác" list: nothing to avoid.
         avoid: [],
@@ -485,7 +485,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       const setResult = {
         title: 'Giới thiệu bản thân cơ bản',
         description: 'Luyện các câu giới thiệu bản thân ngắn.',
-        level: 'BEGINNER',
+        level: 'BASIC',
         track: 'OFFICE_BUSINESS',
       };
       const exerciseResult = {
@@ -493,7 +493,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
           {
             title: 'Nói về nghề nghiệp',
             targetText: 'I work as a designer.',
-            difficulty: 'BEGINNER',
+            difficulty: 'BASIC',
             taskType: 'READ_ALOUD',
           },
         ],
@@ -504,7 +504,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestSpeakingPracticeSet({
           topic: 'Giới thiệu bản thân',
-          level: 'BEGINNER',
+          level: 'BASIC',
           track: 'OFFICE_BUSINESS',
           currentTitle: 'Bản nháp cũ',
         }),
@@ -513,7 +513,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         controller.suggestSpeakingExercises({
           practiceSetTitle: setResult.title,
           practiceSetDescription: setResult.description,
-          level: 'BEGINNER',
+          level: 'BASIC',
           existingExerciseTitles: ['Chào hỏi'],
           taskType: 'READ_ALOUD',
           count: 1,
@@ -523,7 +523,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       // The track's name and description reach the prompt.
       expect(mockAiService.suggestSpeakingPracticeSet).toHaveBeenCalledWith({
         topic: 'Giới thiệu bản thân',
-        level: 'BEGINNER',
+        level: 'BASIC',
         currentTitle: 'Bản nháp cũ',
         currentDescription: undefined,
         trackContext: {
@@ -540,7 +540,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       expect(mockAiService.suggestSpeakingExercises).toHaveBeenCalledWith({
         practiceSetTitle: setResult.title,
         practiceSetDescription: setResult.description,
-        level: 'BEGINNER',
+        level: 'BASIC',
         currentTitle: undefined,
         currentTargetText: undefined,
         taskType: 'READ_ALOUD',
@@ -554,7 +554,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestSpeakingFullDraft({
           topic: 'Khách sạn',
-          level: 'A1-B1',
+          level: 'INTERMEDIATE',
           track: 'HOSPITALITY_TOURISM',
           count: 1,
         }),
@@ -637,7 +637,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       mockAiService.suggestSpeakingPracticeSet!.mockResolvedValue({
         title: 't',
         description: 'd',
-        level: 'BEGINNER',
+        level: 'BASIC',
         track: null,
       });
       mockAiService.suggestSpeakingExercises!.mockResolvedValue({
@@ -647,10 +647,10 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await controller.suggestVocabWord({ word: 'test' });
       await controller.suggestGrammarQuestions({
         topicTitle: 't',
-        level: 'A1',
+        level: 'STARTER',
         count: 1,
       });
-      await controller.suggestReadingPassage({ topic: 't', level: 'A1' });
+      await controller.suggestReadingPassage({ topic: 't', level: 'STARTER' });
       await controller.suggestReadingQuestions({ passage: 'p', count: 1 });
       await controller.suggestToeicPart5({ count: 1 });
       await controller.suggestListeningContent({ mode: 'DICTATION' });
@@ -662,11 +662,11 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await controller.suggestWritingTask({ taskType: 'EMAIL' });
       await controller.suggestSpeakingPracticeSet({
         topic: 't',
-        level: 'BEGINNER',
+        level: 'BASIC',
       });
       await controller.suggestSpeakingExercises({
         practiceSetTitle: 't',
-        level: 'BEGINNER',
+        level: 'BASIC',
         count: 1,
       });
 
@@ -707,7 +707,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       await expect(
         controller.suggestGrammarQuestions({
           topicTitle: 't',
-          level: 'B1',
+          level: 'INTERMEDIATE',
           count: 2,
         }),
       ).rejects.toThrow(BadGatewayException);
@@ -718,7 +718,10 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         new Error('Gemini API call timed out after 30000ms'),
       );
       await expect(
-        controller.suggestReadingPassage({ topic: 'tech', level: 'B2' }),
+        controller.suggestReadingPassage({
+          topic: 'tech',
+          level: 'INTERMEDIATE',
+        }),
       ).rejects.toThrow(BadGatewayException);
     });
 
@@ -765,7 +768,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         () =>
           controller.suggestReadingFullDraft({
             topic: 'Remote work',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             count: 3,
           }),
         'Không thể soạn bài đọc lúc này. Vui lòng thử lại sau.',
@@ -776,7 +779,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         () =>
           controller.suggestWritingFullDraft({
             topic: 'Email',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             kind: 'EMAIL',
             count: 3,
           }),
@@ -867,7 +870,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
       });
       const draft = await controller.suggestDictationLines({
         topic: 'Nói chuyện với người thân',
-        level: 'A2',
+        level: 'BASIC',
         count: 1,
         avoid: ['  We usually eat dinner together at six.  ', ''],
         brief: 'Câu về gia đình',
@@ -899,7 +902,7 @@ describe('AdminContextualAiController (Phase 5A Governance & Architecture)', () 
         await expect(
           controller.suggestSpeakingExercises({
             practiceSetTitle: 'T',
-            level: 'BEGINNER',
+            level: 'BASIC',
             count: 1,
           }),
         ).rejects.toThrow(BadGatewayException);

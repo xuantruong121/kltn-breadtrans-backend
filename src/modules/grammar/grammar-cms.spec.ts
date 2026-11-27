@@ -501,14 +501,14 @@ describe('AdminGrammarCMS (Phase 4)', () => {
         {
           id: 2,
           title: 'Past simple',
-          level: 'BEGINNER',
+          level: 'BASIC',
           publicationStatus: 'PUBLISHED',
           _count: { questions: 5 },
         },
         {
           id: 1,
           title: 'Articles',
-          level: 'BEGINNER',
+          level: 'BASIC',
           publicationStatus: 'DRAFT',
           _count: { questions: 0 },
         },
