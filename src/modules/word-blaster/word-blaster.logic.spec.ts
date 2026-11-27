@@ -14,6 +14,9 @@ import {
   mainSense,
   blasterPayout,
   blasterXp,
+  BLASTER_PACE,
+  BLASTER_STAKES,
+  blasterPace,
   buildBlasterRound,
   hardWordTally,
   landsAt,
@@ -396,5 +399,45 @@ describe('pullForward', () => {
       destroyed: 1,
       landed: 0,
     });
+  });
+});
+
+describe('pace by stake (2026-11-27)', () => {
+  it('has a pace for every stake, rising with it, and 1 for anything else', () => {
+    expect(BLASTER_STAKES.map((s) => blasterPace(s))).toEqual([1, 1.15, 1.3]);
+    expect(
+      Object.keys(BLASTER_PACE)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual([...BLASTER_STAKES]);
+    expect(blasterPace(999)).toBe(1);
+  });
+
+  it('leaves the lowest stake as the game was', () => {
+    expect(buildBlasterRound(pool, seeded(4), 'copy', { pace: 1 })).toEqual(
+      buildBlasterRound(pool, seeded(4), 'copy'),
+    );
+  });
+
+  it('shortens every fall by the pace and changes nothing else', () => {
+    for (const mode of ['copy', 'missing', 'vi_to_en', 'en_to_vi'] as const) {
+      const plain = buildBlasterRound(pool, seeded(6), mode);
+      const fast = buildBlasterRound(pool, seeded(6), mode, { pace: 1.3 });
+      expect(fast).toHaveLength(plain.length);
+      fast.forEach((b, i) => {
+        const { fallMs, ...rest } = b;
+        const { fallMs: plainFall, ...plainRest } = plain[i];
+        // Same word, prompt, lane and spawn time; only the fall is shorter.
+        expect(rest).toEqual(plainRest);
+        expect(fallMs).toBeLessThan(plainFall);
+        expect(Math.abs(fallMs - plainFall / 1.3)).toBeLessThanOrEqual(1);
+      });
+    }
+  });
+
+  it('never slows the game down', () => {
+    expect(buildBlasterRound(pool, seeded(4), 'copy', { pace: 0.5 })).toEqual(
+      buildBlasterRound(pool, seeded(4), 'copy'),
+    );
   });
 });

@@ -29,6 +29,20 @@ import {
 export const BLASTER_BLOCKS = 20;
 export const BLASTER_LIVES = 3;
 export const BLASTER_STAKES = [20, 50, 100] as const;
+/**
+ * How much faster the blocks fall at each stake (owner 2026-11-27). The three
+ * stakes played the same, so the highest was always the better pick; now the
+ * bigger win asks for faster typing. Only the fall time changes: the words,
+ * the gaps between blocks, the lives and the payout are the same at every stake.
+ */
+export const BLASTER_PACE: Record<number, number> = {
+  20: 1,
+  50: 1.15,
+  100: 1.3,
+};
+export function blasterPace(stake: number): number {
+  return BLASTER_PACE[stake] ?? 1;
+}
 /** A shot this long after a block's landing still counts (network delay). */
 export const LANDING_GRACE_MS = 400;
 export const BLASTER_XP_PER_BLOCK = 2;
@@ -236,14 +250,18 @@ export function pullForward(
  * `hardIds`: the learner's hard flashcard words, in order (hardWordOrder).
  * Up to six that suit the mode take places spread over the game; the other
  * blocks are chosen by level as before (thesis supervisor 2026-11-26).
+ *
+ * `pace`: how much faster every block falls, from the stake (blasterPace).
  */
 export function buildBlasterRound(
   pool: readonly ArenaWord[],
   rng: () => number,
   mode: BlasterMode,
-  opts: { count?: number; hardIds?: readonly number[] } = {},
+  opts: { count?: number; hardIds?: readonly number[]; pace?: number } = {},
 ): BlasterBlock[] {
   const count = opts.count ?? BLASTER_BLOCKS;
+  // The stake's pace (blasterPace); never slower than the plain game.
+  const pace = Math.max(1, opts.pace ?? 1);
   const all = pool.filter(isDuelWord);
   // Words that suit the mode: a gap needs a few letters, a hint a short meaning.
   const suits = (w: ArenaWord) =>
@@ -330,7 +348,7 @@ export function buildBlasterRound(
       prompt,
       answers,
       spawnAtMs: at,
-      fallMs: Math.round(BASE_FALL_MS[kind] / speed),
+      fallMs: Math.round(BASE_FALL_MS[kind] / (speed * pace)),
       lane: LANES[lane],
       hint,
       word: { id: word.id, displayWord: display, meaningVi: word.meaningVi },

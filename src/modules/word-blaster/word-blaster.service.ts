@@ -28,6 +28,7 @@ import {
   blasterDeadline,
   blasterPayout,
   blasterXp,
+  blasterPace,
   buildBlasterRound,
   hardWordTally,
   matchShot,
@@ -161,10 +162,11 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
 
     const hardIds = await this.hardWordIds(userId);
     let words = await loadDeckWords(this.prisma);
-    let blocks = buildBlasterRound(words, Math.random, mode, { hardIds });
+    const pace = blasterPace(stake);
+    let blocks = buildBlasterRound(words, Math.random, mode, { hardIds, pace });
     if (blocks.length < BLASTER_BLOCKS) {
       words = await loadAllReviewedWords(this.prisma);
-      blocks = buildBlasterRound(words, Math.random, mode, { hardIds });
+      blocks = buildBlasterRound(words, Math.random, mode, { hardIds, pace });
     }
     if (blocks.length < BLASTER_BLOCKS)
       throw new BadRequestException(

@@ -149,6 +149,20 @@ describe('WordBlasterService', () => {
     expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
   });
 
+  it('a higher stake makes the blocks fall faster (owner 2026-11-27)', async () => {
+    // "copy" blocks fall for 9000 ms at the start of the plain game.
+    const low = await service.start(1, 20, 'copy');
+    expect(low.blocks[0].fallMs).toBe(9000);
+    const mid = await service.start(2, 50, 'copy');
+    expect(mid.blocks[0].fallMs).toBe(Math.round(9000 / 1.15));
+    const high = await service.start(3, 100, 'copy');
+    expect(high.blocks[0].fallMs).toBe(Math.round(9000 / 1.3));
+    // The blocks come at the same moments at every stake.
+    expect(high.blocks.map((b) => b.spawnAtMs)).toEqual(
+      low.blocks.map((b) => b.spawnAtMs),
+    );
+  });
+
   it('only the owner can shoot', async () => {
     const view = await service.start(1, 20, 'copy');
     await expect(service.shot(2, view.sessionId, 'x')).rejects.toBeInstanceOf(
