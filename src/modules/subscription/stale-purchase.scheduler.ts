@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { BUSINESS_TIMEZONE } from '../../common/time/business-time.util';
+import { OFF_MIDNIGHT_CRON } from '../../common/time/off-midnight-cron';
 import { PlanPurchaseService } from './plan-purchase.service';
 
 /**
@@ -14,8 +16,21 @@ export class StalePurchaseScheduler {
 
   constructor(private readonly purchases: PlanPurchaseService) {}
 
-  @Cron('*/5 * * * *')
+  // Hour 0 runs at 00:02, then 00:05 onwards (OFF_MIDNIGHT_CRON). Both
+  // methods share `running`, so a slow round still blocks the next tick.
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutes, { timeZone: BUSINESS_TIMEZONE })
   async sweep(): Promise<void> {
+    await this.sweepOnce();
+  }
+
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutesAfterMidnight, {
+    timeZone: BUSINESS_TIMEZONE,
+  })
+  async sweepAfterMidnight(): Promise<void> {
+    await this.sweepOnce();
+  }
+
+  private async sweepOnce(): Promise<void> {
     if (process.env.STALE_PURCHASE_SWEEP_ENABLED === 'false') return;
     // A slow PayOS round must not overlap the next tick.
     if (this.running) return;

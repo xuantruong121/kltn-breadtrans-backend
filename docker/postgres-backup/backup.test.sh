@@ -103,14 +103,16 @@ is "a zero-byte dump never counts as a success" \
   "$(last_automatic_success_epoch)" "$(stamp_to_epoch 20261025_011937)"
 
 echo
-echo "daily slot (00:00 Vietnam time = 17:00 UTC the day before)"
+echo "daily slot (00:01 Vietnam time = 17:01 UTC the day before)"
 e() { stamp_to_epoch "$1"; }
-is "afternoon: the slot is this local day's midnight"   "$(current_slot_epoch "$(e 20261116_100000)")" "$(e 20261115_170000)"
-is "exactly at midnight: the slot is now"   "$(current_slot_epoch "$(e 20261115_170000)")" "$(e 20261115_170000)"
-is "one second before midnight: the slot is the previous midnight"   "$(current_slot_epoch "$(e 20261115_165959)")" "$(e 20261114_170000)"
+is "the default slot is 00:01, never midnight"   "$BACKUP_AT" "00:01"
+is "afternoon: the slot is this local day's 00:01"   "$(current_slot_epoch "$(e 20261116_100000)")" "$(e 20261115_170100)"
+is "exactly at 00:01: the slot is now"   "$(current_slot_epoch "$(e 20261115_170100)")" "$(e 20261115_170100)"
+is "at midnight: the slot is still the previous 00:01"   "$(current_slot_epoch "$(e 20261115_170000)")" "$(e 20261114_170100)"
+is "one second before 00:01: the slot is the previous 00:01"   "$(current_slot_epoch "$(e 20261115_170059)")" "$(e 20261114_170100)"
 BACKUP_AT=08:05
 is "BACKUP_AT=08:05 at 07:00 local: yesterday's 08:05"   "$(current_slot_epoch "$(e 20261116_000000)")" "$(e 20261115_010500)"
-BACKUP_AT=00:00
+BACKUP_AT=00:01
 
 echo
 echo "due / wait decision (the reboot regression, daily)"
@@ -131,12 +133,12 @@ decide() {
 }
 NOW=$(e 20261116_100000) # 17:00 Vietnam time
 is "no history is immediately due" "$(decide 0 "$NOW")" "DUE_NO_HISTORY"
-is "backup made today (11:14 VN) waits for the next midnight"   "$(decide "$(e 20261116_041405)" "$NOW")" "WAIT_25200"
+is "backup made today (11:14 VN) waits for the next 00:01"   "$(decide "$(e 20261116_041405)" "$NOW")" "WAIT_25260"
 is "last backup yesterday evening (17:14 VN) is due now"   "$(decide "$(e 20261115_101409)" "$NOW")" "DUE_SINCE_SLOT"
 is "machine switched on at 08:00 VN after a night off is due at once"   "$(decide "$(e 20261115_101409)" "$(e 20261116_010000)")" "DUE_SINCE_SLOT"
-is "a backup made at midnight waits a full day"   "$(decide "$(e 20261115_170000)" "$(e 20261115_170500)")" "WAIT_86100"
+is "a backup made at 00:01 waits a full day"   "$(decide "$(e 20261115_170100)" "$(e 20261115_170600)")" "WAIT_86100"
 is "a backup dated far in the future is due, never an absurd sleep"   "$(decide $((NOW + 86400)) "$NOW")" "DUE_CLOCK_SKEW"
-is "a backup dated slightly ahead stays within skew tolerance"   "$(decide $((NOW + 60)) "$NOW")" "WAIT_25200"
+is "a backup dated slightly ahead stays within skew tolerance"   "$(decide $((NOW + 60)) "$NOW")" "WAIT_25260"
 
 echo
 echo "prune safety"
