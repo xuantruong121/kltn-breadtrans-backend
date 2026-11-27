@@ -1,10 +1,11 @@
 import { historyEditProblem } from './edit-with-history';
 import { skillDeleteRefusal } from './skill-content-delete';
 import {
+  isPracticeLevel,
+  keepTitleHead,
   listeningTitleLabel,
-  parseCefrRange,
+  PRACTICE_LEVEL_LABEL,
   relabelTitleHead,
-  titleWithLevel,
 } from '../subscription/practice-level';
 import {
   mergeListeningContent,
@@ -27,6 +28,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import {
   type LearningContentType,
+  type PracticeLevel,
   Prisma,
   QuizPublicationStatus,
   QuizType,
@@ -47,7 +49,6 @@ import { isAcceptedContentImageReference } from '../upload/content-image-validat
 import { QuizService } from '../quiz/quiz.service';
 import { ListeningAudioAuthoringService } from '../quiz/listening-audio-authoring.service';
 import { normalizeDialogueSegments } from '../quiz/listening-dialogue.contract';
-import { SPEAKING_SET_LEVELS } from '../speaking/speaking-contract';
 import { taskTypeValidationErrors } from '../speaking/speaking-task-validation';
 import { isPremiumSpeaking } from '../speaking/speaking-content-access.logic';
 import { toeicSpeakingContractErrors } from '../speaking/toeic-speaking-contract';
@@ -106,12 +107,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-const SKILL_TITLE_LABEL: Record<string, string> = {
-  listening: 'Listening',
-  reading: 'Reading',
-  writing: 'Writing',
-};
-
 /** The publish check's line for a choice question, in the checklist's words. */
 const CHOICES_INCOMPLETE = 'chưa đủ phương án hoặc chưa chọn đáp án đúng';
 
@@ -163,12 +158,9 @@ export class SkillCmsService {
   }
 
   private assertSpeakingSetContract(dto: SkillContentDto) {
-    if (
-      dto.level &&
-      !SPEAKING_SET_LEVELS.some((level) => level === dto.level)
-    ) {
+    if (dto.level && !isPracticeLevel(dto.level)) {
       throw new BadRequestException(
-        `Trình độ bộ luyện nói phải là một trong: ${SPEAKING_SET_LEVELS.join(', ')}`,
+        `Trình độ bộ luyện nói phải là một trong: ${Object.values(PRACTICE_LEVEL_LABEL).join(', ')}`,
       );
     }
   }
@@ -215,7 +207,7 @@ export class SkillCmsService {
   private async practiceTopicId(
     domain: Exclude<Domain, 'speaking'>,
     type: QuizType,
-    level?: string,
+    level?: PracticeLevel,
     writingKind?: 'TRANSLATION',
   ) {
     const category =
@@ -254,12 +246,10 @@ export class SkillCmsService {
     ).filter((topic) => topic.name !== SENTENCE_TRANSLATION_TOPIC.name);
     if (!topics.length) return undefined;
     if (domain !== 'reading') return topics[0].id;
-    const normalizedLevel = level?.trim().toUpperCase() ?? '';
-    const marker = normalizedLevel.includes('C1')
-      ? 'C1'
-      : normalizedLevel.includes('B1') || normalizedLevel.includes('B2')
-        ? 'B1'
-        : 'A1';
+    // The reading topics are named by the old bands ("… A1 …", "… B1 …",
+    // "… C1 …"): Mất gốc and Cơ bản go to the first, Trung cấp to the second.
+    const marker =
+      level === 'ADVANCED' ? 'C1' : level === 'INTERMEDIATE' ? 'B1' : 'A1';
     return (
       topics.find((topic) => topic.name.toUpperCase().includes(marker))?.id ??
       topics[0].id
@@ -668,7 +658,7 @@ export class SkillCmsService {
           id: `speaking-${randomUUID()}`,
           title: dto.title.trim(),
           description: dto.description?.trim() ?? '',
-          level: dto.level?.trim() || 'A1-B1',
+          level: dto.level ?? 'BASIC',
           publicationStatus: QuizPublicationStatus.DRAFT,
         },
       });
@@ -688,11 +678,10 @@ export class SkillCmsService {
     );
     return this.prisma.quiz.create({
       data: {
-        title: this.headedTitle(
-          domain,
-          titleWithLevel(dto.title, dto.level, SKILL_TITLE_LABEL[domain]),
-          dto.bilingualContent,
-        ),
+        // The level is its own column (owner 2026-11-27): a new title carries
+        // no level tag.
+        title: this.headedTitle(domain, dto.title.trim(), dto.bilingualContent),
+        practiceLevel: dto.level ?? 'BASIC',
         description: dto.description?.trim(),
         theoryContent: dto.passage,
         bilingualContent: this.contentMetadata(domain, dto),
@@ -725,7 +714,7 @@ export class SkillCmsService {
         data: {
           title: dto.title?.trim(),
           description: dto.description?.trim(),
-          level: dto.level?.trim(),
+          level: dto.level,
         },
       });
     }
@@ -748,18 +737,18 @@ export class SkillCmsService {
       );
     // An exam task carries no level: the exam sets who can open it.
     const metadata = this.contentMetadata(domain, dto, quiz.bilingualContent);
-    const title =
-      dto.level && !(await this.isExamTask(id))
-        ? this.headedTitle(
-            domain,
-            titleWithLevel(
-              dto.title ?? quiz.title,
-              dto.level,
-              SKILL_TITLE_LABEL[domain],
-            ),
-            metadata ?? quiz.bilingualContent,
-          )
-        : dto.title?.trim();
+    const examTask = await this.isExamTask(id);
+    // A published title keeps its old level head ("Listening B1 — …"):
+    // learner titles and the starter roadmap look titles up by their text.
+    const base =
+      dto.title !== undefined
+        ? keepTitleHead(quiz.title, dto.title.trim())
+        : domain === 'listening' && metadata
+          ? quiz.title
+          : undefined;
+    const title = base
+      ? this.headedTitle(domain, base, metadata ?? quiz.bilingualContent)
+      : undefined;
     return this.prisma.quiz.update({
       where: { id },
       data: {
@@ -774,6 +763,7 @@ export class SkillCmsService {
             : metadata,
         timeLimit: dto.timeLimit,
         type,
+        practiceLevel: dto.level && !examTask ? dto.level : undefined,
         isPremiumContent: dto.isPremiumContent,
       },
     });
@@ -995,7 +985,9 @@ export class SkillCmsService {
     const data: any = {
       title: dto.title.trim(),
       targetText: dto.targetText.trim(),
-      difficulty: dto.difficulty || set.level,
+      // A question's own level, else its set's (before 2026-11-27 this could
+      // copy a CEFR set level into a difficulty).
+      difficulty: dto.difficulty ?? set.level,
       imageUrl: dto.imageUrl,
       audioUrl: dto.audioUrl,
       isPremiumContent: dto.isPremiumContent ?? false,
@@ -1140,8 +1132,8 @@ export class SkillCmsService {
     const text = exercise.targetText.trim();
     if (!text) throw new BadRequestException('Câu luyện chưa có câu mẫu.');
     // The learner endpoint drops a public URL on paid content, and paid is
-    // decided from the set level (B1+), not from the stored flag (QA
-    // 2026-11-22: a B1-B2 clip saved public never played). Same rule here.
+    // decided from the set level (Trung cấp and above), not from the stored
+    // flag (QA 2026-11-22: a B1-B2 clip saved public never played).
     const premium = isPremiumSpeaking(exercise);
     if (premium && !this.uploadService.isPrivateStorageConfigured())
       throw new ServiceUnavailableException(
@@ -1590,6 +1582,7 @@ export class SkillCmsService {
       id: number;
       type?: QuizType;
       title?: string;
+      practiceLevel?: PracticeLevel | null;
       bilingualContent?: unknown;
       questions: Array<{
         type: string;
@@ -1613,7 +1606,7 @@ export class SkillCmsService {
       );
     if (!quiz.title?.trim()) errors.push('Thiếu tiêu đề');
     if (!answered.length) errors.push('Cần ít nhất một câu hỏi');
-    if (!parseCefrRange(quiz.title) && !(await this.isExamTask(quiz.id)))
+    if (!quiz.practiceLevel && !(await this.isExamTask(quiz.id)))
       errors.push('Chưa có trình độ: chọn trình độ rồi lưu lại');
     if (
       domain === 'listening' &&

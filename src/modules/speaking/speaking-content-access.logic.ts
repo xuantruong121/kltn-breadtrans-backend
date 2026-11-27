@@ -1,7 +1,7 @@
+import type { PracticeLevel } from '@prisma/client';
+
 import {
   advancedPracticePlan,
-  type CefrRange,
-  parseCefrRange,
   type PracticePlan,
   requiredPracticePlan,
 } from '../subscription/practice-level';
@@ -13,34 +13,32 @@ import {
  */
 export type SpeakingPlanSubject = {
   isPremiumContent: boolean;
-  /** Present on full rows; carries the authored CEFR tag. */
-  title?: string | null;
   /** Present when the row was loaded with its practice set. */
-  practiceSet?: { scope?: string | null; level?: string | null } | null;
+  practiceSet?: {
+    scope?: string | null;
+    level?: PracticeLevel | null;
+  } | null;
 };
 
-/** Practice set level, else the title tag; null for TOEIC exam tasks. */
-export function speakingCefrRange(
+/** The practice set's level; null for TOEIC exam tasks and set-less rows. */
+export function speakingPracticeLevel(
   exercise: SpeakingPlanSubject,
-): CefrRange | null {
+): PracticeLevel | null {
   if (exercise.practiceSet?.scope === 'EXAM_INTERNAL') return null;
-  return (
-    parseCefrRange(exercise.practiceSet?.level) ??
-    parseCefrRange(exercise.title)
-  );
+  return exercise.practiceSet?.level ?? null;
 }
 
 /**
  * Lowest plan for this exercise. Standalone practice follows the owner
- * matrix (A1/A2 free, B1+ paid) from its practice set level, else from the
- * CEFR tag of its title. TOEIC exam tasks and untagged items keep their
+ * matrix (Mất gốc and Cơ bản free, Trung cấp PLUS, Nâng cao PRO) from its
+ * practice set level. TOEIC exam tasks and items with no level keep their
  * stored flag, which then needs PRO.
  */
 export function speakingRequiredPlan(
   exercise: SpeakingPlanSubject,
 ): PracticePlan {
-  const range = speakingCefrRange(exercise);
-  if (range) return requiredPracticePlan('SPEAKING', range);
+  const level = speakingPracticeLevel(exercise);
+  if (level) return requiredPracticePlan('SPEAKING', level);
   return exercise.isPremiumContent ? advancedPracticePlan('SPEAKING') : 'FREE';
 }
 

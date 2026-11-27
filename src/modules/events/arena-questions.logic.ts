@@ -89,13 +89,12 @@ export type ArenaQuestion = {
   explanation: string;
 };
 
+/** A deck's practice level as a rank (owner 2026-11-27; CEFR A1-C2 before). */
 const LEVEL_RANK: Record<string, number> = {
-  A1: 1,
-  A2: 2,
-  B1: 3,
-  B2: 4,
-  C1: 5,
-  C2: 6,
+  STARTER: 1,
+  BASIC: 2,
+  INTERMEDIATE: 3,
+  ADVANCED: 4,
 };
 
 export function levelRank(level: string | null | undefined): number | null {
@@ -167,16 +166,17 @@ export function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 }
 
 /**
- * Allowed CEFR ranks for a round: the first 30 % A2–B1, the middle B1, the
- * last 30 % B2, widened to B1 and C1 when B2 runs out (for 10 rounds: 1–3,
- * 4–7, 8–10). The decks hold about twice as many B1 words as B2, so a B1–B2
- * range made the last rounds mostly B1.
+ * Allowed level ranks for a round (owner 2026-11-27, four practice levels):
+ * the first 30 % Mất gốc–Cơ bản, the middle 40 % Cơ bản–Trung cấp, the last
+ * 30 % Trung cấp–Nâng cao, widened by `widen` when a stage runs out (for 10
+ * rounds: 1–3, 4–7, 8–10). Before, the stages were CEFR A2–B1, B1 and B2; B1
+ * and B2 are now one level, so the last rounds mix them.
  */
 export function stageLevels(roundIndex: number, count: number): number[] {
   const position = roundIndex / count;
-  if (position < 0.3) return [2, 3];
-  if (position < 0.7) return [3];
-  return [4];
+  if (position < 0.3) return [1, 2];
+  if (position < 0.7) return [2, 3];
+  return [3, 4];
 }
 
 /** Kinds for a match: each kind at least count/3 times, in random order. */

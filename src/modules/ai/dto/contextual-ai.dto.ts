@@ -1,3 +1,4 @@
+import { PRACTICE_LEVELS } from '../../subscription/practice-level';
 import {
   IsNotEmpty,
   IsString,
@@ -26,8 +27,9 @@ import {
 
 // C2 too (owner 2026-11-22): the CMS level select offers it, and a C2
 // draft was refused with 400 in every AI form.
-const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
-const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
+/** Every AI draft takes one of the four practice levels (owner 2026-11-27). */
+const CONTENT_LEVELS = PRACTICE_LEVELS;
+const GRAMMAR_LEVELS = PRACTICE_LEVELS;
 const TOEIC_PART5_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
 export type ToeicPart5Difficulty = (typeof TOEIC_PART5_DIFFICULTIES)[number];
 

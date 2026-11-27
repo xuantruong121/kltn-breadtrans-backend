@@ -7,13 +7,11 @@ import {
 import { PlanFeatureKey, PracticeLevel, Role } from '@prisma/client';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
-  cefrSpan,
-  type CefrRange,
   planSatisfies,
   type PracticePlan,
 } from '../subscription/practice-level';
 import {
-  speakingCefrRange,
+  speakingPracticeLevel,
   speakingRequiredPlan,
 } from './speaking-content-access.logic';
 import {
@@ -27,10 +25,11 @@ import { PLAN_LABEL, planCodeOf } from '../subscription/plan-limits';
 export type SpeakingContentAccessSubject = {
   id: number;
   isPremiumContent: boolean;
-  /** Present on full rows; carries the authored CEFR tag. */
-  title?: string;
   /** Present when the row was loaded with its practice set. */
-  practiceSet?: { scope?: string | null; level?: string | null } | null;
+  practiceSet?: {
+    scope?: string | null;
+    level?: PracticeLevel | null;
+  } | null;
 };
 
 export type SpeakingContentAccess = {
@@ -39,8 +38,6 @@ export type SpeakingContentAccess = {
   featureKey: PlanFeatureKey;
   /** Lowest plan that opens this exercise (FREE when it is not premium). */
   requiredPlan: PracticePlan;
-  /** Authored CEFR level the plan was decided from ("A2", "B1-B2"). */
-  cefrLevel: string | null;
   /** The item's internal practice level, when it has one. */
   practiceLevel: PracticeLevel | null;
   unlockedLevel: PracticeLevel;
@@ -66,9 +63,9 @@ export class SpeakingContentAccessService {
     return speakingRequiredPlan(exercise);
   }
 
-  /** Practice set level, else the title tag; null for TOEIC exam tasks. */
-  cefrRange(exercise: SpeakingContentAccessSubject): CefrRange | null {
-    return speakingCefrRange(exercise);
+  /** The practice set's level; null for TOEIC exam tasks. */
+  practiceLevel(exercise: SpeakingContentAccessSubject): PracticeLevel | null {
+    return speakingPracticeLevel(exercise);
   }
 
   isPremium(exercise: SpeakingContentAccessSubject): boolean {
@@ -91,7 +88,6 @@ export class SpeakingContentAccessService {
         !planSatisfies(planCode, requiredPlan),
       featureKey: this.featureKey,
       requiredPlan,
-      cefrLevel: cefrSpan(this.cefrRange(exercise)),
       ...this.levelOf(exercise, role, unlocked),
     };
   }
@@ -109,7 +105,7 @@ export class SpeakingContentAccessService {
       };
     return this.levelAccess.check(
       'SPEAKING',
-      this.cefrRange(exercise),
+      this.practiceLevel(exercise),
       unlocked,
       role,
     );

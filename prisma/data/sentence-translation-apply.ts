@@ -76,7 +76,8 @@ export async function applySentenceTranslation(db: Db) {
         description: exercise.description,
         type: QuizType.WRITING_PICTURE,
         practiceTopicId: topicId,
-        // A1 and A2 are free (practice-level.ts); the seed resyncs it anyway.
+        practiceLevel: exercise.level,
+        // STARTER and BASIC are free (practice-level.ts); the seed resyncs it anyway.
         isPremiumContent: false,
         publishedAt: new Date(),
         questions: {

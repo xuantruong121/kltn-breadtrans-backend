@@ -11,8 +11,6 @@ import type {
 } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import { parseCefrRange } from '../subscription/practice-level';
-import { itemLevel } from './ability.logic';
 import {
   gateQuestionView,
   gateRetryAt,
@@ -56,10 +54,10 @@ export class GateService {
       where: {
         type: GATE_QUIZ_TYPE[skill],
         publicationStatus: 'PUBLISHED',
+        practiceLevel: level,
         toeicWritingSetItems: { none: {} },
       },
       select: {
-        title: true,
         questions: {
           where: {
             type: 'MULTIPLE_CHOICE',
@@ -71,12 +69,7 @@ export class GateService {
         },
       },
     });
-    return quizzes
-      .filter((quiz) => {
-        const range = parseCefrRange(quiz.title);
-        return range !== null && itemLevel(range) === level;
-      })
-      .flatMap((quiz) => quiz.questions);
+    return quizzes.flatMap((quiz) => quiz.questions);
   }
 
   /** The gate open to this learner for a skill, and why not if none is. */

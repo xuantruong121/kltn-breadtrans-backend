@@ -7,8 +7,6 @@ import type { PracticeLevel, PracticeSkill } from '@prisma/client';
 
 import {
   decksToLearn,
-  deckLevel,
-  grammarLevel,
   grammarToStudy,
   type DeckInput,
   type GrammarInput,
@@ -66,7 +64,7 @@ function skillStep(s: RoadmapSkill, level: PracticeLevel) {
 }
 
 function grammarStep(topics: GrammarInput[], level: PracticeLevel) {
-  const own = topics.filter((t) => grammarLevel(t.level) === level);
+  const own = topics.filter((t) => t.level === level);
   if (!own.length) return [];
   const open = grammarToStudy(own, level);
   return [
@@ -83,7 +81,7 @@ function grammarStep(topics: GrammarInput[], level: PracticeLevel) {
 }
 
 function vocabStep(decks: DeckInput[], level: PracticeLevel) {
-  const own = decks.filter((d) => deckLevel(d.level) === level);
+  const own = decks.filter((d) => d.level === level);
   if (!own.length) return [];
   const learned = own.filter((d) => deckDone(d.mastered, d.total)).length;
   const open = decksToLearn(own, level);

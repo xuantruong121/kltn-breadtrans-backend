@@ -30,7 +30,7 @@ import { GeminiEvaluatorStrategy } from '../src/modules/ai/strategies/gemini-eva
 import { SkillCmsService } from '../src/modules/content/skill-cms.service';
 import { keyOrder } from './toeic-rewrite-listening-34';
 import {
-  parseCefrRange,
+  legacyPracticeLevel,
   requiredPracticePlan,
   type PracticeSkill,
 } from '../src/modules/subscription/practice-level';
@@ -296,8 +296,8 @@ async function apply() {
     for (const item of buildSpec()) {
       const d = drafts[item.key];
       if (!d || applied[item.key]) continue;
-      const premium =
-        requiredPracticePlan(item.skill, parseCefrRange(item.cefr)!) !== 'FREE';
+      const level = legacyPracticeLevel(item.cefr) ?? 'BASIC';
+      const premium = requiredPracticePlan(item.skill, level) !== 'FREE';
       let domain: string;
       let id: number | string;
       if (item.skill === 'LISTENING') {
@@ -307,7 +307,7 @@ async function apply() {
           {
             title: `Hội thoại ${item.cefr} — ${d.title}`,
             description: d.description,
-            level: item.cefr,
+            level,
             timeLimit: 15,
             isPremiumContent: premium,
             bilingualContent: { mode: 'DIALOGUE' },
@@ -356,7 +356,7 @@ async function apply() {
           {
             title: `Reading ${item.cefr} — ${d.title}`,
             description: d.description,
-            level: item.cefr,
+            level,
             timeLimit: 15,
             passage: d.passage,
             isPremiumContent: premium,
@@ -390,7 +390,7 @@ async function apply() {
           {
             title: `Writing ${item.cefr} — ${item.topic.replace(/^./, (c) => c.toUpperCase())}`,
             description: d.scenario || d.context || d.prompt.slice(0, 160),
-            level: item.cefr,
+            level,
             timeLimit: 20,
             type: 'WRITING_EMAIL',
             isPremiumContent: premium,
@@ -404,7 +404,7 @@ async function apply() {
             type: 'WRITING',
             prompt: d.prompt,
             taskType: d.taskType || writingTaskType(item.cefr),
-            level: item.cefr,
+            level,
             keywords: d.keywords,
             wordRange: d.wordRange ?? writingWords(item.cefr),
             sampleSentences: d.sampleSentences,
@@ -419,7 +419,7 @@ async function apply() {
           {
             title: d.practiceSet.title,
             description: d.practiceSet.description,
-            level: item.cefr,
+            level,
           },
           user,
         );
@@ -432,11 +432,7 @@ async function apply() {
               title: e.title,
               targetText: e.targetText,
               taskType: e.taskType,
-              difficulty: item.cefr.startsWith('A')
-                ? 'BEGINNER'
-                : item.cefr.startsWith('B')
-                  ? 'INTERMEDIATE'
-                  : 'ADVANCED',
+              difficulty: level,
               isPremiumContent: premium,
             },
             user,

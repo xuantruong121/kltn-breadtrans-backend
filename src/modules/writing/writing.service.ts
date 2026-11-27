@@ -77,7 +77,6 @@ import { QuizPublicationStatus, QuizType, TopicCategory } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
 import { TrialService } from '../subscription/trial.service';
-import { cefrSpan } from '../subscription/practice-level';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import {
@@ -813,7 +812,6 @@ export class WritingService {
           isLocked: access.isLocked,
           ...levelFields(access),
           requiredPlan: access.requiredPlan ?? 'FREE',
-          cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
         };
         if (access.isLocked) return safeMetadata;
         return {
@@ -939,9 +937,7 @@ export class WritingService {
       type: quiz.type,
       topicName: quiz.practiceTopic?.name ?? '',
       level: content.level,
-      cefrLevel: this.quizContentAccess
-        ? cefrSpan(this.quizContentAccess.cefrRange(quiz))
-        : null,
+      practiceLevel: quiz.practiceLevel ?? null,
       taskType: content.taskType,
       prompt: content.prompt,
       imageUrl: content.imageUrl,

@@ -303,7 +303,7 @@ async function main() {
             id: speakingId,
             title: `${spec.title} — Speaking`,
             description: 'Nguồn Speaking nội bộ của đề thi (BreadTrans).',
-            level: 'B1-C1',
+            level: 'ADVANCED',
             scope: SpeakingPracticeScope.EXAM_INTERNAL,
             publicationStatus: QuizPublicationStatus.DRAFT,
           },

@@ -2,8 +2,6 @@ import { Injectable, Optional } from '@nestjs/common';
 import type { PracticeLevel, PracticeSkill, Role } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import { parseCefrRange } from '../subscription/practice-level';
-import { itemLevel } from './ability.logic';
 import { PRACTICE_SKILLS } from './placement.logic';
 import {
   effectiveUnlockedLevel,
@@ -85,9 +83,8 @@ export class LevelAccessService {
       PRACTICE_SKILLS.map((skill) => [skill, new Set<PracticeLevel>()]),
     );
     if (!this.prisma) return levels;
-    const add = (skill: PracticeSkill, tag: string | null | undefined) => {
-      const range = parseCefrRange(tag);
-      if (range) levels.get(skill)?.add(itemLevel(range));
+    const add = (skill: PracticeSkill, level: PracticeLevel | null) => {
+      if (level) levels.get(skill)?.add(level);
     };
     const skillOf = new Map(QUIZ_TYPES);
     const [quizzes, sets] = await Promise.all([
@@ -96,30 +93,31 @@ export class LevelAccessService {
           type: { in: QUIZ_TYPES.map(([type]) => type) as never },
           publicationStatus: 'PUBLISHED',
         },
-        select: { type: true, title: true },
+        select: { type: true, practiceLevel: true },
       }),
       this.prisma.speakingPracticeSet.findMany({
         where: { scope: 'SKILL_PRACTICE', publicationStatus: 'PUBLISHED' },
         select: { level: true },
       }),
     ]);
-    for (const quiz of quizzes) add(skillOf.get(quiz.type)!, quiz.title);
+    for (const quiz of quizzes)
+      add(skillOf.get(quiz.type)!, quiz.practiceLevel);
     for (const set of sets) add('SPEAKING', set.level);
     this.contentCache = { at: Date.now(), levels };
     return levels;
   }
 
-  /** The lock for one item; `range` null means it has no practice level. */
+  /** The lock for one item; `level` null means it has no practice level. */
   check(
     skill: PracticeSkill | null,
-    range: Parameters<typeof itemLevel>[0] | null,
+    level: PracticeLevel | null,
     unlocked: UnlockedLevels,
     role?: Role,
   ): LevelAccess {
     const unlockedLevel = skill ? unlocked[skill] : UNPLACED_UNLOCKED;
-    if (!skill || !range)
+    if (!skill || !level)
       return { practiceLevel: null, unlockedLevel, isLevelLocked: false };
-    const practiceLevel = itemLevel(range);
+    const practiceLevel = level;
     return {
       practiceLevel,
       unlockedLevel,

@@ -6,6 +6,7 @@
  * Usage: npx ts-node --transpile-only scripts/qa/cp58-cefr-audit.ts [BE] [email] [password]
  */
 import {
+  legacyPracticeLevel,
   parseCefrRange,
   requiredPracticePlan,
   type CefrRange,
@@ -13,7 +14,10 @@ import {
 } from '../../src/modules/subscription/practice-level';
 import { requireExplicitOptIn } from './qa-target-guard';
 
-requireExplicitOptIn('QA_OWNER_READONLY', 'cp58-cefr-audit drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions');
+requireExplicitOptIn(
+  'QA_OWNER_READONLY',
+  'cp58-cefr-audit drives the owner app (:3000/:3001, kltn_db) read-only; logins still write sessions',
+);
 
 const BE = process.argv[2] ?? 'http://127.0.0.1:3001';
 const EMAIL = process.argv[3] ?? 'student2@breadtrans.com';
@@ -89,7 +93,11 @@ void (async () => {
 
   let mismatches = 0;
   for (const r of rows) {
-    const plan = r.policy ? requiredPracticePlan(r.skill, r.policy) : 'UNKNOWN';
+    const level =
+      legacyPracticeLevel(r.title) ??
+      (r.policy ? legacyPracticeLevel(span(r.policy)) : null);
+    const plan =
+      r.policy && level ? requiredPracticePlan(r.skill, level) : 'UNKNOWN';
     const problems: string[] = [];
     if (!r.policy) problems.push('no CEFR tag');
     if (r.requiredPlan && r.requiredPlan !== plan)

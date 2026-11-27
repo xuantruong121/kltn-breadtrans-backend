@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { PracticeSkill, QuizType } from '@prisma/client';
+import type { PracticeLevel, PracticeSkill, QuizType } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import { parseCefrRange } from '../subscription/practice-level';
-import { itemLevel } from './ability.logic';
 import { LevelAccessService } from './level-access.service';
 import { isLevelLocked } from './progression.logic';
 import {
@@ -66,6 +64,7 @@ export class StarterRoadmapService {
           id: true,
           title: true,
           type: true,
+          practiceLevel: true,
           submissions: { where: { userId }, take: 1, select: { id: true } },
         },
       }),
@@ -103,10 +102,8 @@ export class StarterRoadmapService {
       select: { topicId: true },
     });
 
-    const locked = (skill: PracticeSkill, tag?: string | null) => {
-      const range = parseCefrRange(tag);
-      return range ? isLevelLocked(itemLevel(range), unlocked[skill]) : false;
-    };
+    const locked = (skill: PracticeSkill, level: PracticeLevel | null) =>
+      level ? isLevelLocked(level, unlocked[skill]) : false;
     const facts = (ref: RoadmapRef): StepFacts | undefined => {
       if (ref.kind === 'GRAMMAR') {
         const topic = grammar.find((t) => t.title === ref.title);
@@ -138,7 +135,7 @@ export class StarterRoadmapService {
           ? {
               route: `/${skill.toLowerCase()}/${quiz.id}`,
               done: quiz.submissions.length > 0,
-              locked: locked(skill, quiz.title),
+              locked: locked(skill, quiz.practiceLevel),
             }
           : undefined;
       }

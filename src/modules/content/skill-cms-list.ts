@@ -5,6 +5,7 @@
  * former browser-side ones (FE `skillCmsStatus.ts`). No I/O.
  */
 import { isAll, ListQuery, matchesSearch } from '../../common/paging/list-page';
+import { PRACTICE_LEVELS } from '../subscription/practice-level';
 
 export type AudioTone = 'ok' | 'pending' | 'error' | 'none';
 export type ListeningMode = 'COMPREHENSION' | 'DICTATION' | 'DIALOGUE';
@@ -14,8 +15,6 @@ export const LISTENING_MODES: ListeningMode[] = [
   'DICTATION',
   'DIALOGUE',
 ];
-
-const CMS_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 const AUDIO_TONE: Record<string, AudioTone> = {
   PUBLISHED: 'ok',
@@ -110,6 +109,8 @@ export type QuizListRow = {
   title?: string | null;
   description?: string | null;
   level?: string | null;
+  /** The quiz's practice level (owner 2026-11-27). */
+  practiceLevel?: string | null;
   type?: string | null;
   publicationStatus?: string | null;
   bilingualContent?: unknown;
@@ -159,10 +160,9 @@ export function levelFromTitle(title?: string | null) {
   return /\b([ABC][12])\b/.exec(head)?.[1] ?? null;
 }
 
-export const contentLevel = (row: {
-  title?: string | null;
-  level?: string | null;
-}) => levelFromTitle(row.title) ?? row.level ?? null;
+/** The level a card shows and the filter reads: the stored practice level. */
+export const contentLevel = (row: { practiceLevel?: string | null }) =>
+  row.practiceLevel ?? null;
 
 /** The title as a card shows it, without the "Hội thoại C1 — " head. */
 export function displayTitle(row: { title?: string | null }) {
@@ -172,9 +172,9 @@ export function displayTitle(row: { title?: string | null }) {
     : title;
 }
 
-const levelRank = (level: string | null) => {
-  const index = CMS_LEVELS.indexOf(level ?? '');
-  return index < 0 ? CMS_LEVELS.length : index;
+const levelRank = (level: string | null | undefined) => {
+  const index = (PRACTICE_LEVELS as readonly string[]).indexOf(level ?? '');
+  return index < 0 ? PRACTICE_LEVELS.length : index;
 };
 
 /**
@@ -248,7 +248,7 @@ export function quizListFacets(
         rows.filter((row) => listeningModeOf(row) === mode).length,
       ]),
     ) as Record<ListeningMode, number>,
-    levels: CMS_LEVELS.filter((level) =>
+    levels: PRACTICE_LEVELS.filter((level) =>
       rows.some((row) => contentLevel(row) === level),
     ),
     ...(options.writing
@@ -275,16 +275,8 @@ export type SpeakingSetRow = {
   exerciseCount: number;
 };
 
-/** Speaking levels are CEFR or the three-step scale; unknown ones sort last. */
-function speakingLevelRank(level?: string | null) {
-  const cefr = /([ABC][12])/.exec(String(level ?? '').toUpperCase())?.[1];
-  if (cefr) return CMS_LEVELS.indexOf(cefr);
-  return (
-    ({ BEGINNER: 0, INTERMEDIATE: 2, ADVANCED: 4 } as Record<string, number>)[
-      String(level)
-    ] ?? 9
-  );
-}
+/** Speaking set levels in order; an unknown one sorts last. */
+const speakingLevelRank = levelRank;
 
 /**
  * Speaking sets after search, level, status and track, newest first. The old

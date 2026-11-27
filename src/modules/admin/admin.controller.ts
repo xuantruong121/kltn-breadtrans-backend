@@ -228,7 +228,11 @@ export class AdminController {
   @ApiQuery({ name: 'pageSize', required: false })
   @ApiQuery({ name: 'q', required: false })
   @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'level', required: false, description: 'A1..C2 hoac NONE' })
+  @ApiQuery({
+    name: 'level',
+    required: false,
+    description: 'STARTER, BASIC, INTERMEDIATE, ADVANCED hoac NONE',
+  })
   @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
   @ApiQuery({
     name: 'sort',

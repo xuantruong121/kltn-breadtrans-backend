@@ -7,8 +7,6 @@
  */
 import type { PracticeLevel } from '@prisma/client';
 
-import { parseCefrRange } from '../subscription/practice-level';
-import { itemLevel } from './ability.logic';
 import { PRACTICE_LEVEL_LABEL, levelIndex } from './placement.logic';
 import { PROGRESS_AVERAGE } from './progression.logic';
 
@@ -28,7 +26,7 @@ export type FoundationItem = {
 export type GrammarInput = {
   id: number;
   title: string;
-  level: string;
+  level: PracticeLevel;
   /** Best attempt, 0-100; null when never attempted. */
   best: number | null;
 };
@@ -36,29 +34,14 @@ export type GrammarInput = {
 export type DeckInput = {
   id: number;
   title: string;
-  /** CEFR content tag; null on a deck that has none yet. */
-  level: string | null;
+  /** Practice level; null on a deck that has none yet. */
+  level: PracticeLevel | null;
   total: number;
   mastered: number;
 };
 
 const ITEM_MINUTES = 10;
 const WORDS_PER_MINUTE = 2;
-
-const GRAMMAR_LEVELS: Record<string, PracticeLevel> = {
-  BEGINNER: 'BASIC',
-  INTERMEDIATE: 'INTERMEDIATE',
-  ADVANCED: 'ADVANCED',
-};
-
-export const grammarLevel = (level: string): PracticeLevel =>
-  GRAMMAR_LEVELS[level] ?? 'BASIC';
-
-export function deckLevel(level: string | null): PracticeLevel | null {
-  if (!level) return null;
-  const range = parseCefrRange(`(${level})`);
-  return range ? itemLevel(range) : null;
-}
 
 /** Own level first, then one below, then one above; further away never. */
 function distance(item: PracticeLevel, learner: PracticeLevel): number | null {
@@ -91,7 +74,7 @@ export function grammarToStudy(
   const open = topics.filter(
     (t) => t.best === null || t.best < PROGRESS_AVERAGE,
   );
-  return nearest(open, (t) => grammarLevel(t.level), learner).map((t) => ({
+  return nearest(open, (t) => t.level, learner).map((t) => ({
     kind: 'GRAMMAR',
     id: t.id,
     title: t.title,
@@ -99,7 +82,7 @@ export function grammarToStudy(
     minutes: ITEM_MINUTES,
     reason:
       t.best === null
-        ? `Ngữ pháp mức ${PRACTICE_LEVEL_LABEL[grammarLevel(t.level)]}`
+        ? `Ngữ pháp mức ${PRACTICE_LEVEL_LABEL[t.level]}`
         : `Lần gần nhất bạn đạt ${t.best}%, nên ôn lại`,
   }));
 }
@@ -109,8 +92,8 @@ export function decksToLearn(
   learner: PracticeLevel,
 ): FoundationItem[] {
   const open = decks.filter((d) => d.total > 0 && d.mastered < d.total);
-  return nearest(open, (d) => deckLevel(d.level), learner).map((d) => {
-    const level = deckLevel(d.level);
+  return nearest(open, (d) => d.level, learner).map((d) => {
+    const level = d.level;
     return {
       kind: 'VOCAB_DECK',
       id: d.id,

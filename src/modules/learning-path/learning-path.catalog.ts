@@ -21,12 +21,11 @@ import type {
 
 import {
   isDictationContent,
-  parseCefrRange,
   planSatisfies,
   requiredPracticePlan,
 } from '../subscription/practice-level';
 import { GENERAL_TRACK } from '../learning-track/learning-track.logic';
-import { itemLevel, seedDifficulty } from './ability.logic';
+import { seedDifficulty } from './ability.logic';
 import { weakFocus } from './weak-focus.logic';
 import { percentOfAttempt } from './progression.logic';
 import {
@@ -90,7 +89,13 @@ export async function loadCandidates(
           none: { writingSet: { assessmentComponents: { some: {} } } },
         },
       },
-      select: { id: true, type: true, title: true, bilingualContent: true },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        practiceLevel: true,
+        bilingualContent: true,
+      },
     }),
     db.speakingPracticeSet.findMany({
       where: { scope: 'SKILL_PRACTICE', publicationStatus: 'PUBLISHED' },
@@ -122,19 +127,19 @@ export async function loadCandidates(
   const setKeyOfExercise = new Map<number, number>();
   for (const q of quizzes) {
     const skill = QUIZ_SKILL[q.type];
-    const range = parseCefrRange(q.title);
-    if (!skill || skill === 'SPEAKING' || !range) continue;
-    const requiredPlan = requiredPracticePlan(skill, range, {
+    const level = q.practiceLevel;
+    if (!skill || skill === 'SPEAKING' || !level) continue;
+    const requiredPlan = requiredPracticePlan(skill, level, {
       dictation: isDictationContent(q.bilingualContent),
     });
     out.push({
       type: 'QUIZ',
       id: q.id,
       skill,
-      level: itemLevel(range),
+      level,
       title: q.title,
       route: `${ROUTE[skill]}/${q.id}`,
-      difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(range),
+      difficulty: difficultyOf('QUIZ', q.id) ?? seedDifficulty(level),
       tracks: quizTracksOf(q.id),
       kinds: [q.type],
       planLocked: !planSatisfies(planCode, requiredPlan),
@@ -143,20 +148,20 @@ export async function loadCandidates(
     });
   }
   for (const set of sets) {
-    const range = parseCefrRange(set.level);
+    const level = set.level;
     const first = set.exercises[0];
-    if (!range || !first) continue;
+    if (!first) continue;
     for (const e of set.exercises) setKeyOfExercise.set(e.id, first.id);
-    const requiredPlan = requiredPracticePlan('SPEAKING', range);
+    const requiredPlan = requiredPracticePlan('SPEAKING', level);
     out.push({
       type: 'SPEAKING_SET',
       id: first.id,
       skill: 'SPEAKING',
-      level: itemLevel(range),
+      level,
       title: set.title,
       route: `/speaking/${first.id}?set=${encodeURIComponent(set.id)}`,
       difficulty:
-        difficultyOf('SPEAKING_SET', first.id) ?? seedDifficulty(range),
+        difficultyOf('SPEAKING_SET', first.id) ?? seedDifficulty(level),
       tracks: set.tracks.map((t) => t.track),
       kinds: [...new Set(set.exercises.map((e) => String(e.taskType)))],
       planLocked: !planSatisfies(planCode, requiredPlan),

@@ -1,4 +1,6 @@
 /** What the CMS may read from an uploaded document. No I/O. */
+import { legacyPracticeLevel } from '../subscription/practice-level';
+
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCUMENT_MAX_CHARS = 20_000;
 export const DOCUMENT_MAX_DECKS = 6;
@@ -53,7 +55,8 @@ export function normalizeVocabDecks(
     .map((deck) => ({
       title: (deck.title ?? '').trim(),
       description: (deck.description ?? '').trim(),
-      level: (deck.level ?? '').trim(),
+      // A practice level; an old CEFR answer is read the same way.
+      level: legacyPracticeLevel(deck.level) ?? '',
       words: (deck.words ?? [])
         .filter((row) => row.word?.trim() && row.meaning?.trim())
         .filter((row) => {

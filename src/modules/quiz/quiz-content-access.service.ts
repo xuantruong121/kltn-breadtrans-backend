@@ -10,10 +10,7 @@ import { TtlMemo } from '../../common/utils/ttl-memo';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   advancedPracticePlan,
-  cefrSpan,
-  type CefrRange,
   isDictationContent,
-  parseCefrRange,
   planSatisfies,
   type PracticePlan,
   type PracticeSkill,
@@ -32,14 +29,14 @@ export type QuizContentAccessSubject = {
   type: QuizType;
   isPremiumContent: boolean;
   /**
-   * Carries the authored CEFR tag of practice items. resolve/resolveMany load
-   * it when a caller did not select it, so the plan matrix holds on every
-   * route, not only those that read the full row.
+   * The practice level of a standalone practice (null for an exam quiz).
+   * resolve/resolveMany load it when a caller did not select it, so the plan
+   * matrix holds on every route, not only those that read the full row.
    */
-  title?: string;
+  practiceLevel?: PracticeLevel | null;
   /**
-   * Listening practice keeps its mode here (DICTATION is paid from B1).
-   * Loaded like `title`; a Listening item reaching requiredPlan without it
+   * Listening practice keeps its mode here (DICTATION is paid from
+   * INTERMEDIATE). Loaded like `practiceLevel`; a Listening item reaching requiredPlan without it
    * counts as dictation.
    */
   bilingualContent?: unknown;
@@ -51,8 +48,6 @@ export type QuizContentAccess = {
   featureKey: PlanFeatureKey | null;
   /** Lowest plan that opens this item (FREE when it is not premium). */
   requiredPlan: PracticePlan;
-  /** Authored CEFR level the plan was decided from ("B1", "B2-C1"). */
-  cefrLevel: string | null;
   /** The item's internal practice level, when it has one. */
   practiceLevel: PracticeLevel | null;
   unlockedLevel: PracticeLevel;
@@ -62,7 +57,7 @@ export type QuizContentAccess = {
 
 /**
  * Single policy boundary for commercial access to Quiz-backed skill content.
- * The required plan comes from the skill and the authored CEFR level
+ * The required plan comes from the skill and the practice level
  * (practice-level.ts); the user's plan in effect (expiry included) must reach
  * it. Stored per-version entitlements no longer decide it, so a plan bought
  * under an older policy follows the current one.
@@ -77,34 +72,34 @@ export class QuizContentAccessService {
 
   private readonly policyFields = new TtlMemo<
     number,
-    { title: string; bilingualContent: unknown }
+    { practiceLevel: PracticeLevel | null; bilingualContent: unknown }
   >(60_000);
 
-  /** Fills the title and Listening mode of quizzes selected without them. */
+  /** Fills the level and Listening mode of quizzes selected without them. */
   private async withPolicyFields<T extends QuizContentAccessSubject>(
     quizzes: T[],
   ): Promise<T[]> {
     const missing = quizzes.filter(
       (q) =>
         this.skillForQuizType(q.type) !== null &&
-        (q.title === undefined ||
+        (q.practiceLevel === undefined ||
           (this.skillForQuizType(q.type) === 'LISTENING' &&
             q.bilingualContent === undefined)),
     );
     if (!missing.length) return quizzes;
-    // A quiz's title (its CEFR tag) and bilingualContent are read on almost
+    // A quiz's practice level and bilingualContent are read on almost
     // every learner request; they are kept for 60 s (see TtlMemo).
     const unknown = missing.filter((q) => !this.policyFields.peek(q.id));
     if (unknown.length) {
       const rows = await this.prisma.quiz.findMany({
         where: { id: { in: unknown.map((q) => q.id) } },
-        select: { id: true, title: true, bilingualContent: true },
+        select: { id: true, practiceLevel: true, bilingualContent: true },
       });
       for (const r of rows) this.policyFields.set(r.id, r);
     }
     const byId = new Map<
       number,
-      { title: string; bilingualContent: unknown }
+      { practiceLevel: PracticeLevel | null; bilingualContent: unknown }
     >();
     for (const q of missing) {
       const row = await this.policyFields.peek(q.id);
@@ -114,7 +109,10 @@ export class QuizContentAccessService {
       missing.includes(q)
         ? {
             ...q,
-            title: q.title ?? byId.get(q.id)?.title,
+            practiceLevel:
+              q.practiceLevel !== undefined
+                ? q.practiceLevel
+                : (byId.get(q.id)?.practiceLevel ?? null),
             bilingualContent:
               q.bilingualContent !== undefined
                 ? q.bilingualContent
@@ -141,17 +139,17 @@ export class QuizContentAccessService {
   }
 
   /**
-   * Lowest plan for this quiz. Standalone practice with an authored CEFR tag
-   * follows the owner matrix; other quizzes (TOEIC sets, untagged
-   * content) keep their stored flag, which then needs the skill's advanced
-   * plan. An untagged item is never opened just because its tag is missing.
+   * Lowest plan for this quiz. Standalone practice with a practice level
+   * follows the owner matrix; other quizzes (TOEIC sets, content with no
+   * level) keep their stored flag, which then needs the skill's advanced
+   * plan. An item is never opened just because its level is missing.
    */
   requiredPlan(quiz: QuizContentAccessSubject): PracticePlan {
     const skill = this.skillForQuizType(quiz.type);
     if (!skill) return 'FREE';
-    const range = this.cefrRange(quiz);
-    if (range)
-      return requiredPracticePlan(skill, range, {
+    const level = this.practiceLevel(quiz);
+    if (level)
+      return requiredPracticePlan(skill, level, {
         dictation:
           skill === 'LISTENING' &&
           (quiz.bilingualContent === undefined ||
@@ -160,10 +158,10 @@ export class QuizContentAccessService {
     return quiz.isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
   }
 
-  /** CEFR range of standalone skill practice; null for anything else. */
-  cefrRange(quiz: QuizContentAccessSubject): CefrRange | null {
+  /** Practice level of standalone skill practice; null for anything else. */
+  practiceLevel(quiz: QuizContentAccessSubject): PracticeLevel | null {
     if (!this.skillForQuizType(quiz.type)) return null;
-    return parseCefrRange(quiz.title);
+    return quiz.practiceLevel ?? null;
   }
 
   isPremium(quiz: QuizContentAccessSubject): boolean {
@@ -188,7 +186,6 @@ export class QuizContentAccessService {
         !planSatisfies(planCode, requiredPlan),
       featureKey,
       requiredPlan,
-      cefrLevel: cefrSpan(this.cefrRange(quiz)),
       ...this.levelOf(quiz, role, unlocked, exempt),
     };
   }
@@ -207,7 +204,7 @@ export class QuizContentAccessService {
       };
     const level = this.levelAccess.check(
       this.skillForQuizType(quiz.type),
-      this.cefrRange(quiz),
+      this.practiceLevel(quiz),
       unlocked,
       role,
     );

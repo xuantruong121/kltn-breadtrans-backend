@@ -1,9 +1,8 @@
+import type { PracticeLevel } from '@prisma/client';
+
 import {
-  LEVEL_GROUP_LABEL,
-  levelGroup,
-  parseCefrRange,
+  PRACTICE_LEVEL_LABEL,
   requiredPracticePlan,
-  type LevelGroup,
   type PracticePlan,
   type PracticeSkill,
 } from './practice-level';
@@ -11,18 +10,18 @@ import {
 /**
  * What a learner used in the current paid plan that FREE does not open: the
  * "bạn sẽ mất gì" list shown before the plan ends. Counted per skill and
- * practice level (labels only, no CEFR code is shown to learners).
+ * practice level (labels only).
  */
 export type PracticedItem = {
   skill: PracticeSkill;
-  /** Title or set level that carries the CEFR tag ("Writing B1 — …", "B1-B2"). */
-  levelSource: string | null;
+  /** The quiz's or the speaking set's practice level. */
+  level: PracticeLevel | null;
   dictation?: boolean;
 };
 
 export type LockedGroup = {
   skill: PracticeSkill;
-  levelGroup: LevelGroup;
+  levelGroup: PracticeLevel;
   requiredPlan: Exclude<PracticePlan, 'FREE'>;
   label: string;
   count: number;
@@ -38,13 +37,12 @@ const SKILL_LABEL: Record<PracticeSkill, string> = {
 export function lockedAfterExpiry(items: PracticedItem[]): LockedGroup[] {
   const groups = new Map<string, LockedGroup>();
   for (const item of items) {
-    const range = parseCefrRange(item.levelSource ?? '');
-    if (!range) continue;
-    const required = requiredPracticePlan(item.skill, range, {
+    const group = item.level;
+    if (!group) continue;
+    const required = requiredPracticePlan(item.skill, group, {
       dictation: item.dictation,
     });
-    const group = levelGroup(range);
-    if (required === 'FREE' || !group) continue;
+    if (required === 'FREE') continue;
     const name =
       item.skill === 'LISTENING' && item.dictation
         ? 'Nghe chép'
@@ -59,7 +57,7 @@ export function lockedAfterExpiry(items: PracticedItem[]): LockedGroup[] {
       skill: item.skill,
       levelGroup: group,
       requiredPlan: required,
-      label: `${name} ${LEVEL_GROUP_LABEL[group]}`,
+      label: `${name} ${PRACTICE_LEVEL_LABEL[group]}`,
       count: 1,
     });
   }

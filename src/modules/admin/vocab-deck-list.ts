@@ -3,8 +3,10 @@
  * the server so the list loads one page. No I/O.
  */
 import { isAll, ListQuery, matchesSearch } from '../../common/paging/list-page';
+import { PRACTICE_LEVELS } from '../subscription/practice-level';
 
-const DECK_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+/** A deck's level is one of the four practice levels (owner 2026-11-27). */
+const DECK_LEVELS: readonly string[] = PRACTICE_LEVELS;
 
 export type DeckListRow = {
   id: number;

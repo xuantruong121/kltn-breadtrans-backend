@@ -244,7 +244,8 @@ export function pullForward(
 }
 
 /**
- * Builds a game: distinct words, levels by stage (A2-B1 first, B2 last),
+ * Builds a game: distinct words, levels by stage (Mất gốc–Cơ bản first,
+ * Trung cấp–Nâng cao last),
  * every kind five times. Returns fewer blocks only when the pool is too small.
  *
  * `hardIds`: the learner's hard flashcard words, in order (hardWordOrder).

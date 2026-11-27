@@ -1,31 +1,13 @@
-/** Values already used by the Speaking CMS data; keep them migration-free. */
-/**
- * Practice set levels. The first nine stay inside one learner-facing group
- * (Cơ bản A1-A2, Trung cấp B1-B2, Nâng cao C1-C2), which the catalog, the
- * plan matrix and the recommender read; published sets already use them.
- * The last five span two groups and are kept only for older drafts.
- */
-export const SPEAKING_SET_LEVELS = [
-  'A1-A2',
-  'A1',
-  'A2',
-  'B1-B2',
-  'B1',
-  'B2',
-  'C1-C2',
-  'C1',
-  'C2',
-  'A1-B1',
-  'A2-B1',
-  'A2-B2',
-  'B1-C1',
-] as const;
+import { PRACTICE_LEVELS } from '../subscription/practice-level';
 
-export const SPEAKING_EXERCISE_DIFFICULTIES = [
-  'BEGINNER',
-  'INTERMEDIATE',
-  'ADVANCED',
-] as const;
+/**
+ * A practice set's level and an exercise's difficulty are both one of the four
+ * practice levels (owner 2026-11-27; the set level was a CEFR range and the
+ * difficulty BEGINNER/INTERMEDIATE/ADVANCED before).
+ */
+export const SPEAKING_SET_LEVELS = PRACTICE_LEVELS;
+
+export const SPEAKING_EXERCISE_DIFFICULTIES = PRACTICE_LEVELS;
 
 export const SPEAKING_TASK_TYPES = [
   'READ_ALOUD',

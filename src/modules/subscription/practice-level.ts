@@ -1,27 +1,66 @@
 /**
  * Owner access policy for STANDALONE skill practice (Listening, Reading,
- * Speaking, Writing), decided from the content's CEFR level:
+ * Speaking, Writing), decided from the content's practice level:
  *   Reading → free;
- *   Listening → free, except dictation B1 and above (PLUS);
- *   Speaking, Writing → A1–A2 free, B1–B2 PLUS, C1 and above PRO.
+ *   Listening → free, except dictation at Trung cấp and above (PLUS);
+ *   Speaking, Writing → Mất gốc and Cơ bản free, Trung cấp PLUS, Nâng cao PRO.
  * PRO includes PLUS.
- * Learner-facing groups: Cơ bản (A1–A2), Trung cấp (B1–B2), Nâng cao (C1–C2).
  *
- * Levels come from authored data: a Speaking practice set's `level`, or the
- * explicit CEFR tag the content team writes at the start of a practice title
- * ("Listening B1 — …", "Reading A1–A2 — …", "Nghe chép A2 — …"). Only that
- * tag before the " — " separator is read; anything else is "unknown", which
- * callers must never treat as free.
+ * Since 2026-11-27 (owner) every content table stores one of the four
+ * practice levels: `Quiz.practiceLevel`, `SpeakingPracticeSet.level`,
+ * `SpeakingExercise.difficulty`, `VocabTopic.level`, `GrammarTopic.level`.
+ * They are BreadTrans practice levels, not CEFR levels. A practice with no
+ * level is "unknown", which callers must never treat as free.
+ *
+ * The CEFR tags that titles still carry ("Listening B1 — …") are no longer
+ * read at run time; `legacyPracticeLevel` converts them for seed data and
+ * scripts, with the same table as the migration.
  */
+import type { PracticeLevel } from '@prisma/client';
+
+/** The four practice levels, in order. */
+export const PRACTICE_LEVELS = [
+  'STARTER',
+  'BASIC',
+  'INTERMEDIATE',
+  'ADVANCED',
+] as const satisfies readonly PracticeLevel[];
+
+export const PRACTICE_LEVEL_LABEL: Record<PracticeLevel, string> = {
+  STARTER: 'Mất gốc',
+  BASIC: 'Cơ bản',
+  INTERMEDIATE: 'Trung cấp',
+  ADVANCED: 'Nâng cao',
+};
+
+export function isPracticeLevel(value: unknown): value is PracticeLevel {
+  return (PRACTICE_LEVELS as readonly unknown[]).includes(value);
+}
+
+/** 0 for STARTER up to 3 for ADVANCED. */
+export function practiceLevelRank(level: PracticeLevel): number {
+  return PRACTICE_LEVELS.indexOf(level);
+}
+
+/** "Trung cấp"; null for an item with no level. */
+export function practiceLevelLabel(
+  level: PracticeLevel | null | undefined,
+): string | null {
+  return level ? PRACTICE_LEVEL_LABEL[level] : null;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy CEFR tags: seed data, scripts and the migration only.
+// ---------------------------------------------------------------------------
+
 export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export type Cefr = (typeof CEFR_LEVELS)[number];
 export type CefrRange = { min: Cefr; max: Cefr };
-export type LevelGroup = 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
 
 const rank = (level: Cefr) => CEFR_LEVELS.indexOf(level);
 const TAG = /\b([ABC][12])(?:\s*[–-]\s*([ABC][12]))?\b/;
 
-/** "B1", "A1–A2", "B1-C1" → range; null when no explicit tag. */
+/** "B1", "A1–A2", "B1-C1", "Listening B1 — Work" → range; null when no tag. */
 export function parseCefrRange(
   value: string | null | undefined,
 ): CefrRange | null {
@@ -37,15 +76,36 @@ export function parseCefrRange(
 }
 
 /**
- * The title a skill practice is stored with, so the level the admin picks is
- * the one access reads. A title already tagged inside that level keeps its
- * tag: the form shows one level, and "A1–A2" must not shrink to "A1".
+ * A level written the old way, as a CEFR tag, a CEFR range, a title head
+ * ("Listening B1 — Work") or BEGINNER, read as a practice level. Same table as
+ * migration 20261127120000_unify_practice_levels, agreed with the owner:
+ *   A1, A1-A2 → STARTER; A2 → BASIC; B1, B2 and ranges up to B2 →
+ *   INTERMEDIATE; any range reaching C1 → ADVANCED; BEGINNER → BASIC.
+ * A practice level passes through. Null when nothing can be read.
  */
+export function legacyPracticeLevel(
+  value: string | null | undefined,
+): PracticeLevel | null {
+  const raw = value?.trim().toUpperCase() ?? '';
+  if (!raw) return null;
+  if (isPracticeLevel(raw)) return raw;
+  if (raw === 'BEGINNER') return 'BASIC';
+  const range = parseCefrRange(raw);
+  if (!range) return null;
+  if (rank(range.max) >= rank('C1')) return 'ADVANCED';
+  if (range.min === 'A1' && rank(range.max) <= rank('A2')) return 'STARTER';
+  if (range.min === 'A2' && range.max === 'A2') return 'BASIC';
+  return 'INTERMEDIATE';
+}
+
+// ---------------------------------------------------------------------------
+// Titles
+// ---------------------------------------------------------------------------
+
 /**
  * The head word of a Listening lesson's stored title, by its form (owner
  * 2026-11-24: "lưu theo dạng đã chọn"), as the published dialogues already
- * read ("Hội thoại A2 — …"). Learners never see the head (withoutLevelTag);
- * its level decides access.
+ * read ("Hội thoại A2 — …"). Learners never see the head (withoutLevelTag).
  */
 export function listeningTitleLabel(mode: unknown): string {
   if (mode === 'DIALOGUE') return 'Hội thoại';
@@ -54,7 +114,11 @@ export function listeningTitleLabel(mode: unknown): string {
   return 'Listening';
 }
 
-/** "Listening A2 — Work" with label "Nghe hiểu" → "Nghe hiểu A2 — Work"; a title with no level head is left alone. */
+/**
+ * "Listening A2 — Work" with label "Nghe hiểu" → "Nghe hiểu A2 — Work". The
+ * old level head of a published title is kept as written (titles are looked
+ * up by their text); a title with no level head is left alone.
+ */
 export function relabelTitleHead(title: string, label: string): string {
   const at = title.indexOf(' — ');
   if (at < 0) return title;
@@ -65,70 +129,24 @@ export function relabelTitleHead(title: string, label: string): string {
   return `${label} ${level.toUpperCase()} — ${title.slice(at + 3)}`;
 }
 
-export function titleWithLevel(
-  title: string,
-  level: string | null | undefined,
-  skillLabel: string,
-): string {
-  const clean = title.trim();
-  const picked = level?.trim().toUpperCase() as Cefr | undefined;
-  if (!picked || !CEFR_LEVELS.includes(picked)) return clean;
-  const head = clean.includes(' — ') ? clean.split(' — ')[0] : '';
-  const range = parseCefrRange(head);
-  if (!range) return `${skillLabel} ${picked} — ${clean}`;
-  if (rank(picked) >= rank(range.min) && rank(picked) <= rank(range.max))
-    return clean;
-  return clean.replace(
-    head,
-    head.replace(/\b[ABC][12](?:\s*[–-]\s*[ABC][12])?\b/i, picked),
-  );
-}
-
 /**
- * The one level string every practice catalog exposes ("B1", "B2-C1"), from
- * the same range the access policy reads. Null when the item has no tag.
+ * The title an edit saves. An old published title keeps its level head
+ * ("Listening B1 — Work" edited to "Work Day" stays "Listening B1 — Work
+ * Day"): learner titles and the starter roadmap look titles up by their text.
+ * A title the admin wrote with its own head is saved as written.
  */
-export function cefrSpan(range: CefrRange | null): string | null {
-  if (!range) return null;
-  return range.min === range.max ? range.min : `${range.min}-${range.max}`;
+export function keepTitleHead(previous: string, next: string): string {
+  if (next.includes(' — ')) return next;
+  const at = previous.indexOf(' — ');
+  if (at < 0) return next;
+  const head = previous.slice(0, at);
+  if (!/\b[ABC][12]\b/i.test(head)) return next;
+  return `${head} — ${next}`;
 }
 
-/** True when any part of the range is B1 or above. */
-export function practiceRequiresPlus(range: CefrRange): boolean {
-  return rank(range.max) >= rank('B1');
-}
-
-const groupOf = (level: Cefr): LevelGroup =>
-  rank(level) <= 1 ? 'BASIC' : rank(level) <= 3 ? 'INTERMEDIATE' : 'ADVANCED';
-
-/** The single learner-facing group, or null when the range spans two. */
-export function levelGroup(range: CefrRange): LevelGroup | null {
-  const group = groupOf(range.min);
-  return group === groupOf(range.max) ? group : null;
-}
-
-export const LEVEL_GROUP_LABEL: Record<LevelGroup, string> = {
-  BASIC: 'Cơ bản',
-  INTERMEDIATE: 'Trung cấp',
-  ADVANCED: 'Nâng cao',
-};
-
-/** Speaking `difficulty` values used by the catalog filters. */
-export const LEVEL_GROUP_DIFFICULTY: Record<LevelGroup, string> = {
-  BASIC: 'BEGINNER',
-  INTERMEDIATE: 'INTERMEDIATE',
-  ADVANCED: 'ADVANCED',
-};
-
-/** "Cơ bản · A1–A2", "Trung cấp · B1"; null for a mixed or unknown range. */
-export function levelLabel(range: CefrRange | null): string | null {
-  if (!range) return null;
-  const group = levelGroup(range);
-  if (!group) return null;
-  const span =
-    range.min === range.max ? range.min : `${range.min}–${range.max}`;
-  return `${LEVEL_GROUP_LABEL[group]} · ${span}`;
-}
+// ---------------------------------------------------------------------------
+// Plans
+// ---------------------------------------------------------------------------
 
 export type PracticeSkill = 'LISTENING' | 'READING' | 'SPEAKING' | 'WRITING';
 export type PracticePlan = 'FREE' | 'PLUS' | 'PRO';
@@ -136,31 +154,34 @@ export type PracticePlan = 'FREE' | 'PLUS' | 'PRO';
 const PLAN_RANK: Record<PracticePlan, number> = { FREE: 0, PLUS: 1, PRO: 2 };
 
 /**
- * Owner policy (2026-10-30, replaces 2026-10-28) for standalone skill
- * practice. PRO includes PLUS.
- *   Reading                      every level FREE
- *   Listening                    every level FREE, except dictation
- *                                ("Nghe chép") B1-C2: PLUS
- *   Speaking / Writing A1-A2     FREE
- *   Speaking / Writing B1-B2     PLUS
- *   Speaking / Writing C1-C2     PRO (any part of the range at C1+)
+ * Owner policy (2026-10-30, in practice levels since 2026-11-27) for
+ * standalone skill practice. PRO includes PLUS.
+ *   Reading                        every level FREE
+ *   Listening                      every level FREE, except dictation
+ *                                  ("Nghe chép") at INTERMEDIATE or ADVANCED: PLUS
+ *   Speaking / Writing STARTER, BASIC  FREE
+ *   Speaking / Writing INTERMEDIATE    PLUS
+ *   Speaking / Writing ADVANCED        PRO
+ * The plans are those of the CEFR era: B1 and above was INTERMEDIATE or
+ * ADVANCED, and every range reaching C1 is ADVANCED.
  * TOEIC and the Entry Diagnostic have their own rules.
  */
 export function requiredPracticePlan(
   skill: PracticeSkill,
-  range: CefrRange,
+  level: PracticeLevel,
   options: { dictation?: boolean } = {},
 ): PracticePlan {
+  const upper = practiceLevelRank(level) >= practiceLevelRank('INTERMEDIATE');
   if (skill === 'READING') return 'FREE';
   if (skill === 'LISTENING')
-    return options.dictation && practiceRequiresPlus(range) ? 'PLUS' : 'FREE';
-  if (rank(range.max) >= rank('C1')) return 'PRO';
-  return practiceRequiresPlus(range) ? 'PLUS' : 'FREE';
+    return options.dictation && upper ? 'PLUS' : 'FREE';
+  if (level === 'ADVANCED') return 'PRO';
+  return upper ? 'PLUS' : 'FREE';
 }
 
 /**
- * Plan for an untagged item that is flagged premium (no level to read): the
- * highest plan its skill can need, so a missing tag never opens anything.
+ * Plan for a premium item with no level: the highest plan its skill can
+ * need, so a missing level never opens anything.
  */
 export function advancedPracticePlan(skill: PracticeSkill): PracticePlan {
   if (skill === 'READING') return 'FREE';

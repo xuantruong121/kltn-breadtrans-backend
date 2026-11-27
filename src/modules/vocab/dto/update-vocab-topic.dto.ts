@@ -5,6 +5,7 @@ import {
   IsIn,
   MaxLength,
 } from 'class-validator';
+import type { PracticeLevel } from '@prisma/client';
 import { VOCAB_LEVELS } from './create-vocab-topic.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -34,8 +35,8 @@ export class UpdateVocabTopicDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiPropertyOptional({ example: 'B1', enum: VOCAB_LEVELS })
-  @IsIn(VOCAB_LEVELS)
+  @ApiPropertyOptional({ example: 'INTERMEDIATE', enum: VOCAB_LEVELS })
+  @IsIn([...VOCAB_LEVELS])
   @IsOptional()
-  level?: string;
+  level?: PracticeLevel;
 }

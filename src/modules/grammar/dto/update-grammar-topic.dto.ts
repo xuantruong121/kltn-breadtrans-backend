@@ -1,4 +1,6 @@
-import { IsString, IsOptional, IsInt } from 'class-validator';
+import { IsIn, IsString, IsOptional, IsInt } from 'class-validator';
+import type { PracticeLevel } from '@prisma/client';
+import { PRACTICE_LEVELS } from '../../subscription/practice-level';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateGrammarTopicDto {
@@ -7,10 +9,10 @@ export class UpdateGrammarTopicDto {
   @IsOptional()
   title?: string;
 
-  @ApiPropertyOptional({ example: 'BEGINNER' })
-  @IsString()
+  @ApiPropertyOptional({ example: 'BASIC', enum: PRACTICE_LEVELS })
+  @IsIn([...PRACTICE_LEVELS])
   @IsOptional()
-  level?: string;
+  level?: PracticeLevel;
 
   @ApiPropertyOptional({ example: 'Mô tả chi tiết' })
   @IsString()
