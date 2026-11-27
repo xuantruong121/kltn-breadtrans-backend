@@ -122,7 +122,7 @@ export class VocabController {
   @ApiOperation({
     summary: 'Cập nhật tiến độ ôn tập SRS sau khi học/làm trắc nghiệm',
     description:
-      'Phòng flashcard gửi `evidence` (kết quả trắc nghiệm, gõ từ, số gợi ý, phát âm, kiểm tra nhanh); máy chủ tự xếp mức nhớ và trả về `grade`. `grade` hoặc `isCorrect` vẫn được nhận cho các nơi gọi cũ.',
+      'Phòng flashcard gửi `evidence` (kết quả trắc nghiệm, gõ từ, số gợi ý, phát âm, nút Đã nhớ); máy chủ tự xếp mức nhớ và trả về `grade`. `grade` hoặc `isCorrect` vẫn được nhận cho các nơi gọi cũ.',
   })
   @ApiBody({
     schema: {

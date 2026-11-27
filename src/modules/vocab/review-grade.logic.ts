@@ -9,7 +9,7 @@ import type { SrsGrade } from './srs.logic';
  * A skipped check counts as a miss. Two misses: "Học lại"; one miss, or a
  * right spelling found with hints: "Khó"; both right without help: "Tốt",
  * or "Dễ" when the word was also said right or the learner asked for the
- * quick check ("Kiểm tra nhanh") and passed it.
+ * quick check ("Đã nhớ") and passed it.
  */
 
 export const STEP_RESULTS = ['CORRECT', 'WRONG', 'SKIPPED'] as const;
@@ -30,7 +30,7 @@ export type ReviewEvidence = {
   typingHints: number;
   /** PASSED only for a real speech recognition match. */
   speaking: SpeakingResult;
-  /** "Kiểm tra nhanh": the learner said they know it; the room asked only the two checks. */
+  /** "Đã nhớ": the learner said they know it; the room asked only the two checks. */
   quickCheck: boolean;
 };
 

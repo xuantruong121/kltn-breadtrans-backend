@@ -7,7 +7,7 @@
  * bad grade is refused. Since 2026-11-26 the room sends `evidence` (its steps)
  * and the server decides the grade; bad evidence is refused.
  * Browser: the room shows no rating buttons. A word learned through the steps
- * and a word on "Kiểm tra nhanh" get the system's grade, the interval the
+ * and a word on "Đã nhớ" get the system's grade, the interval the
  * server previewed for it, and that row in the database.
  *
  *   HARNESS_DB=<db> [SHOTS=<dir>] npx ts-node --transpile-only scripts/qa/finalization-vocab-srs.ts
@@ -263,7 +263,7 @@ async function main() {
 
   const steps2 = await learnWord(true);
   check(
-    'a word on "Kiểm tra nhanh" answered right is "Dễ"',
+    'a word on "Đã nhớ" answered right is "Dễ"',
     steps2 !== null &&
       steps2.body.includes(`Dễ · ôn lại sau ${says(steps2.expected.EASY)}`) &&
       steps2.after?.intervalDays === steps2.expected.EASY,
