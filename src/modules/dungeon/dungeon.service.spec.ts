@@ -33,6 +33,21 @@ class FakeRedis {
   exists(key: string) {
     return Promise.resolve(this.store.has(key) ? 1 : 0);
   }
+  sets = new Map<string, Set<string>>();
+  ttl = new Map<string, number>();
+  smembers(key: string) {
+    return Promise.resolve([...(this.sets.get(key) ?? [])]);
+  }
+  sadd(key: string, ...members: (string | number)[]) {
+    const set = this.sets.get(key) ?? new Set<string>();
+    for (const m of members) set.add(String(m));
+    this.sets.set(key, set);
+    return Promise.resolve(members.length);
+  }
+  expire(key: string, seconds: number) {
+    this.ttl.set(key, seconds);
+    return Promise.resolve(1);
+  }
   zadd(_key: string, score: number, member: string) {
     this.zset.set(member, score);
     return Promise.resolve(1);
@@ -411,6 +426,7 @@ describe('DungeonService', () => {
     const hardRow = (entryId: number) => ({
       lapses: 1,
       easeFactor: 2.3,
+      intervalDays: 1,
       nextReviewAt: new Date(0),
       word: { entryId },
     });
@@ -432,6 +448,21 @@ describe('DungeonService', () => {
       const ids = bank.map((e) => (e.choice as { wordId: number }).wordId);
       expect(new Set(ids).size).toBe(ids.length);
       expect(JSON.stringify(view)).not.toMatch(/answers|bank|"display"/);
+    });
+
+    it('a second free run the same day leaves them out (rule B, owner 2026-11-27)', async () => {
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17), hardRow(33)]);
+      const flagged = (id: string) =>
+        stored(id).bank.filter((entry) => entry.oftenForgotten).length;
+      const first = await service.start(1, 'free');
+      expect(flagged(first.sessionId)).toBe(3);
+      await service.finish(1, first.sessionId, true);
+      const second = await service.start(1, 'free');
+      expect(flagged(second.sessionId)).toBe(0);
+      await service.finish(1, second.sessionId, true);
+      // The record is shared with Pháo Bánh Mì through Redis; another learner has their own.
+      const other = await service.start(2, 'free');
+      expect(flagged(other.sessionId)).toBe(3);
     });
 
     it('the day dungeon stays the same for everyone and reads no hard words', async () => {

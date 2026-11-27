@@ -1,5 +1,7 @@
 import type { ArenaWord } from './arena-questions.logic';
 import {
+  HARD_UNTIL_DAYS,
+  hardShownKey,
   hardWordOrder,
   isHardWord,
   pickHardWords,
@@ -15,6 +17,7 @@ const row = (
   entryId,
   lapses: 1,
   easeFactor: 2.3,
+  intervalDays: 1,
   nextReviewAt: new Date('2026-12-01T00:00:00Z'),
   ...over,
 });
@@ -46,10 +49,18 @@ const keepOrder = () => 0.999;
 
 describe('hard words (thesis supervisor 2026-11-26)', () => {
   it('a lapse or a lowered ease makes a word hard', () => {
-    expect(isHardWord({ lapses: 1, easeFactor: 2.5 })).toBe(true);
-    expect(isHardWord({ lapses: 0, easeFactor: 2.35 })).toBe(true);
-    expect(isHardWord({ lapses: 0, easeFactor: 2.5 })).toBe(false);
-    expect(isHardWord({ lapses: 0, easeFactor: 2.65 })).toBe(false);
+    expect(isHardWord({ lapses: 1, easeFactor: 2.5, intervalDays: 1 })).toBe(
+      true,
+    );
+    expect(isHardWord({ lapses: 0, easeFactor: 2.35, intervalDays: 1 })).toBe(
+      true,
+    );
+    expect(isHardWord({ lapses: 0, easeFactor: 2.5, intervalDays: 1 })).toBe(
+      false,
+    );
+    expect(isHardWord({ lapses: 0, easeFactor: 2.65, intervalDays: 1 })).toBe(
+      false,
+    );
   });
 
   it('puts words due for review first, each entry once, easy ones out', () => {
@@ -85,5 +96,46 @@ describe('hard words (thesis supervisor 2026-11-26)', () => {
     expect(spreadIndexes(1, 20)).toEqual([10]);
     expect(spreadIndexes(6, 20)).toEqual([1, 5, 8, 11, 15, 18]);
     expect(spreadIndexes(0, 20)).toEqual([]);
+  });
+});
+
+describe('hard words wear off and wait for tomorrow (owner 2026-11-27)', () => {
+  it('a word recalled across a week is no longer hard (rule A)', () => {
+    expect(HARD_UNTIL_DAYS).toBe(7);
+    expect(isHardWord({ lapses: 3, easeFactor: 2.2, intervalDays: 6 })).toBe(
+      true,
+    );
+    expect(isHardWord({ lapses: 3, easeFactor: 2.2, intervalDays: 7 })).toBe(
+      false,
+    );
+    // Graded "Khó" once, then remembered for 11 days.
+    expect(isHardWord({ lapses: 0, easeFactor: 2.35, intervalDays: 11 })).toBe(
+      false,
+    );
+    // Just forgotten: the interval starts again.
+    expect(isHardWord({ lapses: 1, easeFactor: 2.3, intervalDays: 0 })).toBe(
+      true,
+    );
+  });
+
+  it('leaves out the words already put into a game today (rule B)', () => {
+    const rows = [
+      row(1),
+      row(2, { nextReviewAt: new Date('2026-11-25T00:00:00Z') }),
+      row(3, { nextReviewAt: null }),
+    ];
+    expect(hardWordOrder(rows, NOW, keepOrder).sort()).toEqual([1, 2, 3]);
+    expect(hardWordOrder(rows, NOW, keepOrder, new Set([2])).sort()).toEqual([
+      1, 3,
+    ]);
+    expect(hardWordOrder(rows, NOW, keepOrder, new Set([1, 2, 3]))).toEqual([]);
+    // A word past a week is left out whatever the record says.
+    expect(
+      hardWordOrder([row(4, { intervalDays: 9 })], NOW, keepOrder),
+    ).toEqual([]);
+  });
+
+  it('keeps the record per learner and per learner day', () => {
+    expect(hardShownKey(7, '2026-11-27')).toBe('arena:hard-shown:7:2026-11-27');
   });
 });

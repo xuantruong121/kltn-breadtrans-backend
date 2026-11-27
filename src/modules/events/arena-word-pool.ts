@@ -1,5 +1,11 @@
 import { levelRank, type ArenaWord } from './arena-questions.logic';
-import type { HardWordRow } from './hard-words.logic';
+import { getLearnerDayKey } from '../../common/time/business-time.util';
+import {
+  HARD_SHOWN_TTL_S,
+  HARD_UNTIL_DAYS,
+  hardShownKey,
+  type HardWordRow,
+} from './hard-words.logic';
 
 /**
  * The words both Arena games draw from (the 1v1 duel and Pháo Bánh Mì):
@@ -72,6 +78,7 @@ export async function loadAllReviewedWords(
 type ProgressRow = {
   lapses: number;
   easeFactor: number;
+  intervalDays: number;
   nextReviewAt: Date | null;
   word: { entryId: number | null } | null;
 };
@@ -94,11 +101,14 @@ export async function loadHardWords(
   const rows = (await prisma.userVocabWordProgress.findMany({
     where: {
       userId,
+      // Rule A: not yet recalled across a week (isHardWord says the same).
+      intervalDays: { lt: HARD_UNTIL_DAYS },
       OR: [{ lapses: { gt: 0 } }, { easeFactor: { lt: 2.5 } }],
     },
     select: {
       lapses: true,
       easeFactor: true,
+      intervalDays: true,
       nextReviewAt: true,
       word: { select: { entryId: true } },
     },
@@ -111,6 +121,42 @@ export async function loadHardWords(
       entryId: r.word!.entryId!,
       lapses: r.lapses,
       easeFactor: r.easeFactor,
+      intervalDays: r.intervalDays,
       nextReviewAt: r.nextReviewAt,
     }));
+}
+
+/** The Redis calls the day's record of hard words needs (ioredis). */
+type ShownStore = {
+  smembers(key: string): Promise<string[]>;
+  sadd(key: string, ...members: number[]): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+};
+
+/**
+ * The hard words already put into a game this learner day (rule B, owner
+ * 2026-11-27). The day turns at 00:01 Vietnam time, as every learner day does.
+ */
+export async function hardWordsShownToday(
+  redis: ShownStore,
+  userId: number,
+  now: Date,
+): Promise<Set<number>> {
+  const members = await redis.smembers(
+    hardShownKey(userId, getLearnerDayKey(now)),
+  );
+  return new Set(members.map(Number).filter((n) => Number.isInteger(n)));
+}
+
+/** Notes the hard words a game was given, so the next games that day leave them out. */
+export async function markHardWordsShown(
+  redis: ShownStore,
+  userId: number,
+  now: Date,
+  entryIds: readonly number[],
+): Promise<void> {
+  if (entryIds.length === 0) return;
+  const key = hardShownKey(userId, getLearnerDayKey(now));
+  await redis.sadd(key, ...entryIds);
+  await redis.expire(key, HARD_SHOWN_TTL_S);
 }

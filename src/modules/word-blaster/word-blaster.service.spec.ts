@@ -19,6 +19,21 @@ class FakeRedis {
     this.store.delete(key);
     return Promise.resolve(1);
   }
+  sets = new Map<string, Set<string>>();
+  ttl = new Map<string, number>();
+  smembers(key: string) {
+    return Promise.resolve([...(this.sets.get(key) ?? [])]);
+  }
+  sadd(key: string, ...members: (string | number)[]) {
+    const set = this.sets.get(key) ?? new Set<string>();
+    for (const m of members) set.add(String(m));
+    this.sets.set(key, set);
+    return Promise.resolve(members.length);
+  }
+  expire(key: string, seconds: number) {
+    this.ttl.set(key, seconds);
+    return Promise.resolve(1);
+  }
   /** The lock release script only: delete KEYS[1] while it holds ARGV[1]. */
   eval(_script: string, _n: number, key: string, owner: string) {
     if (this.store.get(key) !== owner) return Promise.resolve(0);
@@ -239,6 +254,7 @@ describe('WordBlasterService', () => {
     const hardRow = (entryId: number, lapses = 1) => ({
       lapses,
       easeFactor: 2.3,
+      intervalDays: 1,
       nextReviewAt: new Date(0),
       word: { entryId },
     });
@@ -257,6 +273,7 @@ describe('WordBlasterService', () => {
         expect.objectContaining({
           where: {
             userId: 1,
+            intervalDays: { lt: 7 },
             OR: [{ lapses: { gt: 0 } }, { easeFactor: { lt: 2.5 } }],
           },
         }),
@@ -274,6 +291,43 @@ describe('WordBlasterService', () => {
       const last = await service.finish(1, view.sessionId, false);
       expect(last.result?.hardWords).toEqual({ hit: 1, total: 2 });
       expect(last.result).not.toHaveProperty('words');
+    });
+
+    it('puts each hard word into one game a learner day (rule B, owner 2026-11-27)', async () => {
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        hardRow(3),
+        hardRow(7),
+      ]);
+      const flaggedOf = (id: string) =>
+        stored(id)
+          .blocks.filter((b) => b.oftenForgotten)
+          .map((b) => b.word.id);
+      const first = await service.start(1, 20, 'copy');
+      expect(flaggedOf(first.sessionId).sort()).toEqual([3, 7]);
+      now = 1_000_000 + 10 * 60_000;
+      await service.finish(1, first.sessionId, false);
+      // The same learner day: both wait for tomorrow.
+      const second = await service.start(1, 20, 'copy');
+      expect(flaggedOf(second.sessionId)).toEqual([]);
+      now += 10 * 60_000;
+      await service.finish(1, second.sessionId, false);
+      // Another learner has a record of their own.
+      const other = await service.start(2, 20, 'copy');
+      expect(flaggedOf(other.sessionId).sort()).toEqual([3, 7]);
+      now += 10 * 60_000;
+      await service.finish(2, other.sessionId, false);
+      // The next learner day they come back.
+      now += 86_400_000;
+      const third = await service.start(1, 20, 'copy');
+      expect(flaggedOf(third.sessionId).sort()).toEqual([3, 7]);
+    });
+
+    it('still asks them when the day record cannot be read', async () => {
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([hardRow(3)]);
+      (redis as unknown as { smembers: () => Promise<string[]> }).smembers =
+        () => Promise.reject(new Error('redis busy'));
+      const view = await service.start(1, 20, 'copy');
+      expect(view.blocks.filter((b) => b.oftenForgotten)).toHaveLength(1);
     });
 
     it('a learner without hard words gets an ordinary game and a zero count', async () => {
