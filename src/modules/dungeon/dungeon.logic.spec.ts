@@ -5,6 +5,13 @@ import {
 import {
   ANSWER_GRACE_MS,
   BOSS_REWARD,
+  BOSS_STRIKE_EVERY,
+  DESPERATE_BOOST,
+  DESPERATE_SHARE,
+  STRIKE_BREAK_BOOST,
+  STRIKE_HIT_BOOST,
+  isDesperate,
+  strikeIn,
   DUNGEON_TICKET,
   PLAYER_HP,
   RETRY_AFTER,
@@ -289,7 +296,13 @@ describe('a run', () => {
     expect(shielded.run.hp).toBe(PLAYER_HP);
 
     const egg = answer(
-      { ...newRun(11, 'free'), hp: 1, toppings: { egg: 1 } },
+      // The run's last breath is already spent, so the egg is what saves it.
+      {
+        ...newRun(11, 'free'),
+        hp: 1,
+        toppings: { egg: 1 },
+        lastBreathUsed: true,
+      },
       bank,
       false,
     );
@@ -497,5 +510,133 @@ describe("the learner's hard words in a free run (thesis supervisor 2026-11-26)"
     const { run } = answer(newRun(7, 'free'), bankFor(7), true);
     expect(hardWordsOfRun(run)).toEqual({ hit: 0, total: 0 });
     expect(hardWordsOfRun({})).toEqual({ hit: 0, total: 0 });
+  });
+});
+
+describe('low health and the last breath (2026-11-27)', () => {
+  const bank = bankFor(11);
+  it('is desperate at a quarter of health or less, never at zero', () => {
+    expect(isDesperate(25, 100)).toBe(true);
+    expect(isDesperate(26, 100)).toBe(false);
+    expect(isDesperate(31, 125)).toBe(true);
+    expect(isDesperate(0, 100)).toBe(false);
+    expect(DESPERATE_SHARE).toBe(0.25);
+  });
+
+  it('a right answer at low health hits harder by the boost', () => {
+    const base = newRun(11, 'free');
+    const healthy = answer({ ...base, hp: 80 }, bank, true, 0);
+    const low = answer({ ...base, hp: 20 }, bank, true, 0);
+    expect(healthy.outcome.desperate).toBeUndefined();
+    expect(low.outcome.desperate).toBe(true);
+    // Both are rounded once from the same raw hit, so they agree within 1.
+    expect(
+      Math.abs(low.outcome.damage - healthy.outcome.damage * DESPERATE_BOOST),
+    ).toBeLessThanOrEqual(1);
+    expect(low.outcome.damage).toBeGreaterThan(healthy.outcome.damage);
+  });
+
+  it('the first lethal hit of a run leaves 1 health, the second ends it', () => {
+    const first = answer({ ...newRun(11, 'free'), hp: 3 }, bank, false);
+    expect(first.outcome.lastBreath).toBe(true);
+    expect(first.outcome.died).toBe(false);
+    expect(first.run.hp).toBe(1);
+    expect(first.run.phase).toBe('fight');
+    expect(first.run.lastBreathUsed).toBe(true);
+
+    const second = answer(first.run, bank, false);
+    expect(second.outcome.lastBreath).toBeUndefined();
+    expect(second.outcome.died).toBe(true);
+    expect(second.run.phase).toBe('over');
+  });
+
+  it('spends the last breath before the egg', () => {
+    const first = answer(
+      { ...newRun(11, 'free'), hp: 1, toppings: { egg: 1 } },
+      bank,
+      false,
+    );
+    expect(first.outcome.lastBreath).toBe(true);
+    expect(first.outcome.revived).toBe(false);
+    const second = answer(first.run, bank, false);
+    expect(second.outcome.revived).toBe(true);
+    expect(second.run.hp).toBe(30);
+  });
+});
+
+describe("the boss's strike (2026-11-27)", () => {
+  const bank = bankFor(11);
+  const bossRun = () => ({
+    ...newRun(11, 'free'),
+    floor: 5,
+    monster: {
+      kind: 'sourdough_king' as const,
+      hp: 5000,
+      maxHp: 5000,
+      boss: true,
+    },
+    floorAnswered: 0,
+  });
+
+  it('counts down 2, 1, 0 and starts again; no count off a boss floor', () => {
+    expect([0, 1, 2, 3, 4, 5].map((n) => strikeIn(true, n))).toEqual([
+      2, 1, 0, 2, 1, 0,
+    ]);
+    expect(strikeIn(false, 2)).toBeNull();
+    expect(BOSS_STRIKE_EVERY).toBe(3);
+  });
+
+  it('tells the page how far the strike is, on boss questions only', () => {
+    expect(issueQuestion(bossRun(), bank).publicView.strikeIn).toBe(2);
+    expect(
+      issueQuestion({ ...bossRun(), floorAnswered: 2 }, bank).publicView
+        .strikeIn,
+    ).toBe(0);
+    expect(
+      issueQuestion(newRun(11, 'free'), bank).publicView.strikeIn,
+    ).toBeUndefined();
+  });
+
+  it('a right answer on the strike breaks it and hits twice as hard', () => {
+    const plain = answer({ ...bossRun(), floorAnswered: 1 }, bank, true, 0);
+    const strike = answer({ ...bossRun(), floorAnswered: 2 }, bank, true, 0);
+    expect(plain.outcome.strike).toBeUndefined();
+    expect(strike.outcome.strike).toBe(true);
+    expect(
+      Math.abs(
+        strike.outcome.damage - plain.outcome.damage * STRIKE_BREAK_BOOST,
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(strike.run.floorAnswered).toBe(3);
+  });
+
+  it('a miss on the strike costs one and a half hits; cheese still blocks it', () => {
+    const plain = answer({ ...bossRun(), floorAnswered: 1 }, bank, false);
+    const strike = answer({ ...bossRun(), floorAnswered: 2 }, bank, false);
+    expect(strike.outcome.strike).toBe(true);
+    expect(strike.outcome.taken).toBe(
+      Math.round(plain.outcome.taken * STRIKE_HIT_BOOST),
+    );
+    const blocked = answer(
+      { ...bossRun(), floorAnswered: 2, shieldsLeft: 1 },
+      bank,
+      false,
+    );
+    expect(blocked.outcome.shielded).toBe(true);
+    expect(blocked.outcome.taken).toBe(0);
+  });
+
+  it('a monster floor has no strike, and a new floor starts the count again', () => {
+    const run = { ...newRun(11, 'free'), floorAnswered: 2 };
+    const third = answer(run, bank, false);
+    expect(third.outcome.strike).toBeUndefined();
+    expect(third.outcome.taken).toBe(
+      answer(newRun(11, 'free'), bank, false).outcome.taken,
+    );
+    const picked = pickTopping(
+      { ...run, phase: 'pick', offers: ['sesame'] },
+      'sesame',
+    );
+    expect(picked.floorAnswered).toBe(0);
   });
 });

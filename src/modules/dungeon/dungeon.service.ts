@@ -57,6 +57,7 @@ import {
   type AnswerOutcome,
   type BankEntry,
   type DungeonMode,
+  isDesperate,
   type DungeonQuestion,
   type PublicQuestion,
   type RunState,
@@ -81,6 +82,12 @@ type Session = {
   } | null;
   last: AnswerOutcome | null;
   result: DungeonResult | null;
+  /**
+   * The floor to beat, read when the run started: today's leading floor in the
+   * day's dungeon, the learner's own best in a free run. Missing on runs stored
+   * before 2026-11-27.
+   */
+  recordFloor?: number | null;
 };
 
 export type DungeonResult = {
@@ -141,6 +148,12 @@ export type DungeonView = {
   last: AnswerOutcome | null;
   stats: { answered: number; correct: number; bossesDown: number };
   result: DungeonResult | null;
+  /** At or under a quarter of health: right answers hit harder. */
+  desperate: boolean;
+  /** The run's one last breath (a lethal hit leaves 1 health) is still unused. */
+  lastBreathLeft: boolean;
+  /** The floor to beat and whose it is; null when there is none yet. */
+  record: { floor: number; whose: 'today' | 'mine' } | null;
 };
 
 const SESSION_TTL_S = 60 * 60;
@@ -278,6 +291,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       question: null,
       last: null,
       result: null,
+      recordFloor: await this.recordToBeat(userId, mode, now),
     };
     this.ask(session, RUN_INTRO_MS);
     try {
@@ -548,6 +562,36 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
     return row !== null;
   }
 
+  /**
+   * The floor a new run tries to pass: the deepest anyone went in today's
+   * dungeon, or the learner's own best free run. A failure here never stops a
+   * run from opening.
+   */
+  private async recordToBeat(
+    userId: number,
+    mode: DungeonMode,
+    now: Date,
+  ): Promise<number | null> {
+    try {
+      if (mode === 'free') return await this.best(userId, 'free');
+      const top = await this.prisma.learnerEvent.findFirst({
+        where: {
+          type: EVENT.daily,
+          createdAt: { gte: vietnamDayStart(now) },
+          user: { role: Role.STUDENT },
+        },
+        orderBy: { value: 'desc' },
+        select: { value: true },
+      });
+      return top?.value ?? null;
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] could not read the record to beat: ${String(err)}`,
+      );
+      return null;
+    }
+  }
+
   private async best(
     userId: number,
     mode: DungeonMode,
@@ -690,6 +734,15 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         bossesDown: run.bossesDown,
       },
       result: session.result,
+      desperate: isDesperate(run.hp, run.maxHp),
+      lastBreathLeft: !run.lastBreathUsed,
+      record:
+        typeof session.recordFloor === 'number' && session.recordFloor > 0
+          ? {
+              floor: session.recordFloor,
+              whose: session.mode === 'daily' ? 'today' : 'mine',
+            }
+          : null,
     };
   }
 

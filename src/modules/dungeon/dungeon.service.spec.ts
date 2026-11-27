@@ -194,6 +194,59 @@ describe('DungeonService', () => {
     expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
   });
 
+  describe('what the page is told for the tense moments (2026-11-27)', () => {
+    it('a fresh run is not desperate and still has its last breath', async () => {
+      const view = await service.start(1, 'free');
+      expect(view.desperate).toBe(false);
+      expect(view.lastBreathLeft).toBe(true);
+      expect(view.record).toBeNull();
+    });
+
+    it('says when health is low and when the last breath is spent', async () => {
+      const view = await service.start(1, 'free');
+      patch(view.sessionId, (s) => {
+        s.run.hp = 20;
+        s.run.lastBreathUsed = true;
+      });
+      const now = await service.current(1);
+      expect(now?.desperate).toBe(true);
+      expect(now?.lastBreathLeft).toBe(false);
+    });
+
+    it("a free run tries to beat the learner's own best floor", async () => {
+      events.push({ userId: 1, type: 'DUNGEON_FREE', value: 7 });
+      const view = await service.start(1, 'free');
+      expect(view.record).toEqual({ floor: 7, whose: 'mine' });
+    });
+
+    it("the day's dungeon tries to beat today's leading floor", async () => {
+      const prisma = (
+        service as unknown as {
+          prisma: { learnerEvent: { findFirst: jest.Mock } };
+        }
+      ).prisma;
+      // Asked twice: has this learner played today (no), then the day's top floor.
+      prisma.learnerEvent.findFirst.mockImplementation(
+        ({ where }: { where: { userId?: number } }) =>
+          Promise.resolve(where.userId === undefined ? { value: 12 } : null),
+      );
+      const view = await service.start(1, 'daily');
+      expect(view.record).toEqual({ floor: 12, whose: 'today' });
+    });
+
+    it('still opens the run when the record cannot be read', async () => {
+      const prisma = (
+        service as unknown as {
+          prisma: { learnerEvent: { aggregate: jest.Mock } };
+        }
+      ).prisma;
+      prisma.learnerEvent.aggregate.mockRejectedValueOnce(new Error('db down'));
+      const view = await service.start(1, 'free');
+      expect(view.record).toBeNull();
+      expect(view.phase).toBe('fight');
+    });
+  });
+
   it('a short balance takes nothing and frees the day dungeon again', async () => {
     gamification.deductBanh.mockResolvedValueOnce({
       success: false,
@@ -308,6 +361,8 @@ describe('DungeonService', () => {
     patch(id, (x) => {
       x.run.hp = 1;
       x.run.shieldsLeft = 0;
+      // The run's last breath is spent, so this fall ends it.
+      x.run.lastBreathUsed = true;
     });
     const end = await service.answer(1, id, wrongAnswer(id));
     expect(next.floor).toBe(6);
