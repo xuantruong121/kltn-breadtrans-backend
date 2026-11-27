@@ -94,6 +94,7 @@ describe('foundationPlan', () => {
   const input = {
     learner: 'BASIC' as const,
     dueWords: 0,
+    dueDeckId: null,
     readingToReview: false,
     grammar: [topic({ id: 1 }), topic({ id: 2 }), topic({ id: 3 })],
     decks: [deck({ id: 7 }), deck({ id: 8 })],
@@ -110,11 +111,16 @@ describe('foundationPlan', () => {
   });
 
   it('puts due words first with a matching count', () => {
-    const [first] = foundationPlan({ ...input, dueWords: 7 }, 3);
+    const [first] = foundationPlan({ ...input, dueWords: 7, dueDeckId: 4 }, 3);
     expect(first.kind).toBe('VOCAB_REVIEW');
     expect(first.title).toBe('Ôn 7 từ đến hạn');
     expect(first.minutes).toBe(4);
-    expect(first.route).toBe('/vocabulary/study');
+    expect(first.route).toBe('/flashcard/4');
+  });
+
+  it('falls back to the deck list when the due deck is unknown', () => {
+    const [first] = foundationPlan({ ...input, dueWords: 2 }, 3);
+    expect(first.route).toBe('/flashcard');
   });
 
   it('adds the Reading review after due words', () => {

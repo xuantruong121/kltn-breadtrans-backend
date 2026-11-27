@@ -276,13 +276,17 @@ export class LearningPathService {
     for (const p of progress)
       if (p.isMastered)
         mastered.set(p.word.topicId, (mastered.get(p.word.topicId) ?? 0) + 1);
+    // Due words, the one due first at the head: its deck is the one to open.
+    const due = progress
+      .filter((p) => p.nextReviewAt && p.nextReviewAt <= now)
+      .sort((a, b) => a.nextReviewAt!.getTime() - b.nextReviewAt!.getTime());
     return {
       learner:
         (profile?.placementSource === 'DIAGNOSTIC'
           ? profile.placementLevel
           : profile?.selfLevel) ?? 'BASIC',
-      dueWords: progress.filter((p) => p.nextReviewAt && p.nextReviewAt <= now)
-        .length,
+      dueWords: due.length,
+      dueDeckId: due[0]?.word.topicId ?? null,
       readingToReview: weakReading !== null,
       grammar: topics.map((t) => ({ ...t, best: best.get(t.id) ?? null })),
       decks: decks.map((d) => ({
