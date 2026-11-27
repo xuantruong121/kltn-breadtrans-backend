@@ -102,6 +102,11 @@ export function nextReviewAt(state: SrsState, now: Date): Date {
 }
 
 /** Days until the next review for each rating; 0 means "in ten minutes". */
+/** A word is due once its review time has come; a word never studied is not. */
+export function isDue(reviewAt: Date | null | undefined, now: Date): boolean {
+  return Boolean(reviewAt && reviewAt.getTime() <= now.getTime());
+}
+
 export function previewSrs(state: SrsState): Record<SrsGrade, number> {
   return {
     AGAIN: 0,

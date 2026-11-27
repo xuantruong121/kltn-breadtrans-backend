@@ -115,7 +115,7 @@ describe('foundationPlan', () => {
     expect(first.kind).toBe('VOCAB_REVIEW');
     expect(first.title).toBe('Ôn 7 từ đến hạn');
     expect(first.minutes).toBe(4);
-    expect(first.route).toBe('/flashcard/4');
+    expect(first.route).toBe('/flashcard/4?due=1');
   });
 
   it('falls back to the deck list when the due deck is unknown', () => {

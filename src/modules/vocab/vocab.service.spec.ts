@@ -20,6 +20,33 @@ describe('VocabService', () => {
     updatedAt: new Date(),
   });
 
+  /** One progress row of a deck, with its review time. */
+  const row = (topicId: number, nextReviewAt: Date | null) => ({
+    isMastered: true,
+    isStarred: false,
+    nextReviewAt,
+    word: { topicId },
+  });
+
+  const deckWord = (id: number) => ({
+    id,
+    topicId: 1,
+    order: id,
+    entry: {
+      displayWord: `word${id}`,
+      pos: 'noun',
+      ipaUs: null,
+      ipaUk: null,
+      meaningVi: `nghĩa ${id}`,
+      audioUs: null,
+      audioUk: null,
+      exampleEn: null,
+      exampleVi: null,
+      collocations: [],
+      status: 'READY',
+    },
+  });
+
   function createPremiumService(
     hasFeature: boolean,
     premiumTopic = topic(true),
@@ -106,6 +133,59 @@ describe('VocabService', () => {
         expect.objectContaining({ id: 1, isPro: false, isLocked: false }),
         expect.objectContaining({ id: 2, isPro: false, isLocked: false }),
       ]);
+    });
+  });
+
+  describe('due words', () => {
+    const past = new Date(Date.now() - 60_000);
+    const future = new Date(Date.now() + 86_400_000);
+
+    it('counts the due words of each deck', async () => {
+      const { service, prisma } = createPremiumService(false);
+      prisma.vocabTopic.findMany = jest
+        .fn()
+        .mockResolvedValue([topic(false), topic(true)]);
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        row(1, past),
+        row(1, past),
+        row(1, future),
+        row(2, null),
+      ]);
+
+      const result = await service.getTopics(7);
+
+      expect(result.topics).toEqual([
+        expect.objectContaining({ id: 1, dueCount: 2 }),
+        expect.objectContaining({ id: 2, dueCount: 0 }),
+      ]);
+    });
+
+    it('marks the due words of a deck, and none for a guest', async () => {
+      const { service, prisma } = createPremiumService(false, topic(false));
+      prisma.vocabWord.findMany.mockResolvedValue([
+        deckWord(11),
+        deckWord(12),
+        deckWord(13),
+      ]);
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        { wordId: 11, isStarred: false, isMastered: true, nextReviewAt: past },
+        {
+          wordId: 12,
+          isStarred: false,
+          isMastered: true,
+          nextReviewAt: future,
+        },
+      ]);
+
+      const mine = await service.getTopicDetails(1, 7);
+      expect(mine.words.map((w) => [w.id, w.isDue])).toEqual([
+        [11, true],
+        [12, false],
+        [13, false],
+      ]);
+
+      const guest = await service.getTopicDetails(1);
+      expect(guest.words.every((w) => w.isDue === false)).toBe(true);
     });
   });
 

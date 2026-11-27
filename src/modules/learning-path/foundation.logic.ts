@@ -132,7 +132,7 @@ export function foundationPlan(
   input: {
     learner: PracticeLevel;
     dueWords: number;
-    /** The deck that holds the word due first; the review card opens it. */
+    /** The deck that holds the word due first; the card opens its due-word review. */
     dueDeckId: number | null;
     /** A Reading attempt scored under the pass mark. */
     readingToReview: boolean;
@@ -147,7 +147,9 @@ export function foundationPlan(
       kind: 'VOCAB_REVIEW',
       id: null,
       title: `Ôn ${input.dueWords} từ đến hạn`,
-      route: input.dueDeckId ? `/flashcard/${input.dueDeckId}` : '/flashcard',
+      route: input.dueDeckId
+        ? `/flashcard/${input.dueDeckId}?due=1`
+        : '/flashcard',
       minutes: Math.max(1, Math.ceil(input.dueWords / WORDS_PER_MINUTE)),
       reason: 'Ôn đúng lúc để không quên',
     });

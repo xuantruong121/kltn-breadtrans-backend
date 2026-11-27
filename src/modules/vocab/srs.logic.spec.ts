@@ -1,4 +1,5 @@
 import {
+  isDue,
   SRS_MAX_INTERVAL_DAYS,
   SRS_MIN_EASE,
   SRS_START,
@@ -102,5 +103,20 @@ describe('srs.logic', () => {
     expect(isSrsGrade('good')).toBe(false);
     expect(isSrsGrade(2)).toBe(false);
     expect(isSrsGrade(undefined)).toBe(false);
+  });
+});
+
+describe('isDue', () => {
+  const now = new Date('2026-11-27T03:00:00.000Z');
+
+  it('is due at and after the review time', () => {
+    expect(isDue(new Date('2026-11-27T03:00:00.000Z'), now)).toBe(true);
+    expect(isDue(new Date('2026-11-26T03:00:00.000Z'), now)).toBe(true);
+  });
+
+  it('is not due before the review time or with no review planned', () => {
+    expect(isDue(new Date('2026-11-27T03:00:00.001Z'), now)).toBe(false);
+    expect(isDue(null, now)).toBe(false);
+    expect(isDue(undefined, now)).toBe(false);
   });
 });

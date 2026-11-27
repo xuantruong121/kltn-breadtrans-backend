@@ -13,6 +13,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { DECK_WORD_INCLUDE, flattenDeckWord } from './dictionary-entry';
 import {
+  isDue,
   nextReviewAt as srsNextReviewAt,
   previewSrs,
   rateSrs,
@@ -108,14 +109,16 @@ export class VocabService {
     // Fetch user progress if userId is provided
     const userProgressMap: Record<
       number,
-      { mastered: number; starred: number; needReview: number }
+      { mastered: number; starred: number; needReview: number; due: number }
     > = {};
     if (userId) {
+      const now = new Date();
       const userProgresses = await this.prisma.userVocabWordProgress.findMany({
         where: { userId },
         select: {
           isMastered: true,
           isStarred: true,
+          nextReviewAt: true,
           word: { select: { topicId: true } },
         },
       });
@@ -123,7 +126,12 @@ export class VocabService {
       userProgresses.forEach((p) => {
         const topicId = p.word.topicId;
         if (!userProgressMap[topicId]) {
-          userProgressMap[topicId] = { mastered: 0, starred: 0, needReview: 0 };
+          userProgressMap[topicId] = {
+            mastered: 0,
+            starred: 0,
+            needReview: 0,
+            due: 0,
+          };
         }
         if (p.isMastered) {
           userProgressMap[topicId].mastered += 1;
@@ -131,6 +139,7 @@ export class VocabService {
           userProgressMap[topicId].needReview += 1;
         }
         if (p.isStarred) userProgressMap[topicId].starred += 1;
+        if (isDue(p.nextReviewAt, now)) userProgressMap[topicId].due += 1;
       });
     }
 
@@ -143,6 +152,7 @@ export class VocabService {
         mastered: 0,
         starred: 0,
         needReview: 0,
+        due: 0,
       };
       categoriesMap[cat].push({
         id: t.id,
@@ -153,6 +163,8 @@ export class VocabService {
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
+        // Words whose review time has come: the due-word review of this deck.
+        dueCount: prog.due,
         isPro: false,
         isLocked: false,
       });
@@ -169,6 +181,7 @@ export class VocabService {
         mastered: 0,
         starred: 0,
         needReview: 0,
+        due: 0,
       };
       return {
         id: t.id,
@@ -179,6 +192,8 @@ export class VocabService {
         totalWords: t.totalWords,
         learnedCount: prog.mastered,
         needReviewCount: prog.needReview,
+        // Words whose review time has come: the due-word review of this deck.
+        dueCount: prog.due,
         isPro: false,
         isLocked: false,
       };
@@ -213,9 +228,10 @@ export class VocabService {
 
     const userProgressMap: Record<
       number,
-      { isStarred: boolean; isMastered: boolean; srs: SrsState }
+      { isStarred: boolean; isMastered: boolean; isDue: boolean; srs: SrsState }
     > = {};
     if (userId) {
+      const now = new Date();
       const progresses = await this.prisma.userVocabWordProgress.findMany({
         where: { userId, word: { topicId } },
         select: {
@@ -225,12 +241,14 @@ export class VocabService {
           intervalDays: true,
           easeFactor: true,
           lapses: true,
+          nextReviewAt: true,
         },
       });
       progresses.forEach((p) => {
         userProgressMap[p.wordId] = {
           isStarred: p.isStarred,
           isMastered: p.isMastered,
+          isDue: isDue(p.nextReviewAt, now),
           srs: srsStateOf(p),
         };
       });
@@ -240,6 +258,7 @@ export class VocabService {
       const prog = userProgressMap[w.id] || {
         isStarred: false,
         isMastered: false,
+        isDue: false,
         srs: srsStateOf(null),
       };
       return {
@@ -256,6 +275,8 @@ export class VocabService {
         collocations: w.collocations,
         isStarred: prog.isStarred,
         isMastered: prog.isMastered,
+        // Its review time has come: the due-word review asks only these.
+        isDue: prog.isDue,
         // Days until the next review for each grade the room may decide (0 = ten minutes).
         reviewPreview: previewSrs(prog.srs),
       };

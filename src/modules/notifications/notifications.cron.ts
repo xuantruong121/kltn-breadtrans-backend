@@ -718,7 +718,8 @@ export class NotificationsCronService {
           count === 1
             ? `Hãy dành 1 phút để ôn tập lại từ "${firstWord}" trong chủ đề "${topicTitle}".`
             : `Bao gồm "${firstWord}" và ${count - 1} từ khác. Ôn tập đều đặn giúp ghi nhớ sâu hơn!`;
-        const url = topicId ? `/flashcard/${topicId}` : '/flashcard';
+        // The deck's due-word review: only the words whose time has come.
+        const url = topicId ? `/flashcard/${topicId}?due=1` : '/flashcard';
 
         let push = false;
         try {
