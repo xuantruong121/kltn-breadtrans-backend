@@ -207,6 +207,26 @@ export class AuthService {
     return `${frontendUrl}/reset-password?token=${rawToken}`;
   }
 
+  /**
+   * Whether a reset link can still be used, without using it. Same conditions
+   * as resetPassword (the token is known and is the user's current one), but
+   * read-only: a mail scanner or a page that only looks leaves the link alive.
+   */
+  async isPasswordResetTokenValid(rawToken: string): Promise<boolean> {
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    const rawUserId = await this.redis.get(
+      `auth:password-reset:token:${tokenHash}`,
+    );
+    if (!rawUserId) return false;
+    const currentTokenHash = await this.redis.get(
+      `auth:password-reset:user:${Number(rawUserId)}`,
+    );
+    return currentTokenHash === tokenHash;
+  }
+
   async resetPassword(rawToken: string, newPassword: string) {
     const tokenHash = crypto
       .createHash('sha256')

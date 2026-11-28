@@ -21,6 +21,7 @@ import {
   VerifyOtpDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  CheckResetTokenDto,
   ChangePasswordDto,
   GoogleExchangeDto,
   GoogleLoginDto,
@@ -155,6 +156,22 @@ export class AuthController {
   @ApiOperation({ summary: 'Đặt lại mật khẩu bằng token một lần' })
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body.token, body.newPassword);
+  }
+
+  @Post('reset-password/check')
+  @PER_MINUTE(20)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Kiểm tra liên kết đặt lại mật khẩu còn dùng được, không dùng nó',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '{ valid: true } khi liên kết còn dùng được, ngược lại false.',
+  })
+  async checkResetToken(@Body() body: CheckResetTokenDto) {
+    return {
+      valid: await this.authService.isPasswordResetTokenValid(body.token),
+    };
   }
 
   @Post('login')

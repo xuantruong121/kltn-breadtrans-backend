@@ -44,10 +44,13 @@ import {
 import {
   DECK_WORD_INCLUDE,
   entryDataFromWord,
+  entryTakenMessage,
   flattenDeckWord,
   headwordOf,
+  isUniqueViolation,
   posOf,
   assertNotANumber,
+  wordInDeckMessage,
 } from '../vocab/dictionary-entry';
 import { ListQuery, pageOf, wantsPage } from '../../common/paging/list-page';
 import { deckListFacets, filterDeckList } from './vocab-deck-list';
@@ -1330,34 +1333,50 @@ export class AdminService {
         );
     }
     const fields = entryDataFromWord(dto);
-    const entry = existing
-      ? await this.prisma.dictionaryEntry.update({
-          where: { id: existing.id },
-          data: {
-            ...fillEmpty(existing, fields),
-            ...(existing.status !== 'APPROVED' && {
-              status: 'APPROVED',
-              reviewedAt: new Date(),
-            }),
-          },
-        })
-      : await this.prisma.dictionaryEntry.create({
-          data: {
-            ...(fields as Prisma.DictionaryEntryCreateInput),
-            headword,
-            pos,
-            displayWord: dto.word.trim(),
-            meaningVi: dto.meaning.trim(),
-          },
-        });
-    const created = await this.prisma.vocabWord.create({
-      data: {
-        topicId,
-        entryId: entry.id,
-        order: dto.order ?? (last._max.order ?? 0) + 1,
-      },
-      include: DECK_WORD_INCLUDE,
-    });
+    // Two requests for the same new word race past the checks above and into
+    // the unique keys: the loser gets the same 409 as the checks, not a 500.
+    let entry;
+    try {
+      entry = existing
+        ? await this.prisma.dictionaryEntry.update({
+            where: { id: existing.id },
+            data: {
+              ...fillEmpty(existing, fields),
+              ...(existing.status !== 'APPROVED' && {
+                status: 'APPROVED',
+                reviewedAt: new Date(),
+              }),
+            },
+          })
+        : await this.prisma.dictionaryEntry.create({
+            data: {
+              ...(fields as Prisma.DictionaryEntryCreateInput),
+              headword,
+              pos,
+              displayWord: dto.word.trim(),
+              meaningVi: dto.meaning.trim(),
+            },
+          });
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(entryTakenMessage(dto.word.trim(), pos));
+      throw error;
+    }
+    let created;
+    try {
+      created = await this.prisma.vocabWord.create({
+        data: {
+          topicId,
+          entryId: entry.id,
+          order: dto.order ?? (last._max.order ?? 0) + 1,
+        },
+        include: DECK_WORD_INCLUDE,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(wordInDeckMessage(dto.word.trim(), pos));
+      throw error;
+    }
     const word = {
       ...flattenDeckWord(created),
       reusedEntry: Boolean(existing),

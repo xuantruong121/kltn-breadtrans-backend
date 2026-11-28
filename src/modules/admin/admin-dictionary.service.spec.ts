@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import {
   AdminDictionaryService,
   dictionaryListWhere,
@@ -104,6 +105,56 @@ describe('AdminDictionaryService', () => {
     await expect(
       build(prisma).create({ word: 'agenda', meaning: 'x' }, 4),
     ).rejects.toThrow('đã có trong kho từ điển');
+  });
+
+  it('answers 409, not 500, when two requests for one word race into the unique key', async () => {
+    const prisma = {
+      dictionaryEntry: {
+        // Both requests found the word free ...
+        findUnique: jest.fn().mockResolvedValue(null),
+        // ... and the second one lost at the database.
+        create: jest.fn().mockRejectedValue(
+          Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+          }),
+        ),
+      },
+    };
+    const attempt = build(prisma).create({ word: 'Far', meaning: 'xa' }, 4);
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toThrow(
+      '"Far" (noun) đã có trong kho từ điển.',
+    );
+  });
+
+  it('lets any other database error through unchanged', async () => {
+    const prisma = {
+      dictionaryEntry: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockRejectedValue(new Error('connection lost')),
+      },
+    };
+    await expect(
+      build(prisma).create({ word: 'far', meaning: 'xa' }, 4),
+    ).rejects.toThrow('connection lost');
+  });
+
+  it('hands the phonetics question to the lookup service and nothing else', async () => {
+    const prisma = { dictionaryEntry: { findUnique: jest.fn() } };
+    const lookup = {
+      phoneticsFor: jest.fn().mockResolvedValue({ found: true }),
+    };
+    const service = new AdminDictionaryService(
+      prisma as never,
+      lookup as never,
+    );
+    expect(await service.phonetics('far', 'adverb')).toEqual({ found: true });
+    expect(lookup.phoneticsFor).toHaveBeenCalledWith('far', 'adverb');
+    expect(prisma.dictionaryEntry.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('says the dictionary is unavailable when no lookup service is wired', () => {
+    expect(() => build({}).phonetics('far')).toThrow('Chưa tra được từ điển');
   });
 
   it('refuses a number as a word', async () => {

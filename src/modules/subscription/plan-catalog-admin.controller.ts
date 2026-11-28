@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
+  ChangePlanPriceDto,
   CreatePlanEntitlementDto,
   CreatePlanVersionDto,
   PlanCatalogAdminDto,
@@ -88,6 +90,31 @@ export class PlanCatalogAdminController {
     @Request() request: AdminRequest,
   ): Promise<PlanVersionAdminDto> {
     return this.catalog.updateDraft(id, dto, request.user.id);
+  }
+
+  @Put('plans/:code/prices/:days')
+  @ApiOperation({
+    summary:
+      'Change the selling price of one term (30, 90 or 180 days) of PLUS or PRO',
+    description:
+      'Creates a new published version of that term from the selling one and retires the old one atomically; purchases keep pointing at the version they bought.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: PlanVersionAdminDto })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'No such term on sale.',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Same price, FREE, or no grants.',
+  })
+  changePrice(
+    @Param('code') code: string,
+    @Param('days', ParseIntPipe) days: number,
+    @Body() dto: ChangePlanPriceDto,
+    @Request() request: AdminRequest,
+  ): Promise<PlanVersionAdminDto> {
+    return this.catalog.changePrice(code, days, dto.priceVnd, request.user.id);
   }
 
   @Get('versions/:id/entitlements')

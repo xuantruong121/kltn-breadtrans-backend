@@ -65,6 +65,37 @@ export interface DictionaryLookupResponse {
   matches: DictionaryMatch[];
 }
 
+/** The pronunciation the admin form asks for: see phoneticsFor. */
+export interface AdminPhonetics {
+  found: boolean;
+  /** Both providers failed: say so, do not say "no phonetics". */
+  unavailable: boolean;
+  ipaUs: string | null;
+  ipaUk: string | null;
+  /** The dictionary has one general phonetics, used for this accent too. */
+  usIsShared: boolean;
+  ukIsShared: boolean;
+  audioUs: string | null;
+  audioUk: string | null;
+  /**
+   * Who answered: the public dictionary, or the AI when the dictionary did not
+   * answer in time. AI phonetics is a suggestion the admin must check.
+   */
+  source: 'DICTIONARY' | 'AI' | null;
+}
+
+const NO_PHONETICS: AdminPhonetics = {
+  source: null,
+  found: false,
+  unavailable: false,
+  ipaUs: null,
+  ipaUk: null,
+  usIsShared: false,
+  ukIsShared: false,
+  audioUs: null,
+  audioUk: null,
+};
+
 @Injectable()
 export class DictionaryLookupService {
   private readonly logger = new Logger(DictionaryLookupService.name);
@@ -185,6 +216,58 @@ export class DictionaryLookupService {
     );
     await this.keepExternalEntries(external);
     return this.attachSaved(external, userId);
+  }
+
+  /**
+   * What the external dictionary says about one word's pronunciation, for the
+   * admin form (owner 2026-11-28). It never reads the store first (a word
+   * already in the store would only give back what the store has, often a
+   * US phonetics and no UK one) and writes nothing: no store entry, no cache.
+   * The learner path above does both, and one button press used to leave a
+   * pending entry behind.
+   */
+  async phoneticsFor(rawWord: string, pos?: string): Promise<AdminPhonetics> {
+    const query = this.normalize(rawWord);
+    let entries: ProviderDictionaryEntry[];
+    let source: 'DICTIONARY' | 'AI' = 'DICTIONARY';
+    try {
+      entries = await this.primaryProvider.lookup(query);
+    } catch (primaryErr) {
+      // The public dictionary did not answer: the AI may still know the word,
+      // but its phonetics is a suggestion, and the answer says so.
+      this.logger.warn(
+        `Phonetics: the dictionary failed for "${query}" (${String(primaryErr)}), asking the AI`,
+      );
+      source = 'AI';
+      try {
+        entries = await this.aiProvider.lookup(query);
+      } catch (err) {
+        this.logger.warn(
+          `Phonetics lookup for "${query}" failed: ${String(err)}`,
+        );
+        return { ...NO_PHONETICS, unavailable: true };
+      }
+    }
+    const withIpa = entries.filter((entry) => entry.ipaUs || entry.ipaUk);
+    const wanted = (pos ?? '').trim().toLowerCase();
+    const entry =
+      (wanted
+        ? withIpa.find(
+            (item) => (item.partOfSpeech ?? '').toLowerCase() === wanted,
+          )
+        : undefined) ?? withIpa[0];
+    if (!entry) return NO_PHONETICS;
+    return {
+      source,
+      found: true,
+      unavailable: false,
+      ipaUs: entry.ipaUs,
+      ipaUk: entry.ipaUk,
+      usIsShared: Boolean(entry.ipaUsShared),
+      ukIsShared: Boolean(entry.ipaUkShared),
+      audioUs: entry.audioUs,
+      audioUk: entry.audioUk,
+    };
   }
 
   /**

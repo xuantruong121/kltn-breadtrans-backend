@@ -2,6 +2,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   DictionaryEntrySource,
@@ -9,10 +11,13 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DictionaryLookupService } from '../vocab/dictionary-lookup.service';
 import {
   assertNotANumber,
   entryDataFromWord,
+  entryTakenMessage,
   headwordOf,
+  isUniqueViolation,
   posOf,
 } from '../vocab/dictionary-entry';
 import {
@@ -72,7 +77,20 @@ export function dictionaryListWhere(
  */
 @Injectable()
 export class AdminDictionaryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly lookup?: DictionaryLookupService,
+  ) {}
+
+  /**
+   * The external dictionary's phonetics for a word, for the word form's
+   * "Lấy phiên âm". Reads and writes nothing in the store (see phoneticsFor).
+   */
+  phonetics(word: string, pos?: string) {
+    if (!this.lookup)
+      throw new ServiceUnavailableException('Chưa tra được từ điển lúc này.');
+    return this.lookup.phoneticsFor(word, pos);
+  }
 
   async list(query: DictionaryListQuery) {
     const page = Math.max(1, Math.floor(Number(query.page) || 1));
@@ -137,19 +155,26 @@ export class AdminDictionaryService {
     const headword = headwordOf(dto.word);
     const pos = posOf(dto.pos);
     await this.assertFree(headword, pos);
-    return this.prisma.dictionaryEntry.create({
-      data: {
-        ...(entryDataFromWord(dto) as Prisma.DictionaryEntryCreateInput),
-        headword,
-        displayWord: dto.word.trim(),
-        pos,
-        meaningVi: dto.meaning.trim(),
-        source: DictionaryEntrySource.CURATED,
-        status: DictionaryEntryStatus.APPROVED,
-        reviewedAt: new Date(),
-        reviewedBy: adminId,
-      },
-    });
+    try {
+      return await this.prisma.dictionaryEntry.create({
+        data: {
+          ...(entryDataFromWord(dto) as Prisma.DictionaryEntryCreateInput),
+          headword,
+          displayWord: dto.word.trim(),
+          pos,
+          meaningVi: dto.meaning.trim(),
+          source: DictionaryEntrySource.CURATED,
+          status: DictionaryEntryStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+        },
+      });
+    } catch (error) {
+      // A second request for the same word got past assertFree first.
+      if (isUniqueViolation(error))
+        throw new ConflictException(entryTakenMessage(dto.word.trim(), pos));
+      throw error;
+    }
   }
 
   /**
@@ -231,8 +256,6 @@ export class AdminDictionaryService {
       where: { headword_pos: { headword, pos } },
     });
     if (taken)
-      throw new ConflictException(
-        `"${taken.displayWord}" (${pos}) đã có trong kho từ điển.`,
-      );
+      throw new ConflictException(entryTakenMessage(taken.displayWord, pos));
   }
 }

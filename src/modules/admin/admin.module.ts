@@ -8,9 +8,10 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 import { AuthModule } from '../auth/auth.module';
 import { AccountModule } from '../account/account.module';
+import { VocabModule } from '../vocab/vocab.module';
 
 @Module({
-  imports: [PrismaModule, UploadModule, AuthModule, AccountModule],
+  imports: [PrismaModule, UploadModule, AuthModule, AccountModule, VocabModule],
   controllers: [AdminController],
   providers: [
     AdminService,

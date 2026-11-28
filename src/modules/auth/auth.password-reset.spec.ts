@@ -139,6 +139,66 @@ describe('AuthService password reset', () => {
     expect(email.sendPasswordChanged).not.toHaveBeenCalled();
   });
 
+  describe('checking a link without using it (owner 2026-11-28)', () => {
+    it('a fresh link is valid, an unknown one is not', async () => {
+      await service.requestPasswordReset(user.email);
+      expect(await service.isPasswordResetTokenValid(tokenFrom())).toBe(true);
+      expect(await service.isPasswordResetTokenValid('f'.repeat(64))).toBe(
+        false,
+      );
+    });
+
+    it('looking at a link twice leaves it usable', async () => {
+      await service.requestPasswordReset(user.email);
+      const token = tokenFrom();
+      expect(await service.isPasswordResetTokenValid(token)).toBe(true);
+      expect(await service.isPasswordResetTokenValid(token)).toBe(true);
+      await expect(
+        service.resetPassword(token, 'New-Password-1!'),
+      ).resolves.toBeDefined();
+    });
+
+    it('a used link is no longer valid', async () => {
+      await service.requestPasswordReset(user.email);
+      const token = tokenFrom();
+      await service.resetPassword(token, 'New-Password-1!');
+      expect(await service.isPasswordResetTokenValid(token)).toBe(false);
+    });
+
+    it('an older link is not valid once a newer one was issued', async () => {
+      await service.requestPasswordReset(user.email);
+      const older = tokenFrom();
+      redis.store.delete(`auth:password-reset:cooldown:${user.email}`);
+      await service.requestPasswordReset(user.email);
+      const newer = tokenFrom();
+      expect(await service.isPasswordResetTokenValid(older)).toBe(false);
+      expect(await service.isPasswordResetTokenValid(newer)).toBe(true);
+    });
+
+    it('a link whose keys expired is not valid', async () => {
+      await service.requestPasswordReset(user.email);
+      const token = tokenFrom();
+      // Redis drops both keys after 15 minutes; the in-memory store has no clock.
+      [...redis.store.keys()]
+        .filter((k) => k.startsWith('auth:password-reset:'))
+        .forEach((k) => redis.store.delete(k));
+      expect(await service.isPasswordResetTokenValid(token)).toBe(false);
+    });
+
+    it('never writes or deletes anything', async () => {
+      await service.requestPasswordReset(user.email);
+      const token = tokenFrom();
+      redis.set.mockClear();
+      redis.del.mockClear();
+      redis.getdel.mockClear();
+      await service.isPasswordResetTokenValid(token);
+      await service.isPasswordResetTokenValid('f'.repeat(64));
+      expect(redis.set).not.toHaveBeenCalled();
+      expect(redis.del).not.toHaveBeenCalled();
+      expect(redis.getdel).not.toHaveBeenCalled();
+    });
+  });
+
   describe('password changed notice (owner 2026-11-21)', () => {
     it('tells the mailbox after a reset that every device was signed out', async () => {
       await service.requestPasswordReset(user.email);

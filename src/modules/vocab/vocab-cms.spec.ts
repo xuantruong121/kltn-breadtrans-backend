@@ -104,7 +104,7 @@ describe('AdminVocabCMS (Phase 4)', () => {
       });
 
       await expect(adminService.publishVocabTopic(101)).rejects.toThrow(
-        'Còn thiếu: phiên âm 1/2 từ; câu ví dụ 1/2 từ; ít nhất 4 nghĩa khác nhau cho bước Trắc nghiệm.',
+        'Còn thiếu: phiên âm 1/2 từ; câu ví dụ 1/2 từ; có ít nhất 4 từ khác nghĩa nhau.',
       );
       expect(prisma.vocabTopic.update).not.toHaveBeenCalled();
     });
