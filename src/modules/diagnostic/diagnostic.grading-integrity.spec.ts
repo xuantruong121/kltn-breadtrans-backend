@@ -23,6 +23,14 @@ import {
 } from './diagnostic.logic';
 import { DiagnosticService } from './diagnostic.service';
 
+// These tests are about grading and attempt authority. The four-skill refresh
+// reads tables the mocked persistence does not model, so it is stubbed to
+// "nothing to refresh"; it has its own specs.
+jest.mock('./diagnostic-four-skill.store', () => ({
+  ...jest.requireActual('./diagnostic-four-skill.store'),
+  refreshFourSkillResult: jest.fn().mockResolvedValue(null),
+}));
+
 function allPermutations(n: number): number[][] {
   if (n === 1) return [[0]];
   const out: number[][] = [];
@@ -345,19 +353,35 @@ describe('task-type-aware validation', () => {
     // DEF-004 is decided (D1), so it is no longer an activation blocker.
     expect(draft.activation.blockers.join(' ')).not.toMatch(/DEF-004/);
 
-    const legacy = evaluateAssessmentReadiness(
-      { scoringVersion: 'OBJECTIVE_POOLED_V1', status: 'ACTIVE' },
+    const objectiveOnly = evaluateAssessmentReadiness(
+      { scoringVersion: 'FOUR_SKILL_PLACEMENT_V2', status: 'ACTIVE' },
       [mcq(1, 0), mcq(2, 1)],
     );
     expect(
-      legacy.content.valid && legacy.runtime.ready && legacy.activation.ready,
+      objectiveOnly.content.valid &&
+        objectiveOnly.runtime.ready &&
+        objectiveOnly.activation.ready,
     ).toBe(true);
   });
+
+  it.each(['OBJECTIVE_POOLED_V1', 'SECTION_BAND_V2', '', null])(
+    'never lets an assessment stored as %p be activated',
+    (version) => {
+      const report = evaluateAssessmentReadiness(
+        { scoringVersion: version, status: 'ACTIVE' },
+        [mcq(1, 0), mcq(2, 1)],
+      );
+      expect(report.activation.ready).toBe(false);
+      expect(report.activation.blockers.join(' ')).toMatch(
+        /DIAGNOSTIC_SCORER_UNSUPPORTED/,
+      );
+    },
+  );
 
   it('blocks activation of productive tasks unless the grader runs on real providers', () => {
     const productiveBlocker = (mode?: 'real' | 'mock' | 'unavailable') =>
       evaluateAssessmentReadiness(
-        { scoringVersion: 'OBJECTIVE_POOLED_V1', status: 'DRAFT' },
+        { scoringVersion: 'FOUR_SKILL_PLACEMENT_V2', status: 'DRAFT' },
         [mcq(1, 0), speaking(), writing()],
         { productiveGraderMode: mode },
       ).activation.blockers.find((b) => b.startsWith('productive grader'));
@@ -368,7 +392,7 @@ describe('task-type-aware validation', () => {
     // An objective-only form is unaffected by the grader mode.
     expect(
       evaluateAssessmentReadiness(
-        { scoringVersion: 'OBJECTIVE_POOLED_V1', status: 'ACTIVE' },
+        { scoringVersion: 'FOUR_SKILL_PLACEMENT_V2', status: 'ACTIVE' },
         [mcq(1, 0), mcq(2, 1)],
       ).activation.ready,
     ).toBe(true);
@@ -378,9 +402,16 @@ describe('task-type-aware validation', () => {
 describe('DiagnosticService attempt authority and delivery', () => {
   const USER = 7;
   const ASSESSMENT = 1;
-  const questions = [mcq(1, 0), mcq(2, 1), mcq(3, 2), mcq(4, 3)].map((q) => ({
+  const authored = [mcq(1, 0), mcq(2, 1), mcq(3, 2), mcq(4, 3)];
+  // Stored as the importer stores a four-skill item: options carry the section.
+  const questions = authored.map((q) => ({
     ...q,
     assessmentId: ASSESSMENT,
+    options: {
+      values: q.options,
+      section: 'LANGUAGE_USE',
+      questionType: 'MCQ',
+    },
   }));
   const assessment = {
     id: ASSESSMENT,
@@ -388,8 +419,8 @@ describe('DiagnosticService attempt authority and delivery', () => {
     description: null,
     isActive: true,
     status: 'ACTIVE',
-    scoringVersion: 'OBJECTIVE_POOLED_V1',
-    blueprintVersion: 'V1_LEGACY_20_ITEM',
+    scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
+    blueprintVersion: 'TEST_FORM',
     contentVersion: 1,
     questions,
   };
@@ -406,6 +437,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
       assessmentId: ASSESSMENT,
       status: 'IN_PROGRESS',
       answers: {},
+      scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
     };
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(0),
@@ -425,6 +457,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
           throw new Error('an attempt must never be created on submit');
         }),
       },
+      diagnosticSkillResult: { upsert: jest.fn() },
       learningActivity: { create: jest.fn() },
     };
     prisma = {
@@ -466,7 +499,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
     // And the order really is permuted for at least one item.
     expect(
       before.questions.some(
-        (q: any, i: number) => q.options.join() !== questions[i].options.join(),
+        (q: any, i: number) => q.options.join() !== authored[i].options.join(),
       ),
     ).toBe(true);
   });
@@ -585,7 +618,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
       correctCount: 1,
       totalCount: 4,
       percentage: 25,
-      level: 'Starter',
+      level: 'FOUR_SKILL_PROFILE',
       submittedAt: new Date(),
     };
     const served = await service.getCurrentAssessment(USER);
@@ -629,7 +662,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
               correctCount: 0,
               totalCount: 4,
               percentage: 0,
-              level: 'Starter',
+              level: 'FOUR_SKILL_PROFILE',
               submittedAt: new Date(),
             });
           }),
@@ -662,7 +695,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
     expect(result.attemptId).toBe(40);
   });
 
-  it('an attempt graded under the legacy attempt-seeded scheme is re-derived with that scheme', async () => {
+  it('an attempt-seeded marker is no longer read: such an answer is unresolvable', async () => {
     const legacyPerm = getAttemptQuestionPermutation(40, 1, 4);
     attemptRow = {
       ...attemptRow,
@@ -671,16 +704,18 @@ describe('DiagnosticService attempt authority and delivery', () => {
       correctCount: 1,
       totalCount: 4,
       percentage: 25,
-      level: 'Starter',
+      level: 'FOUR_SKILL_PROFILE',
       submittedAt: new Date(),
     };
     prisma.diagnosticAttempt.findFirst.mockImplementation((args: any) =>
       Promise.resolve(args.where.status === 'COMPLETED' ? attemptRow : null),
     );
     const result: any = await service.getLatestResult(USER);
+    // The old fallback re-derived a permutation from `__permAttemptId`. It is
+    // gone, so the index answer cannot be resolved and is not marked correct.
     expect(
       result.questionsResult.find((r: any) => r.questionId === 1).isCorrect,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('an attempt with no recorded scheme does not guess: index answers are unresolvable', async () => {
@@ -691,7 +726,7 @@ describe('DiagnosticService attempt authority and delivery', () => {
       correctCount: 1,
       totalCount: 4,
       percentage: 25,
-      level: 'Starter',
+      level: 'FOUR_SKILL_PROFILE',
       submittedAt: new Date(),
     };
     prisma.diagnosticAttempt.findFirst.mockImplementation((args: any) =>

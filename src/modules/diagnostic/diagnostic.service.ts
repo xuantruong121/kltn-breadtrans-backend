@@ -12,17 +12,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
-  buildPracticeRecommendations,
   buildSkillProfiles,
-  buildStrengthsAndWeaknesses,
-  CANONICAL_DIAGNOSTIC_BLUEPRINT,
   resolvePersistedScoringVersion,
-  assertSectionBandV2Scorable,
   describeAdministeredForm,
-  DiagnosticSkillProfile,
   DiagnosticQuestionForScoring,
   classifyDiagnosticTask,
-  getAttemptQuestionPermutation,
   getLearnerQuestionPermutation,
   getQuestionMeta,
   getQuestionOptions,
@@ -30,16 +24,11 @@ import {
   isOpenDiagnosticQuestion,
   LEARNER_PERMUTATION_SCHEME,
   resolveAuthoredOptionIndex,
-  resolvePlacementLevel,
-  resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
 import { placeFromScores } from '../learning-path/placement.logic';
 import { scoresFromOutcome } from '../learning-path/placement.store';
-import {
-  FOUR_SKILL_SCORING_VERSION,
-  scoreFourSkillPlacementV2,
-} from './diagnostic-four-skill';
+import { scoreFourSkillPlacementV2 } from './diagnostic-four-skill';
 import { DiagnosticAdviceCatalogService } from './diagnostic-advice-catalog.service';
 import { taskWeightingView } from './diagnostic-result-policy.store';
 import { buildDiagnosticAdvice } from './diagnostic-v2-advice';
@@ -54,10 +43,7 @@ import {
   WRITING_MIN_CHARACTERS,
 } from './diagnostic-productive';
 import { GamificationService } from '../gamification/gamification.service';
-import {
-  DiagnosticWritingFeedback,
-  DiagnosticWritingService,
-} from './diagnostic-writing.service';
+import { DiagnosticWritingService } from './diagnostic-writing.service';
 import { getLearnerDayKey } from '../../common/time/business-time.util';
 
 type AnswerMap = Record<string, unknown>;
@@ -214,10 +200,11 @@ export class DiagnosticService {
     },
     questions: DiagnosticQuestionForScoring[],
   ) {
-    const fourSkill =
-      attempt.scoringVersion === FOUR_SKILL_SCORING_VERSION
-        ? await refreshFourSkillResult(this.prisma, attempt.id)
-        : null;
+    // The version pinned on the attempt decides how it is read. One this build
+    // does not run stops here with DIAGNOSTIC_SCORER_UNSUPPORTED; it is never
+    // shown through another scorer.
+    resolvePersistedScoringVersion(attempt.scoringVersion);
+    const fourSkill = await refreshFourSkillResult(this.prisma, attempt.id);
     const answers = this.readAnswerMap(attempt.answers);
     const objectiveQuestions = questions.filter(
       (question) => !isOpenDiagnosticQuestion(question),
@@ -225,11 +212,9 @@ export class DiagnosticService {
     const productiveTaskCount = questions.length - objectiveQuestions.length;
 
     // Re-derive the display permutation from the scheme recorded at
-    // submission. The former fallback - "attempt id >= 50 means permuted" -
-    // guessed, and disagreed with how the same attempt had been graded when it
-    // was created without an attempt id. An attempt whose scheme is unknown
-    // gets no permutation, so its index answers resolve to "unresolvable"
-    // rather than to a comparison of incompatible indexes.
+    // submission. An attempt whose scheme is unknown gets no permutation, so
+    // its index answers resolve to "unresolvable" rather than to a comparison
+    // of incompatible indexes.
     const permutations: Record<number, number[]> = {};
     if (answers.__permScheme === LEARNER_PERMUTATION_SCHEME) {
       Object.assign(
@@ -240,16 +225,6 @@ export class DiagnosticService {
           objectiveQuestions,
         ),
       );
-    } else if (typeof answers.__permAttemptId === 'number') {
-      for (const question of objectiveQuestions) {
-        const options = getQuestionOptions(question);
-        if (options.length > 0)
-          permutations[question.id] = getAttemptQuestionPermutation(
-            answers.__permAttemptId,
-            question.id,
-            options.length,
-          );
-      }
     }
 
     const profiles = buildSkillProfiles(
@@ -286,44 +261,6 @@ export class DiagnosticService {
       speakingRows,
     );
     const speakingScore = speakingSkill.score;
-    const objectiveCoreScore = this.weightedCore(
-      questions,
-      answers,
-      permutations,
-    );
-    // Speaking/Writing are formative feedback only. The reference band is
-    // calculated from the reviewed 48-item objective core and never controls
-    // access to learning content.
-    const referenceLevel = attempt.level;
-    const profileWithSpeaking: DiagnosticSkillProfile[] =
-      speakingScore === null
-        ? profiles
-        : [
-            ...profiles,
-            {
-              skill: 'Speaking',
-              correctCount: Math.round(speakingScore),
-              totalCount: 100,
-              percentage: Math.round(speakingScore),
-              evidence:
-                gradedSpeaking.length >= 2 ? 'SUFFICIENT' : 'INSUFFICIENT',
-            },
-          ];
-    const base = buildStrengthsAndWeaknesses(profileWithSpeaking);
-    const strengths = Array.from(
-      new Set(
-        speakingScore !== null && speakingScore >= 75
-          ? [...base.strengths, 'Speaking']
-          : base.strengths,
-      ),
-    );
-    const weaknesses = Array.from(
-      new Set(
-        speakingScore !== null && speakingScore < 60
-          ? [...base.weaknesses, 'Speaking']
-          : base.weaknesses,
-      ),
-    );
 
     const questionsResult = questions.map((question) => {
       const rawAnswer = answers[String(question.id)];
@@ -355,30 +292,16 @@ export class DiagnosticService {
       };
     });
 
-    const wrongQuestions = questions.filter((q) => {
-      if (isOpenDiagnosticQuestion(q)) return false;
-      const qr = questionsResult.find((item) => item.questionId === q.id);
-      return qr ? qr.isCorrect === false : false;
-    });
-
-    const writingRows = this.writingService
+    const writingFeedback = this.writingService
       ? await this.writingService.listFeedback(attempt.id)
       : [];
-    const writingFeedback = writingRows.length
-      ? writingRows
-      : this.readWritingFeedback(answers);
     const writingSkill = summarizeProductiveSkill(
       questions
         .filter((question) => classifyDiagnosticTask(question) === 'WRITING')
         .map((question) => question.id),
       writingFeedback,
     );
-    const practiceRecommendations = buildPracticeRecommendations(
-      referenceLevel,
-      weaknesses,
-      wrongQuestions,
-    );
-    // D1 advice (V2 only): findings from this attempt's own evidence and
+    // D1 advice: findings from this attempt's own evidence and
     // links to content that is published now, with the learner's access.
     const advice =
       fourSkill && this.adviceCatalog
@@ -409,7 +332,7 @@ export class DiagnosticService {
                   provider: row.provider,
                 };
               }),
-              ...writingRows.map((row) => ({
+              ...writingFeedback.map((row) => ({
                 skill: 'WRITING' as const,
                 questionId: row.questionId,
                 status: row.status,
@@ -439,17 +362,8 @@ export class DiagnosticService {
     return {
       attemptId: attempt.id,
       objectiveBreakdown,
-      // The form actually administered, derived from its own items. The
-      // 52-item CANONICAL_DIAGNOSTIC_BLUEPRINT exists in no backup and in no
-      // live database, so it is no longer returned as `canonicalBlueprint`
-      // next to a 20-item result; it is offered as an explicitly unauthored
-      // plan instead.
+      // The form actually administered, derived from its own items.
       administeredForm: describeAdministeredForm(questions),
-      plannedBlueprint: {
-        ...CANONICAL_DIAGNOSTIC_BLUEPRINT,
-        status: 'NOT_AUTHORED',
-        note: 'Planned structure only. It is not what this attempt administered; see administeredForm.',
-      },
       correctCount: totalObjectiveCorrect,
       totalCount: objectiveQuestions.length,
       totalTaskCount: questions.length,
@@ -469,10 +383,8 @@ export class DiagnosticService {
           : Math.round(
               (totalObjectiveCorrect / objectiveQuestions.length) * 100,
             ),
-      // Keep `level` for legacy consumers while presenting it as a reference.
-      level: referenceLevel,
-      referenceLevel,
-      objectiveCoreScore,
+      // The FOUR_SKILL_PROFILE marker, not a band: V2 names no placement level.
+      level: attempt.level,
       speakingEvidenceCount: gradedSpeaking.length,
       speakingScore,
       speakingEvidenceConfidence:
@@ -518,41 +430,14 @@ export class DiagnosticService {
       submittedAt: attempt.submittedAt,
       completedAt:
         (attempt as { completedAt?: Date }).completedAt ?? attempt.submittedAt,
-      skillProfiles: profiles,
-      // V2 uses the D1 advice below. The V1 lists are not returned for it:
-      // their thresholds are V1 rules and their practice routes point at
-      // fixed Grammar topics that may not be published.
-      strengths: advice ? [] : strengths,
-      weaknesses: advice ? [] : weaknesses,
-      practiceRecommendations: advice ? [] : practiceRecommendations,
       advice,
       questionsResult,
     };
   }
 
-  private boundedLevel(level: string, score: number) {
-    const bands = ['A1', 'A2', 'B1', 'B2'];
-    const current = Math.max(0, bands.indexOf(level));
-    const target = score >= 75 ? 3 : score >= 50 ? 2 : score >= 25 ? 1 : 0;
-    return bands[
-      Math.max(
-        0,
-        Math.min(3, Math.min(current + 1, Math.max(current - 1, target))),
-      )
-    ];
-  }
-
   private readAnswerMap(value: unknown): AnswerMap {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value as AnswerMap;
-  }
-
-  private readWritingFeedback(answers: AnswerMap): DiagnosticWritingFeedback[] {
-    const value = answers.__writingFeedback;
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-    return Object.values(value as Record<string, DiagnosticWritingFeedback>)
-      .filter((item) => item && typeof item.questionId === 'number')
-      .sort((left, right) => left.questionId - right.questionId);
   }
 
   private async awaitSpeakingFinalization(
@@ -635,16 +520,8 @@ export class DiagnosticService {
       id: assessment.id,
       title: assessment.title,
       description: assessment.description,
-      // The form actually being served, derived from its own items. The
-      // 52-item CANONICAL_DIAGNOSTIC_BLUEPRINT exists in no backup and in no
-      // live database, so it is no longer returned as `canonicalBlueprint`
-      // beside a 20-item form; it is offered as an explicitly unauthored plan.
+      // The form actually being served, derived from its own items.
       administeredForm: describeAdministeredForm(formQuestions),
-      plannedBlueprint: {
-        ...CANONICAL_DIAGNOSTIC_BLUEPRINT,
-        status: 'NOT_AUTHORED',
-        note: 'Planned structure only. It is not the form being administered; see administeredForm.',
-      },
       hasCompleted: !!latestAttempt,
       // Same order before "start", after it, on resume and on review.
       questions: formQuestions.map((question) =>
@@ -729,6 +606,11 @@ export class DiagnosticService {
         'Bài kiểm tra không tồn tại hoặc đã ngừng hoạt động',
       );
     this.assertQuestionBank(assessment.questions);
+    // Refuse to open an attempt under a version this build cannot score,
+    // before anything is written.
+    const scoringVersion = resolvePersistedScoringVersion(
+      assessment.scoringVersion,
+    );
 
     // 1. If COMPLETED attempt exists, learner cannot retake official test
     const completed = await this.prisma.diagnosticAttempt.findFirst({
@@ -793,7 +675,7 @@ export class DiagnosticService {
           submissionToken,
           // Pinned so the attempt is always scored by the version it was
           // taken under, whatever later happens to the assessment.
-          scoringVersion: assessment.scoringVersion,
+          scoringVersion,
           blueprintVersion: assessment.blueprintVersion,
           contentVersion: assessment.contentVersion,
         },
@@ -855,6 +737,11 @@ export class DiagnosticService {
     if (ownedAttempt.status !== 'IN_PROGRESS') {
       throw new BadRequestException('Phiên kiểm tra không hợp lệ');
     }
+    // The scorer comes from the version PINNED on this attempt when it started.
+    // Nothing else - assessment id, title, question count, skill labels or item
+    // metadata - is in scope, so none of them can change which algorithm runs.
+    // A version this build does not run throws here and nothing is graded.
+    resolvePersistedScoringVersion(ownedAttempt.scoringVersion);
     const permutations = this.permutationsFor(
       userId,
       assessmentId,
@@ -972,71 +859,24 @@ export class DiagnosticService {
     const totalCount = objectiveQuestions.length;
     const percentage =
       totalCount === 0 ? 0 : Math.round((correctCount / totalCount) * 100);
-    // The algorithm is chosen from the items' own structure, never from the
-    // assessment's id or title: renaming an assessment must not change any
-    // learner's score, and the section/band scorer must not run against items
-    // that carry no section metadata (it would score every learner Pre-A1).
-    // The scorer comes from the assessment's PERSISTED scoringVersion.
-    // Nothing else about the assessment - id, title, question count, skills,
-    // order, or section/intendedLevel metadata on its items - is in scope, so
-    // none of them can change which algorithm runs (DIAG-002, DIAG-008). An
-    // unknown or not-yet-implemented version throws rather than falling back.
-    const scoringVersion = resolvePersistedScoringVersion(
-      assessment.scoringVersion,
-    );
-    const useSectionBandV2 = scoringVersion === 'SECTION_BAND_V2';
-    const useFourSkillV2 = scoringVersion === 'FOUR_SKILL_PLACEMENT_V2';
-    // V2: Listening/Reading/Language Use are final now; Speaking/Writing are
-    // filled in as grading completes (refreshFourSkillResult).
-    const objectiveFourSkill = useFourSkillV2
-      ? scoreFourSkillPlacementV2({
-          objective: formQuestions
-            .filter((question) => !isOpenDiagnosticQuestion(question))
-            .map((question) => ({
-              section: getQuestionMeta(question).section,
-              isCorrect:
-                questionsResult.find((r) => r.questionId === question.id)
-                  ?.isCorrect === true,
-            })),
-          speakingQuestionIds: [],
-          speaking: [],
-          writingQuestionIds: [],
-          writing: [],
-        })
-      : null;
-    if (useSectionBandV2) {
-      // Fails closed rather than quietly computing zeros for a missing section.
-      assertSectionBandV2Scorable(formQuestions);
-    }
-    const level = useSectionBandV2
-      ? resolvePlacementLevel(
-          {
-            LANGUAGE_USE: this.sectionPercentage(
-              formQuestions,
-              answerMap,
-              'LANGUAGE_USE',
-              permutations,
-            ),
-            READING: this.sectionPercentage(
-              formQuestions,
-              answerMap,
-              'READING',
-              permutations,
-            ),
-            LISTENING: this.sectionPercentage(
-              formQuestions,
-              answerMap,
-              'LISTENING',
-              permutations,
-            ),
-            CORE: this.weightedCore(formQuestions, answerMap, permutations),
-          },
-          this.bandPercentages(formQuestions, answerMap, permutations),
-        )
-      : useFourSkillV2
-        ? // No band: the V2 band model is undecided (DEF-004).
-          FOUR_SKILL_PROFILE_LEVEL
-        : resolveEstimatedLevel(percentage);
+    // Listening/Reading/Language Use are final now; Speaking/Writing are filled
+    // in as grading completes (refreshFourSkillResult).
+    const objectiveFourSkill = scoreFourSkillPlacementV2({
+      objective: formQuestions
+        .filter((question) => !isOpenDiagnosticQuestion(question))
+        .map((question) => ({
+          section: getQuestionMeta(question).section,
+          isCorrect:
+            questionsResult.find((r) => r.questionId === question.id)
+              ?.isCorrect === true,
+        })),
+      speakingQuestionIds: [],
+      speaking: [],
+      writingQuestionIds: [],
+      writing: [],
+    });
+    // No band: V2 names no placement level.
+    const level = FOUR_SKILL_PROFILE_LEVEL;
     const attempt = await this.prisma.$transaction(async (tx) => {
       if (submissionToken) {
         // Serialize retries for the same learner/assessment/token without a
@@ -1069,19 +909,12 @@ export class DiagnosticService {
         // Names how the options were displayed, so the result screen
         // re-derives exactly the permutation this grade was computed with.
         __permScheme: LEARNER_PERMUTATION_SCHEME,
-        // Server-owned result policy (CP60-DIAG): four-skill attempts from now
-        // on use FOUR_SKILL_OBSERVED_V3. Always written here, after the
-        // learner's map, so a client cannot choose it; older attempts have no
-        // marker and keep the policy they were scored with.
-        ...(useFourSkillV2
-          ? { [RESULT_POLICY_ANSWER_KEY]: OBSERVED_RESULT_POLICY }
-          : {}),
+        // Server-owned result policy: four-skill attempts use
+        // FOUR_SKILL_OBSERVED_V3. Always written here, after the learner's
+        // map, so a client cannot choose it; older attempts have no marker
+        // and keep the policy they were scored with.
+        [RESULT_POLICY_ANSWER_KEY]: OBSERVED_RESULT_POLICY,
       };
-      // A learner-supplied marker never survives for other scorers either.
-      if (!useFourSkillV2)
-        delete (storedAnswers as Record<string, unknown>)[
-          RESULT_POLICY_ANSWER_KEY
-        ];
       const created = await tx.diagnosticAttempt.update({
         where: { id: attemptId },
         data: {
@@ -1092,13 +925,10 @@ export class DiagnosticService {
           level,
           status: 'COMPLETED',
           completedAt: new Date(),
-          ...(useFourSkillV2
-            ? { resultState: 'PENDING_GRADING' as const }
-            : {}),
+          resultState: 'PENDING_GRADING' as const,
         },
       });
-      if (objectiveFourSkill)
-        await writeObjectiveSkillRows(tx, created.id, objectiveFourSkill);
+      await writeObjectiveSkillRows(tx, created.id, objectiveFourSkill);
       // Writing rows commit with the COMPLETED status: a result read between
       // commit and queueing must see them pending, not missing (missing reads
       // as not attempted, which ended result polling on the learner's page).
@@ -1113,9 +943,7 @@ export class DiagnosticService {
           userId,
           type: 'DIAGNOSTIC',
           title: assessment.title,
-          detail: useFourSkillV2
-            ? `${correctCount}/${totalCount} câu trắc nghiệm đúng • Nói/Viết đang được chấm`
-            : `${correctCount}/${totalCount} câu đúng • ${level}`,
+          detail: `${correctCount}/${totalCount} câu trắc nghiệm đúng • Nói/Viết đang được chấm`,
           score: percentage,
           sourceType: 'DiagnosticAttempt',
           sourceId: String(created.id),
@@ -1130,7 +958,7 @@ export class DiagnosticService {
     if (this.writingService) {
       await this.writingService.enqueueForAttempt(attempt, formQuestions);
     }
-    if (useFourSkillV2) await refreshFourSkillResult(this.prisma, attempt.id);
+    await refreshFourSkillResult(this.prisma, attempt.id);
 
     return this.toResult(attempt, formQuestions);
   }
@@ -1138,74 +966,5 @@ export class DiagnosticService {
   /** The learner day (turns at 00:01, owner 2026-11-24). */
   private getVietnamDateKey() {
     return getLearnerDayKey();
-  }
-
-  private sectionPercentage(
-    questions: DiagnosticQuestionForScoring[],
-    answers: AnswerMap,
-    section: string,
-    permutations: Record<number, number[]>,
-  ) {
-    const items = questions.filter(
-      (question) =>
-        getQuestionMeta(question).section === section &&
-        !isOpenDiagnosticQuestion(question),
-    );
-    if (!items.length) return 0;
-    return Math.round(
-      (items.filter((question) =>
-        isDiagnosticAnswerCorrect(
-          question,
-          answers[String(question.id)],
-          permutations[question.id],
-        ),
-      ).length /
-        items.length) *
-        100,
-    );
-  }
-
-  private weightedCore(
-    questions: DiagnosticQuestionForScoring[],
-    answers: AnswerMap,
-    permutations: Record<number, number[]>,
-  ) {
-    return Math.round(
-      this.sectionPercentage(questions, answers, 'LANGUAGE_USE', permutations) *
-        0.4 +
-        this.sectionPercentage(questions, answers, 'READING', permutations) *
-          0.3 +
-        this.sectionPercentage(questions, answers, 'LISTENING', permutations) *
-          0.3,
-    );
-  }
-
-  private bandPercentages(
-    questions: DiagnosticQuestionForScoring[],
-    answers: AnswerMap,
-    permutations: Record<number, number[]>,
-  ) {
-    const result: Record<string, number> = {};
-    for (const band of ['A1', 'A2', 'B1', 'B2']) {
-      const items = questions.filter(
-        (question) =>
-          getQuestionMeta(question).intendedLevel === band &&
-          !isOpenDiagnosticQuestion(question),
-      );
-      result[band] = items.length
-        ? Math.round(
-            (items.filter((question) =>
-              isDiagnosticAnswerCorrect(
-                question,
-                answers[String(question.id)],
-                permutations[question.id],
-              ),
-            ).length /
-              items.length) *
-              100,
-          )
-        : 0;
-    }
-    return result;
   }
 }

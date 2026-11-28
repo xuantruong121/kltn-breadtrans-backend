@@ -167,7 +167,7 @@ async function main() {
       title: 'C2 synthetic productive form',
       isActive: true,
       status: 'ACTIVE',
-      scoringVersion: 'OBJECTIVE_POOLED_V1',
+      scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
       blueprintVersion: 'C2_SYNTHETIC',
       sourceKey: `C2_SYNTHETIC_${Date.now()}`,
       questions: {

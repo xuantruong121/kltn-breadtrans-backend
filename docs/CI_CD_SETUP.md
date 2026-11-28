@@ -20,8 +20,6 @@ The workflow installs with `npm ci`, generates and validates Prisma, applies mig
 - Tier 2 (PR merge gate): the existing Backend CI quality job, including ephemeral migration validation and blocking E2E coverage.
 - Tier 3 (main/phase closure): the same required CI plus explicit full-regression/manual evidence when needed. Backend has no automatic deployment path.
 
-The Entry Diagnostic tests use repository-owned fixtures under `test/fixtures/diagnostic/`. CI never runs the database-mutating materializer.
-
 ## Secrets
 
 No production secrets are required by this CI. Test-only values are injected by the workflow. Provider integrations are mocked by the test suite.
@@ -36,6 +34,5 @@ The local environment has no authenticated GitHub CLI, so these account-side set
 
 ## Troubleshooting
 
-- Missing Diagnostic artifacts: run the fixture validation/update process against an isolated test database; do not recreate them in CI with a mutating script.
 - Prisma engine issues: run `npx prisma generate` after dependency installation.
 - A Vercel Preview cannot reach a backend running on an owner's localhost. Configure a remotely reachable backend before end-to-end Preview testing.

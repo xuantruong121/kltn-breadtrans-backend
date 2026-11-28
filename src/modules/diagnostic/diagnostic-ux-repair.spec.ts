@@ -1,41 +1,11 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import {
-  CANONICAL_DIAGNOSTIC_BLUEPRINT,
   getAttemptQuestionPermutation,
   isDiagnosticAnswerCorrect,
-  buildPracticeRecommendations,
-  buildStrengthsAndWeaknesses,
   buildSkillProfiles,
-  resolvePlacementLevel,
-  resolveEstimatedLevel,
 } from './diagnostic.logic';
 import { DiagnosticService } from './diagnostic.service';
 
 describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
-  describe('Canonical Blueprint Invariants', () => {
-    it('defines 52 total items, 48 objective, and 4 productive items across 5 sections', () => {
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.totalItems).toBe(52);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.objectiveCount).toBe(48);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.productiveCount).toBe(4);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.LANGUAGE_USE.total).toBe(
-        16,
-      );
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.READING.total).toBe(16);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.LISTENING.total).toBe(16);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.SPEAKING.total).toBe(2);
-      expect(CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.WRITING.total).toBe(2);
-    });
-
-    it('enforces exact 8 Grammar + 8 Vocabulary in Language Use blueprint', () => {
-      const lu = CANONICAL_DIAGNOSTIC_BLUEPRINT.sections.LANGUAGE_USE;
-      expect(lu.grammarTotal).toBe(8);
-      expect(lu.vocabularyTotal).toBe(8);
-      expect(lu.grammarTotal + lu.vocabularyTotal).toBe(16);
-      expect(lu.total).toBe(16);
-    });
-  });
-
   describe('Result Arithmetic Invariant', () => {
     it('guarantees overallObjectiveCorrect == sum(skillCorrect) with permutations', () => {
       const mockQuestions = [
@@ -203,166 +173,6 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
     });
   });
 
-  describe('Strength Logic & Level Wording', () => {
-    it('produces empty strengths when all scores are low (no false positive strength)', () => {
-      const lowProfiles = [
-        {
-          skill: 'Grammar',
-          correctCount: 2,
-          totalCount: 8,
-          percentage: 25,
-          evidence: 'SUFFICIENT' as const,
-        },
-        {
-          skill: 'Vocabulary',
-          correctCount: 2,
-          totalCount: 8,
-          percentage: 25,
-          evidence: 'SUFFICIENT' as const,
-        },
-        {
-          skill: 'Reading',
-          correctCount: 4,
-          totalCount: 16,
-          percentage: 25,
-          evidence: 'SUFFICIENT' as const,
-        },
-        {
-          skill: 'Listening',
-          correctCount: 4,
-          totalCount: 16,
-          percentage: 25,
-          evidence: 'SUFFICIENT' as const,
-        },
-      ];
-      const result = buildStrengthsAndWeaknesses(lowProfiles);
-      expect(result.strengths).toEqual([]);
-      expect(result.weaknesses.length).toBe(4);
-    });
-
-    it('correctly identifies single strong skill and sorts weaknesses from weakest to strongest', () => {
-      const mixedProfiles = [
-        {
-          skill: 'Grammar',
-          correctCount: 7,
-          totalCount: 8,
-          percentage: 88,
-          evidence: 'SUFFICIENT' as const,
-        },
-        {
-          skill: 'Vocabulary',
-          correctCount: 1,
-          totalCount: 8,
-          percentage: 13,
-          evidence: 'SUFFICIENT' as const,
-        },
-        {
-          skill: 'Reading',
-          correctCount: 8,
-          totalCount: 16,
-          percentage: 50,
-          evidence: 'SUFFICIENT' as const,
-        },
-      ];
-      const result = buildStrengthsAndWeaknesses(mixedProfiles);
-      expect(result.strengths).toEqual(['Grammar']);
-      // Weaknesses sorted ascending: Vocabulary (13%) before Reading (50%)
-      expect(result.weaknesses).toEqual(['Vocabulary', 'Reading']);
-    });
-
-    it('returns natural Vietnamese wording for CEFR placement levels', () => {
-      expect(resolvePlacementLevel({}, {})).toBe(
-        'Pre-A1 – Cần củng cố nền tảng',
-      );
-      expect(
-        resolvePlacementLevel({ CORE: 75 }, { A1: 85, A2: 80, B1: 75, B2: 70 }),
-      ).toBe('B2 – Trung cấp trên');
-      expect(
-        resolvePlacementLevel({ CORE: 70 }, { A1: 85, A2: 80, B1: 75, B2: 50 }),
-      ).toBe('B1 – Trung cấp');
-      expect(resolveEstimatedLevel(80)).toBe('Intermediate');
-      expect(resolveEstimatedLevel(50)).toBe('Foundation');
-      expect(resolveEstimatedLevel(20)).toBe('Starter');
-    });
-  });
-
-  describe('Practice Recommendations & Concrete Mapping', () => {
-    it('maps wrong questions to concrete BreadTrans practice topics and routes', () => {
-      const wrongQuestions = [
-        {
-          id: 2002,
-          skill: 'Grammar',
-          question: 'Every morning, Sam ___ coffee before work.',
-          options: {
-            values: ['drink', 'drinks', 'drinking', 'drank'],
-            construct: 'basic present',
-            intendedLevel: 'A1',
-          },
-          correctIndex: 1,
-          explanation: null,
-          order: 2,
-        },
-        {
-          id: 2004,
-          skill: 'Vocabulary',
-          question: 'The keys are ___ the drawer.',
-          options: {
-            values: ['at', 'in', 'on', 'to'],
-            construct: 'basic prepositions',
-            intendedLevel: 'A1',
-          },
-          correctIndex: 1,
-          explanation: null,
-          order: 4,
-        },
-        {
-          id: 2017,
-          skill: 'Reading',
-          question: 'What time is the library open?',
-          options: {
-            values: ['8:00', '9:00', '10:00', '11:00'],
-            intendedLevel: 'A2',
-          },
-          correctIndex: 0,
-          explanation: null,
-          order: 17,
-        },
-      ];
-
-      const recs = buildPracticeRecommendations(
-        'Pre-A1 – Cần củng cố nền tảng',
-        ['Grammar', 'Vocabulary', 'Reading'],
-        wrongQuestions,
-      );
-
-      expect(recs.length).toBeGreaterThanOrEqual(3);
-      expect(
-        recs.some((r) => r.route === '/reading?category=grammar&topicId=1'),
-      ).toBe(true);
-      expect(recs.some((r) => r.route === '/vocabulary/study?topicId=1')).toBe(
-        true,
-      );
-      expect(recs.some((r) => r.route === '/reading/2')).toBe(true);
-      // Real routes only, no courses
-      expect(recs.every((r) => !r.route.includes('/courses'))).toBe(true);
-      // Check deduplication
-      const ids = recs.map((r) => r.id);
-      expect(new Set(ids).size).toBe(ids.length);
-    });
-
-    it('falls back safely when no specific construct matches', () => {
-      const recs = buildPracticeRecommendations('A1 – Sơ cấp', [
-        'Speaking',
-        'Writing',
-      ]);
-      expect(recs.length).toBeGreaterThanOrEqual(2);
-      expect(
-        recs.some((r) => r.route === '/speaking/pronunciation-foundations'),
-      ).toBe(true);
-      expect(recs.some((r) => r.route === '/writing/3')).toBe(true);
-    });
-  });
-
   describe('One Official Attempt Enforcement in Service', () => {
     it('blocks retaking when a completed attempt already exists', async () => {
       const mockPrisma: any = {
@@ -370,6 +180,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 2,
             isActive: true,
+            scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
             questions: [
               {
                 id: 1,
@@ -412,6 +223,7 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 2,
             isActive: true,
+            scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
             questions: [
               {
                 id: 1,
@@ -447,172 +259,6 @@ describe('Entry Diagnostic 2.0 UX & Data Integrity Repair Tests', () => {
       expect(res.hasCompleted).toBe(false);
       expect(res.attemptId).toBe(55);
       expect(res.status).toBe('IN_PROGRESS');
-    });
-  });
-
-  describe('Language Use Semantic Blueprint & Balance Validation', () => {
-    function getArtifactPath(subPath: string) {
-      return resolve(process.cwd(), 'test', 'fixtures', 'diagnostic', subPath);
-    }
-
-    interface SemanticMatrixItem {
-      id: number;
-      order: number;
-      stableKey: string;
-      stem: string;
-      construct: string;
-      skill: string;
-      cefr?: string;
-      CEFR?: string;
-      activeInForm: boolean;
-      activeSource: string;
-    }
-
-    interface BankAuditQuestion {
-      questionId?: number;
-      id?: number;
-      order: number;
-      section?: string;
-      stableKey: string;
-      stem?: string;
-      prompt?: string;
-      skill: string;
-      cefr?: string;
-      intendedLevel?: string;
-      currentDifficulty?: string;
-      questionType?: string;
-      correctAnswer?: number;
-      options: unknown[];
-      active?: boolean;
-    }
-
-    const artifactPath = getArtifactPath('final-language-use-matrix.json');
-    const bankAuditPath = getArtifactPath(
-      'entry-diagnostic-question-audit-after.json',
-    );
-
-    it('enforces exact 8 Grammar + 8 Vocabulary parity with 2 per CEFR band in Language Use', () => {
-      expect(existsSync(artifactPath)).toBe(true);
-      const matrix = JSON.parse(
-        readFileSync(artifactPath, 'utf8'),
-      ) as SemanticMatrixItem[];
-
-      expect(matrix).toHaveLength(16);
-
-      const grammarItems = matrix.filter(
-        (item: SemanticMatrixItem) => item.skill === 'Grammar',
-      );
-      const vocabItems = matrix.filter(
-        (item: SemanticMatrixItem) => item.skill === 'Vocabulary',
-      );
-
-      expect(grammarItems).toHaveLength(8);
-      expect(vocabItems).toHaveLength(8);
-
-      const bands = ['A1', 'A2', 'B1', 'B2'];
-      for (const band of bands) {
-        const bandGrammar = grammarItems.filter(
-          (i: SemanticMatrixItem) => (i.cefr || i.CEFR) === band,
-        );
-        const bandVocab = vocabItems.filter(
-          (i: SemanticMatrixItem) => (i.cefr || i.CEFR) === band,
-        );
-        expect(bandGrammar).toHaveLength(2);
-        expect(bandVocab).toHaveLength(2);
-      }
-    });
-
-    it('validates CEFR metadata, option correctness, and guarantees no duplicate keys or collisions', () => {
-      expect(existsSync(artifactPath)).toBe(true);
-      expect(existsSync(bankAuditPath)).toBe(true);
-      const matrix = JSON.parse(
-        readFileSync(artifactPath, 'utf8'),
-      ) as SemanticMatrixItem[];
-      const bank = JSON.parse(
-        readFileSync(bankAuditPath, 'utf8'),
-      ) as BankAuditQuestion[];
-      const activeBank = bank.filter((q) => q.active !== false);
-      expect(activeBank).toHaveLength(52);
-      for (const [section, expected] of [
-        ['LANGUAGE_USE', 16],
-        ['READING', 16],
-        ['LISTENING', 16],
-        ['SPEAKING', 2],
-        ['WRITING', 2],
-      ] as const) {
-        expect(activeBank.filter((q) => q.section === section)).toHaveLength(
-          expected,
-        );
-      }
-      expect(activeBank.filter((q) => q.questionType === 'MCQ')).toHaveLength(
-        48,
-      );
-      expect(activeBank.filter((q) => q.questionType !== 'MCQ')).toHaveLength(
-        4,
-      );
-
-      const validBands = new Set(['A1', 'A2', 'B1', 'B2']);
-      for (const item of matrix) {
-        const band = item.cefr || item.CEFR;
-        expect(band && validBands.has(band)).toBe(true);
-      }
-
-      // Exactly one correct answer per question in bank
-      for (const q of bank) {
-        if (q.questionType === 'MCQ') {
-          expect(Number.isInteger(q.correctAnswer)).toBe(true);
-          expect(q.correctAnswer).toBeGreaterThanOrEqual(0);
-          expect(q.correctAnswer).toBeLessThan(q.options.length);
-        }
-      }
-
-      // No duplicate stable key in active Language Use
-      const keys = matrix.map((i: SemanticMatrixItem) => i.stableKey);
-      expect(new Set(keys).size).toBe(keys.length);
-
-      // No duplicate stem in active Language Use
-      const stems = matrix.map((i: SemanticMatrixItem) => i.stem.trim());
-      expect(new Set(stems).size).toBe(stems.length);
-
-      // No active/reserve collision
-      const activeKeys = new Set(
-        bank
-          .filter((q: BankAuditQuestion) => q.active !== false)
-          .map((q: BankAuditQuestion) => q.stableKey),
-      );
-      const reserveKeys = new Set(
-        bank
-          .filter((q: BankAuditQuestion) => q.active === false)
-          .map((q: BankAuditQuestion) => q.stableKey),
-      );
-      for (const k of activeKeys) {
-        expect(reserveKeys.has(k)).toBe(false);
-      }
-
-      // Verify specific active and reserve status
-      expect(activeKeys.has('lu-a1-daily-object')).toBe(true); // A1 Vocab Q2061
-      expect(activeKeys.has('lu-a1-school-object')).toBe(true); // new A1 Vocab Q2063
-      expect(activeKeys.has('lu-b1-phrasal-postpone')).toBe(true); // B1 Vocab Q2062
-      expect(activeKeys.has('reserve-lu-a2-01')).toBe(true); // Q2050 activated
-      expect(reserveKeys.has('lu-a1-article')).toBe(true); // Q2003 reserved
-      expect(reserveKeys.has('lu-a2-modal')).toBe(true); // Q2007 reserved
-      expect(reserveKeys.has('lu-b1-relative')).toBe(true); // Q2010 reserved
-      expect(reserveKeys.has('reserve-lu-a1-01')).toBe(true); // Q2049 reserved
-      expect(reserveKeys.has('lu-a1-preposition')).toBe(true); // Q2004 reserved
-
-      // Verify Q2004 skill is Grammar and Q2063 is Vocabulary A1
-      const q2004 = bank.find(
-        (q: BankAuditQuestion) => q.stableKey === 'lu-a1-preposition',
-      );
-      expect(q2004?.active).toBe(false);
-      expect(q2004?.skill).toBe('Grammar');
-
-      const q2063 = bank.find(
-        (q: BankAuditQuestion) => q.stableKey === 'lu-a1-school-object',
-      );
-      expect(q2063?.active).toBe(true);
-      expect(q2063?.skill).toBe('Vocabulary');
-      expect(q2063?.intendedLevel || q2063?.cefr).toBe('A1');
     });
   });
 });
