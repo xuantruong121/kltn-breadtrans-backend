@@ -25,6 +25,7 @@ import { R2Service, type StorageUsage } from '../upload/r2.service';
 import { R2CleanupService } from '../upload/r2-cleanup.service';
 import { AccountPurgeService } from '../account/account-purge.service';
 import { assertKeepsAnAdmin } from './admin-roster';
+import { feedbackSummary } from './feedback-summary';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UpdateUserDto } from './dto/admin-user.dto';
 import { DEFAULT_GEMINI_TEXT_MODEL } from '../ai/gemini/gemini-model-router';
@@ -731,13 +732,6 @@ export class AdminService {
         if (score !== null) return score;
       }
       return null;
-    };
-    const feedbackSummary = (feedback: string | null) => {
-      if (!feedback) return null;
-      const normalized = feedback.replace(/\s+/g, ' ').trim();
-      return normalized.length > 180
-        ? `${normalized.slice(0, 177)}...`
-        : normalized;
     };
 
     return {
