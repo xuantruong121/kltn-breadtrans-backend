@@ -1202,13 +1202,14 @@ model DiagnosticAssessment {
   id          Int     @id @default(autoincrement())
   title       String
   description String?
-  /// Deprecated in favour of `status`, kept so V1 code paths keep working
-  /// during the transition. `status` is authoritative for learner-current.
+  /// Deprecated in favour of `status`. `status` is authoritative for
+  /// learner-current.
   isActive    Boolean @default(true)
 
   /// Which scoring algorithm this form is scored by. Persisted so the scorer is
-  /// never inferred from id, title, question count or item metadata.
-  scoringVersion   String                     @default("OBJECTIVE_POOLED_V1")
+  /// never inferred from id, title, question count or item metadata. Only
+  /// FOUR_SKILL_PLACEMENT_V2 is run; any other value fails closed.
+  scoringVersion   String                     @default("FOUR_SKILL_PLACEMENT_V2")
   /// Which content blueprint this form implements. Separate from
   /// scoringVersion because one scorer may later serve several forms.
   blueprintVersion String?

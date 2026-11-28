@@ -28,7 +28,11 @@ describe('DiagnosticService', () => {
       assessmentId: 1,
       skill: 'Reading',
       question: 'A',
-      options: ['a', 'b'],
+      options: {
+        values: ['a', 'b'],
+        section: 'LANGUAGE_USE',
+        questionType: 'MCQ',
+      },
       correctIndex: 0,
       explanation: 'A',
       order: 1,
@@ -38,7 +42,11 @@ describe('DiagnosticService', () => {
       assessmentId: 1,
       skill: 'Reading',
       question: 'B',
-      options: ['a', 'b'],
+      options: {
+        values: ['a', 'b'],
+        section: 'LANGUAGE_USE',
+        questionType: 'MCQ',
+      },
       correctIndex: 1,
       explanation: 'B',
       order: 2,
@@ -48,7 +56,11 @@ describe('DiagnosticService', () => {
       assessmentId: 1,
       skill: 'Reading',
       question: 'C',
-      options: ['a', 'b'],
+      options: {
+        values: ['a', 'b'],
+        section: 'LANGUAGE_USE',
+        questionType: 'MCQ',
+      },
       correctIndex: 0,
       explanation: 'C',
       order: 3,
@@ -61,8 +73,8 @@ describe('DiagnosticService', () => {
     isActive: true,
     // Persisted scoring identity. Production resolves the scorer from this
     // field, so every assessment fixture must state it.
-    scoringVersion: 'OBJECTIVE_POOLED_V1',
-    blueprintVersion: 'V1_LEGACY_20_ITEM',
+    scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
+    blueprintVersion: 'TEST_FORM',
     contentVersion: 1,
     status: 'ACTIVE',
     questions,
@@ -86,6 +98,7 @@ describe('DiagnosticService', () => {
           assessmentId: 1,
           status: 'IN_PROGRESS',
           answers: {},
+          scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
         }),
       },
       course: {
@@ -164,10 +177,12 @@ describe('DiagnosticService', () => {
                 userId: 7,
                 assessmentId: 1,
                 submittedAt: new Date(),
+                scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
                 ...args.data,
               }),
             ),
           },
+          diagnosticSkillResult: { upsert: jest.fn() },
           learningActivity: { create: jest.fn() },
           userStats: {
             upsert: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),
@@ -222,15 +237,74 @@ describe('DiagnosticService', () => {
       correctCount: 3,
       totalCount: 3,
       percentage: 100,
-      level: 'Intermediate',
+      // V2 names no band: the level column carries only the profile marker.
+      level: 'FOUR_SKILL_PROFILE',
     });
     expect(result.questionsResult).toHaveLength(3);
-    expect(result.skillProfiles[0]).toMatchObject({
-      skill: 'Reading',
-      correctCount: 3,
-      totalCount: 3,
-      percentage: 100,
+    // The retired single-score fields are gone from the payload.
+    for (const retired of [
+      'referenceLevel',
+      'skillProfiles',
+      'strengths',
+      'weaknesses',
+      'practiceRecommendations',
+      'objectiveCoreScore',
+      'plannedBlueprint',
+    ])
+      expect(result).not.toHaveProperty(retired);
+  });
+
+  it('writes a learning-history line that states only what is known at submit', async () => {
+    const created: Array<{ data: Record<string, unknown> }> = [];
+    (prisma.$transaction as jest.Mock).mockImplementationOnce(
+      (callback: (tx: any) => unknown) =>
+        callback({
+          $executeRaw: jest.fn().mockResolvedValue(0),
+          diagnosticAttempt: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ id: 4, status: 'IN_PROGRESS' }),
+            update: jest.fn((args: { data: Record<string, unknown> }) =>
+              Promise.resolve({
+                id: 4,
+                userId: 7,
+                assessmentId: 1,
+                submittedAt: new Date(),
+                scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
+                ...args.data,
+              }),
+            ),
+          },
+          diagnosticSkillResult: { upsert: jest.fn() },
+          learningActivity: {
+            create: jest.fn((args: { data: Record<string, unknown> }) => {
+              created.push(args);
+              return Promise.resolve(args.data);
+            }),
+          },
+        }),
+    );
+    await service.submitAssessment(
+      7,
+      1,
+      {
+        '1': shown(7, 1, 1, 0, 2),
+        '2': shown(7, 1, 2, 0, 2), // key is option 1, so this one is wrong
+        '3': shown(7, 1, 3, 0, 2),
+      },
+      'token-history',
+      4,
+    );
+    expect(created).toHaveLength(1);
+    expect(created[0].data).toMatchObject({
+      type: 'DIAGNOSTIC',
+      detail: '2/3 câu trắc nghiệm đúng',
+      sourceType: 'DiagnosticAttempt',
+      sourceId: '4',
     });
+    // Speaking/Writing grading is not known at submit and is never promised here.
+    expect(String(created[0].data.detail)).not.toMatch(/đang được chấm/);
   });
 
   it('does not expose answer keys in the pre-submit assessment payload', async () => {
@@ -248,7 +322,8 @@ describe('DiagnosticService', () => {
       correctCount: 3,
       totalCount: 3,
       percentage: 100,
-      level: 'Intermediate',
+      level: 'FOUR_SKILL_PROFILE',
+      scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
       submittedAt: new Date(),
     };
     const executeRaw = jest.fn().mockResolvedValue(0);
@@ -290,7 +365,6 @@ describe('DiagnosticService', () => {
         options: {
           values: ['a', 'b'],
           section: 'LANGUAGE_USE',
-          intendedLevel: 'A1',
           stableKey: 'a',
           construct: 'grammar',
           questionType: 'MCQ',
@@ -307,7 +381,6 @@ describe('DiagnosticService', () => {
         options: {
           values: ['a', 'b'],
           section: 'READING',
-          intendedLevel: 'A1',
           stableKey: 'b',
           construct: 'detail',
           questionType: 'MCQ',
@@ -325,7 +398,6 @@ describe('DiagnosticService', () => {
         options: {
           values: [],
           section: 'SPEAKING',
-          intendedLevel: 'A2',
           stableKey: 'c',
           construct: 'fluency',
           questionType: 'OPEN_TEXT',
@@ -340,7 +412,7 @@ describe('DiagnosticService', () => {
       ...assessment,
       id: 2,
       title: 'Entry Diagnostic v2',
-      scoringVersion: 'OBJECTIVE_POOLED_V1',
+      scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
       questions: v2Questions,
     });
     prisma.diagnosticAttempt.findUnique = jest.fn().mockResolvedValue({
@@ -348,6 +420,7 @@ describe('DiagnosticService', () => {
       userId: 7,
       assessmentId: 2,
       status: 'IN_PROGRESS',
+      scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
       speakingResponses: [{ questionId: 103, status: 'SKIPPED', score: null }],
     });
     prisma.diagnosticSpeakingResponse = {
@@ -375,6 +448,7 @@ describe('DiagnosticService', () => {
                 userId: 7,
                 assessmentId: 2,
                 submittedAt: new Date(),
+                scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
                 ...args.data,
               }),
             ),
@@ -384,10 +458,11 @@ describe('DiagnosticService', () => {
               correctCount: 1,
               totalCount: 2,
               percentage: 50,
-              level: 'A1',
+              level: 'FOUR_SKILL_PROFILE',
               submittedAt: new Date(),
             }),
           },
+          diagnosticSkillResult: { upsert: jest.fn() },
           learningActivity: { create: jest.fn() },
           userStats: {
             upsert: jest.fn().mockResolvedValue({ totalBanhRan: 50 }),

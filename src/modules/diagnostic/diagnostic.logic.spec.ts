@@ -1,9 +1,6 @@
 import {
   buildSkillProfiles,
-  buildStrengthsAndWeaknesses,
   getQuestionMeta,
-  resolvePlacementLevel,
-  resolveEstimatedLevel,
   validateQuestionBank,
 } from './diagnostic.logic';
 
@@ -47,13 +44,6 @@ const questions = [
 ];
 
 describe('diagnostic logic', () => {
-  it('uses documented level boundaries', () => {
-    expect(resolveEstimatedLevel(44)).toBe('Starter');
-    expect(resolveEstimatedLevel(45)).toBe('Foundation');
-    expect(resolveEstimatedLevel(74)).toBe('Foundation');
-    expect(resolveEstimatedLevel(75)).toBe('Intermediate');
-  });
-
   it('marks low-sample domains as insufficient instead of precise', () => {
     // Shown in authored order, so the display permutation is the identity.
     // An index answer is only gradable through a permutation.
@@ -68,7 +58,6 @@ describe('diagnostic logic', () => {
     expect(
       profiles.find((profile) => profile.skill === 'Grammar')?.percentage,
     ).toBeNull();
-    expect(buildStrengthsAndWeaknesses(profiles).weaknesses).toEqual([]);
   });
 
   it('reports malformed question banks', () => {
@@ -88,7 +77,6 @@ describe('diagnostic logic', () => {
             stableKey: 'listen-a1-01',
             section: 'LISTENING',
             construct: 'short-dialogue',
-            intendedLevel: 'A1',
             questionType: 'MCQ',
             audioUrl: null,
           },
@@ -109,12 +97,8 @@ describe('diagnostic logic', () => {
         questionType: 'MCQ',
       },
     });
-    expect(meta).toMatchObject({
-      section: 'LANGUAGE_USE',
-      intendedLevel: 'A1',
-    });
-    expect(
-      resolvePlacementLevel({ CORE: 72 }, { A1: 80, A2: 70, B1: 40, B2: 10 }),
-    ).toBe('A2 – Sơ trung cấp');
+    expect(meta).toMatchObject({ section: 'LANGUAGE_USE' });
+    // A stored CEFR-style tag is never read: items carry no learner level.
+    expect(meta).not.toHaveProperty('intendedLevel');
   });
 });
