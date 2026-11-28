@@ -17,6 +17,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiQuery,
   ApiResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -133,17 +134,24 @@ export class UserController {
   @ApiBearerAuth()
   @Get('learning-history')
   @ApiOperation({
-    summary: 'Lấy lịch sử luyện tập đã được lưu của user hiện tại',
+    summary:
+      'Lấy một trang lịch sử luyện tập của user hiện tại (mỗi trang gồm trọn các ngày học)',
+  })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Số trang, từ 1. Ngoài khoảng thì lấy trang gần nhất hợp lệ.',
   })
   getLearningHistory(
     @Request() req: { user: { id: number } },
     @Query('type') type?: string,
-    @Query('limit') limit?: string,
+    @Query('page') page?: string,
   ) {
     return this.userService.getLearningHistory(
       req.user.id,
       type,
-      Number(limit) || 50,
+      Number(page) || 1,
     );
   }
 

@@ -38,6 +38,17 @@ import {
 import { resolveSpeakingPracticeSet } from '../speaking/speaking-practice-set';
 import { studiedWeekdays, vietnamWeekStart } from './study-week.logic';
 import {
+  clampHistoryPage,
+  HISTORY_MAX_PAGE_ROWS,
+  lastDaysCounts,
+  nextDayKey,
+  planHistoryPages,
+} from './learning-history.logic';
+import {
+  getLearnerDayKey,
+  getLearnerDayStartOf,
+} from '../../common/time/business-time.util';
+import {
   LISTENING_CATALOG_QUIZ,
   SPEAKING_CATALOG_EXERCISE,
   WRITING_CATALOG_QUIZ,
@@ -557,13 +568,52 @@ export class UserService {
     };
   }
 
-  async getLearningHistory(userId: number, type?: string, requestedLimit = 50) {
-    const limit = Math.min(Math.max(requestedLimit, 1), 100);
-    const activities = await this.prisma.learningActivity.findMany({
-      where: { userId, ...(type && type !== 'ALL' ? { type } : {}) },
-      orderBy: { occurredAt: 'desc' },
-      take: limit,
-    });
+  /**
+   * One page of the learner's activity history. A page holds whole learner
+   * days (see learning-history.logic.ts), so the app can group a day's rows
+   * without a group being cut at a page edge. `weekly` counts the last 7
+   * learner days over ALL rows, independent of the page.
+   */
+  async getLearningHistory(userId: number, type?: string, requestedPage = 1) {
+    const typeFilter = type && type !== 'ALL' ? { type } : {};
+    // Rows per learner day (the day turns at 00:01 Vietnam time).
+    const perDay = await this.prisma.$queryRaw<
+      Array<{ dayKey: string; count: number }>
+    >`
+      SELECT to_char(
+               ("occurredAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '1 minute',
+               'YYYY-MM-DD'
+             ) AS "dayKey",
+             count(*)::int AS "count"
+      FROM "LearningActivity"
+      WHERE "userId" = ${userId}
+        AND (${type && type !== 'ALL' ? type : null}::text IS NULL OR "type" = ${type && type !== 'ALL' ? type : null}::text)
+      GROUP BY 1
+      ORDER BY 1 DESC
+    `;
+    const pages = planHistoryPages(perDay);
+    const page = clampHistoryPage(requestedPage, pages.length);
+    const plan = pages[page - 1];
+    const activities = plan
+      ? await this.prisma.learningActivity.findMany({
+          where: {
+            userId,
+            ...typeFilter,
+            occurredAt: {
+              gte: getLearnerDayStartOf(plan.oldestDayKey),
+              // The newest page has no upper edge, so a row stamped a moment
+              // ahead of the clock is never lost.
+              ...(page > 1
+                ? { lt: getLearnerDayStartOf(nextDayKey(plan.newestDayKey)) }
+                : {}),
+            },
+          },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          take: HISTORY_MAX_PAGE_ROWS,
+        })
+      : [];
+    const totalRows = perDay.reduce((sum, day) => sum + day.count, 0);
+    const weekly = lastDaysCounts(perDay, getLearnerDayKey());
     const summary = await this.prisma.learningActivity.groupBy({
       by: ['type'],
       where: { userId },
@@ -601,9 +651,16 @@ export class UserService {
     };
 
     return {
-      activities: activities.map((a) => ({ ...a, quizId: quizIdOf(a) })),
+      activities: activities.map((a) => ({
+        ...a,
+        quizId: quizIdOf(a),
+        // The learner day the row belongs to; the app groups rows by it.
+        dayKey: getLearnerDayKey(a.occurredAt),
+      })),
+      pagination: { page, pageCount: pages.length, totalRows },
+      weekly,
       summary: {
-        completedCount: activities.length,
+        completedCount: totalRows,
         streakCount: stats?.streakCount || 0,
         latestDiagnostic: diagnostic
           ? {
