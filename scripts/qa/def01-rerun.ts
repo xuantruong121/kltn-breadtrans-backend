@@ -12,7 +12,7 @@ async function main() {
   const email = `def01-${Date.now()}@harness.local`;
   const body = {
     email,
-    password: 'Password123',
+    password: 'Password123!',
     role: 'STUDENT',
     fullName: 'Học viên DEF01',
   };
