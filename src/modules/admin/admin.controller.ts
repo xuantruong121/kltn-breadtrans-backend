@@ -22,6 +22,7 @@ import {
   ApiQuery,
   ApiResponse,
 } from '@nestjs/swagger';
+import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -50,6 +51,7 @@ export class AdminController {
     private readonly dictionaryService: AdminDictionaryService,
     private readonly retentionMetrics: RetentionMetricsService,
     private readonly aiReviewCosts: AiReviewCostsService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get('dashboard-stats')
@@ -95,6 +97,21 @@ export class AdminController {
   @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
   createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createUser(dto);
+  }
+
+  @Post('users/:id/send-password-reset')
+  @ApiOperation({
+    summary:
+      'Admin gui email dat lai mat khau cho nguoi dung (lien ket mot lan, 15 phut)',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'status: SENT da gui | COOLDOWN gui qua gan nhau (1 phut) | UNDELIVERABLE email thuoc mien thu nghiem, khong nhan duoc thu | EMAIL_FAILED loi gui thu.',
+  })
+  @ApiResponse({ status: 404, description: 'Nguoi dung khong ton tai.' })
+  sendPasswordReset(@Param('id', ParseIntPipe) id: number) {
+    return this.authService.sendPasswordResetForAdmin(id);
   }
 
   @Patch('users/:id')

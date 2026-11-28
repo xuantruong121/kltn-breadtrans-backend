@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   Logger,
   UnauthorizedException,
   ConflictException,
@@ -130,26 +131,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return genericResponse;
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-    const tokenKey = `auth:password-reset:token:${tokenHash}`;
-    const userTokenKey = `auth:password-reset:user:${user.id}`;
-    const previousTokenHash = await this.redis.get(userTokenKey);
-    if (previousTokenHash) {
-      await this.redis.del(`auth:password-reset:token:${previousTokenHash}`);
-    }
-
-    const ttlSeconds = 15 * 60;
-    await this.redis.set(tokenKey, String(user.id), 'EX', ttlSeconds);
-    await this.redis.set(userTokenKey, tokenHash, 'EX', ttlSeconds);
-
-    const frontendUrl = (
-      process.env.FRONTEND_URL || 'http://localhost:3000'
-    ).replace(/\/$/, '');
-    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+    const resetUrl = await this.issuePasswordResetUrl(user.id);
     try {
       await this.emailService.sendPasswordResetEmail(email, resetUrl);
     } catch (error) {
@@ -157,6 +139,72 @@ export class AuthService {
     }
 
     return genericResponse;
+  }
+
+  /**
+   * An admin sends a learner the reset link from the user form (owner
+   * 2026-11-28: the admin no longer types a password for someone else). Same
+   * token as the learner's own request: stored as a hash, one use, 15 minutes,
+   * one live token per user, one request a minute per address. The admin gets
+   * the outcome, which the learner's request hides on purpose.
+   */
+  async sendPasswordResetForAdmin(userId: number): Promise<{
+    status: 'SENT' | 'COOLDOWN' | 'UNDELIVERABLE' | 'EMAIL_FAILED';
+    email: string;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!user) throw new NotFoundException('Người dùng không tồn tại');
+    const email = user.email.trim().toLowerCase();
+    // A test domain never receives mail: say so instead of issuing a token.
+    if (!this.emailService.canDeliver(email))
+      return { status: 'UNDELIVERABLE', email: user.email };
+    const accepted = await this.redis.set(
+      `auth:password-reset:cooldown:${email}`,
+      '1',
+      'EX',
+      60,
+      'NX',
+    );
+    if (accepted !== 'OK') return { status: 'COOLDOWN', email: user.email };
+    const resetUrl = await this.issuePasswordResetUrl(user.id);
+    try {
+      await this.emailService.sendPasswordResetEmail(email, resetUrl);
+    } catch (error) {
+      this.logger.error(
+        `Admin password reset email failed for ${email}`,
+        error,
+      );
+      return { status: 'EMAIL_FAILED', email: user.email };
+    }
+    this.logger.log(`admin_password_reset_sent user=${user.id}`);
+    return { status: 'SENT', email: user.email };
+  }
+
+  /** A fresh single-use reset token for the user (the old one stops working); returns the link. */
+  private async issuePasswordResetUrl(userId: number): Promise<string> {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    const tokenKey = `auth:password-reset:token:${tokenHash}`;
+    const userTokenKey = `auth:password-reset:user:${userId}`;
+    const previousTokenHash = await this.redis.get(userTokenKey);
+    if (previousTokenHash) {
+      await this.redis.del(`auth:password-reset:token:${previousTokenHash}`);
+    }
+
+    const ttlSeconds = 15 * 60;
+    await this.redis.set(tokenKey, String(userId), 'EX', ttlSeconds);
+    await this.redis.set(userTokenKey, tokenHash, 'EX', ttlSeconds);
+
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:3000'
+    ).replace(/\/$/, '');
+    return `${frontendUrl}/reset-password?token=${rawToken}`;
   }
 
   async resetPassword(rawToken: string, newPassword: string) {
