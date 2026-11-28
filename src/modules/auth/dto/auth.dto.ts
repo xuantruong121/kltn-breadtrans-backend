@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
@@ -107,6 +108,16 @@ export class ResetPasswordDto {
 
   @NewPassword()
   newPassword: string;
+}
+
+/** Read-only check of a reset link: no password, and the token is not used up. */
+export class CheckResetTokenDto {
+  @ApiProperty({ example: 'one-time-reset-token' })
+  @IsString()
+  @IsNotEmpty()
+  // A real token is 64 hex characters; the cap keeps a huge body from being hashed.
+  @MaxLength(256)
+  token: string;
 }
 
 export class ChangePasswordDto {
