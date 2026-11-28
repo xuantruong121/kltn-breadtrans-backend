@@ -254,6 +254,59 @@ describe('DiagnosticService', () => {
       expect(result).not.toHaveProperty(retired);
   });
 
+  it('writes a learning-history line that states only what is known at submit', async () => {
+    const created: Array<{ data: Record<string, unknown> }> = [];
+    (prisma.$transaction as jest.Mock).mockImplementationOnce(
+      (callback: (tx: any) => unknown) =>
+        callback({
+          $executeRaw: jest.fn().mockResolvedValue(0),
+          diagnosticAttempt: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({ id: 4, status: 'IN_PROGRESS' }),
+            update: jest.fn((args: { data: Record<string, unknown> }) =>
+              Promise.resolve({
+                id: 4,
+                userId: 7,
+                assessmentId: 1,
+                submittedAt: new Date(),
+                scoringVersion: 'FOUR_SKILL_PLACEMENT_V2',
+                ...args.data,
+              }),
+            ),
+          },
+          diagnosticSkillResult: { upsert: jest.fn() },
+          learningActivity: {
+            create: jest.fn((args: { data: Record<string, unknown> }) => {
+              created.push(args);
+              return Promise.resolve(args.data);
+            }),
+          },
+        }),
+    );
+    await service.submitAssessment(
+      7,
+      1,
+      {
+        '1': shown(7, 1, 1, 0, 2),
+        '2': shown(7, 1, 2, 0, 2), // key is option 1, so this one is wrong
+        '3': shown(7, 1, 3, 0, 2),
+      },
+      'token-history',
+      4,
+    );
+    expect(created).toHaveLength(1);
+    expect(created[0].data).toMatchObject({
+      type: 'DIAGNOSTIC',
+      detail: '2/3 câu trắc nghiệm đúng',
+      sourceType: 'DiagnosticAttempt',
+      sourceId: '4',
+    });
+    // Speaking/Writing grading is not known at submit and is never promised here.
+    expect(String(created[0].data.detail)).not.toMatch(/đang được chấm/);
+  });
+
   it('does not expose answer keys in the pre-submit assessment payload', async () => {
     const result = await service.getCurrentAssessment(7);
     expect(result.questions[0]).not.toHaveProperty('correctIndex');

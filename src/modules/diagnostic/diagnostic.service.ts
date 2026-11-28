@@ -943,7 +943,9 @@ export class DiagnosticService {
           userId,
           type: 'DIAGNOSTIC',
           title: assessment.title,
-          detail: `${correctCount}/${totalCount} câu trắc nghiệm đúng • Nói/Viết đang được chấm`,
+          // Written once at submit, so it states only what is known now. The
+          // Speaking/Writing grading state lives on the result page.
+          detail: `${correctCount}/${totalCount} câu trắc nghiệm đúng`,
           score: percentage,
           sourceType: 'DiagnosticAttempt',
           sourceId: String(created.id),
