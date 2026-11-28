@@ -82,11 +82,14 @@ describe('UserService.getLearningHistory', () => {
       '2026-11-27',
     ]);
     expect(result.summary.completedCount).toBe(60);
+    expect(result.summary.latestActivityDayKey).toBe('2026-11-28');
   });
 
   it('asks for a later page with both edges, on whole learner days', async () => {
     queryRaw.mockResolvedValue(perDay);
-    await service.getLearningHistory(7, undefined, 2);
+    const later = await service.getLearningHistory(7, undefined, 2);
+    // The newest day is reported on every page.
+    expect(later.summary.latestActivityDayKey).toBe('2026-11-28');
 
     const where = findMany.mock.calls[0][0].where;
     // Page 2 holds 26/11 and 25/11.
@@ -118,6 +121,7 @@ describe('UserService.getLearningHistory', () => {
     const result = await service.getLearningHistory(7);
     expect(result.activities).toEqual([]);
     expect(result.pagination).toEqual({ page: 1, pageCount: 0, totalRows: 0 });
+    expect(result.summary.latestActivityDayKey).toBeNull();
     expect(findMany).not.toHaveBeenCalled();
     expect(result.weekly).toHaveLength(7);
     expect(result.weekly.every((d) => d.count === 0)).toBe(true);

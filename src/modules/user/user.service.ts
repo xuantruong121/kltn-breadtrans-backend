@@ -661,6 +661,8 @@ export class UserService {
       weekly,
       summary: {
         completedCount: totalRows,
+        // The newest learner day with a row, whatever page was asked for.
+        latestActivityDayKey: perDay[0]?.dayKey ?? null,
         streakCount: stats?.streakCount || 0,
         latestDiagnostic: diagnostic
           ? {
