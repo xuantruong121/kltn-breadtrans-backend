@@ -32,7 +32,7 @@ export class AdminGrammarController {
   @ApiQuery({
     name: 'level',
     required: false,
-    enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
+    enum: ['STARTER', 'BASIC', 'INTERMEDIATE', 'ADVANCED'],
   })
   @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
   @ApiQuery({

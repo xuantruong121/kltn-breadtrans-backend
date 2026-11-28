@@ -1,8 +1,72 @@
 import {
+  briefRule,
   draftBrief,
+  draftRule,
+  levelLanguage,
   listeningDraftRule,
   situationRule,
 } from './lesson-copy.logic';
+
+describe('levelLanguage: practice levels and legacy tags', () => {
+  it('describes a practice level and maps legacy CEFR codes or ranges', () => {
+    expect(levelLanguage('INTERMEDIATE')).toMatch(
+      /^a learner who handles daily and work situations/,
+    );
+    expect(levelLanguage('B1')).toMatch(
+      /^a learner who handles daily and work situations/,
+    );
+    expect(levelLanguage('A2-B1')).toMatch(
+      /^a learner who handles daily and work situations/,
+    );
+    expect(levelLanguage('STARTER')).toMatch(/^a learner starting from zero/);
+    expect(levelLanguage('ADVANCED')).toMatch(/^a confident learner/);
+  });
+
+  it('gives nothing for no level or an unknown one', () => {
+    expect(levelLanguage(undefined)).toBeUndefined();
+    expect(levelLanguage('Z9')).toBeUndefined();
+    expect(levelLanguage('UNKNOWN')).toBeUndefined();
+  });
+});
+
+describe('draftRule (owner 2026-11-25: every area follows the title and the level, like Listening)', () => {
+  it('ties each area to its title, with a level line naming the chosen level', () => {
+    expect(draftRule('READING', 'INTERMEDIATE')).toMatch(
+      /the passage and every question are about the topic.*\(the lesson title\)/,
+    );
+    expect(draftRule('READING', 'INTERMEDIATE')).toContain(
+      'everyday, work and travel words',
+    );
+    expect(draftRule('WRITING', 'BASIC')).toMatch(
+      /every task is about the topic/,
+    );
+    expect(draftRule('SPEAKING', 'INTERMEDIATE')).toContain(
+      'a learner who handles daily and work situations',
+    );
+    expect(draftRule('GRAMMAR', 'BASIC')).toMatch(
+      /practise exactly that structure, never another one/,
+    );
+    expect(draftRule('GRAMMAR', 'BASIC')).toContain(
+      'a learner with the basics',
+    );
+  });
+
+  it('asks a vocabulary draft for Vietnamese meanings and US phonetics', () => {
+    const rule = draftRule('VOCAB', 'ADVANCED');
+    expect(rule).toMatch(/"meaning" is its Vietnamese meaning/);
+    expect(rule).toMatch(/"ipaUs" is the American IPA/);
+  });
+
+  it('adds no level line for an unknown level', () => {
+    expect(draftRule('READING', undefined)).not.toMatch(/Level:/);
+  });
+
+  it('briefRule speaks of a deck situation or a grammar focus, and is empty without a brief', () => {
+    expect(briefRule('VOCAB', 'Họp nhóm')).toMatch(/description of this deck/);
+    expect(briefRule('GRAMMAR', 'S + V3')).toMatch(/^Focus: /);
+    expect(briefRule('VOCAB', undefined)).toBe('');
+  });
+});
 
 describe('listeningDraftRule (owner 2026-11-25: the full draft follows the title and the level)', () => {
   it('ties the lesson to the title as its topic, and Vietnamese topics are not translated word for word', () => {
@@ -14,30 +78,38 @@ describe('listeningDraftRule (owner 2026-11-25: the full draft follows the title
   });
 
   it('names the chosen level and what it asks of the language and the questions', () => {
-    const b2 = listeningDraftRule('B2', 'COMPREHENSION');
-    expect(b2).toContain('CEFR level B2');
-    expect(b2).toMatch(/phrasal verbs/);
-    expect(b2).toMatch(/questions and every option use the same level/);
-    expect(listeningDraftRule('A1', 'COMPREHENSION')).toMatch(
-      /CEFR level A1: very common words/,
+    const intermediate = listeningDraftRule('INTERMEDIATE', 'COMPREHENSION');
+    expect(intermediate).toMatch(/phrasal verbs/);
+    expect(intermediate).toMatch(
+      /questions and every option use the same level/,
+    );
+    expect(listeningDraftRule('STARTER', 'COMPREHENSION')).toMatch(
+      /a learner starting from zero: the most common words/,
     );
   });
 
   it('gives a dialogue a length that grows with the level, and no length to other forms', () => {
-    expect(listeningDraftRule('A1', 'DIALOGUE')).toMatch(
+    expect(listeningDraftRule('STARTER', 'DIALOGUE')).toMatch(
       /Dialogue: 6 to 8 turns/,
     );
-    expect(listeningDraftRule('B2', 'DIALOGUE')).toMatch(
+    expect(listeningDraftRule('INTERMEDIATE', 'DIALOGUE')).toMatch(
+      /Dialogue: 8 to 14 turns/,
+    );
+    expect(listeningDraftRule('ADVANCED', 'DIALOGUE')).toMatch(
       /Dialogue: 10 to 14 turns/,
     );
-    expect(listeningDraftRule('B2', 'COMPREHENSION')).not.toMatch(/Dialogue:/);
+    expect(listeningDraftRule('INTERMEDIATE', 'COMPREHENSION')).not.toMatch(
+      /Dialogue:/,
+    );
   });
 
-  it('falls back to A2 when no level or an unknown one is given', () => {
+  it('falls back to BASIC when no level or an unknown one is given', () => {
     expect(listeningDraftRule(undefined, 'DIALOGUE')).toContain(
-      'CEFR level A2',
+      'a learner with the basics',
     );
-    expect(listeningDraftRule('Z9', 'DIALOGUE')).toContain('CEFR level A2');
+    expect(listeningDraftRule('Z9', 'DIALOGUE')).toContain(
+      'a learner with the basics',
+    );
   });
 });
 

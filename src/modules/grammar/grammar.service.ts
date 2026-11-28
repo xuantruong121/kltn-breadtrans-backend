@@ -354,7 +354,7 @@ export class GrammarService {
     return this.prisma.grammarTopic.create({
       data: {
         title: dto.title,
-        level: dto.level || 'BEGINNER',
+        level: dto.level ?? 'BASIC',
         description: dto.description,
         videoYoutubeId: dto.videoYoutubeId,
         keyFormula: dto.keyFormula,

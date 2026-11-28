@@ -3,7 +3,7 @@ import {
   normalizeEnglishSentence,
   translationTaskIssues,
 } from '../../src/modules/writing/sentence-translation.logic';
-import { parseCefrRange } from '../../src/modules/subscription/practice-level';
+import { legacyPracticeLevel } from '../../src/modules/subscription/practice-level';
 import {
   SENTENCE_TRANSLATION_EXERCISES,
   translationTaskContent,
@@ -14,15 +14,15 @@ const all = SENTENCE_TRANSLATION_EXERCISES.flatMap((exercise) =>
 );
 
 describe('sentence translation content', () => {
-  it('has 4 A1 and 4 A2 exercises of 6 sentences each, tagged in the title', () => {
+  it('has 4 STARTER and 4 BASIC exercises of 6 sentences each, tagged in the title', () => {
     expect(SENTENCE_TRANSLATION_EXERCISES).toHaveLength(8);
-    for (const level of ['A1', 'A2'] as const)
+    for (const level of ['STARTER', 'BASIC'] as const)
       expect(
         SENTENCE_TRANSLATION_EXERCISES.filter((e) => e.level === level),
       ).toHaveLength(4);
     for (const e of SENTENCE_TRANSLATION_EXERCISES) {
       expect(e.sentences).toHaveLength(6);
-      expect(parseCefrRange(e.title)).toEqual({ min: e.level, max: e.level });
+      expect(legacyPracticeLevel(e.title)).toBe(e.level);
     }
     expect(
       new Set(SENTENCE_TRANSLATION_EXERCISES.map((e) => e.title)).size,
@@ -43,8 +43,8 @@ describe('sentence translation content', () => {
         translationTaskIssues(translationTaskContent(exercise, sentence)),
       ).toEqual([]);
       expect(sentence.tip.length).toBeGreaterThan(20);
-      // A1 sentences stay short.
-      if (exercise.level === 'A1')
+      // STARTER sentences stay short.
+      if (exercise.level === 'STARTER')
         for (const a of sentence.accepted)
           expect(normalizeEnglishSentence(a).length).toBeLessThanOrEqual(10);
     },

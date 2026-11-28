@@ -6,7 +6,7 @@ import { AiService } from './ai.service';
 describe('AiService.suggestWritingFullDraft', () => {
   const input = {
     topic: 'Công việc văn phòng',
-    level: 'B1',
+    level: 'INTERMEDIATE',
     kind: 'EMAIL' as const,
     count: 3,
   };

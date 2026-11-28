@@ -9,35 +9,28 @@
  */
 import type { PracticeLevel } from '@prisma/client';
 
-import type { Cefr, CefrRange } from '../subscription/practice-level';
-
 /** Preferred predicted success: challenging but achievable. */
 export const TARGET_SUCCESS = { min: 0.6, max: 0.8, centre: 0.7 } as const;
 
 const LEARNER_K = 0.4;
 const ITEM_K = 0.15;
 
-/** Difficulty seed per CEFR tag on the content (a content label only). */
-export const CEFR_DIFFICULTY: Record<Cefr, number> = {
-  A1: -1.25,
-  A2: -0.5,
-  B1: 0.25,
-  B2: 0.9,
-  C1: 1.6,
-  C2: 2.2,
+/**
+ * Difficulty seed per practice level of the content (owner 2026-11-27). The
+ * values are those the CEFR seeds gave the same content: STARTER and BASIC as
+ * the old A1 and A2, INTERMEDIATE between the old B1 (0.25) and B2 (0.9),
+ * ADVANCED as the old C1. Only new items start here; an item already in
+ * ContentDifficulty keeps its learned value.
+ */
+export const PRACTICE_LEVEL_DIFFICULTY: Record<PracticeLevel, number> = {
+  STARTER: -1.25,
+  BASIC: -0.5,
+  INTERMEDIATE: 0.55,
+  ADVANCED: 1.6,
 };
 
-/** The practice level an item belongs to, from its tag (lowest of a range). */
-export function itemLevel(range: CefrRange): PracticeLevel {
-  const min = range.min;
-  if (min === 'A1') return 'STARTER';
-  if (min === 'A2') return 'BASIC';
-  if (min === 'B1' || min === 'B2') return 'INTERMEDIATE';
-  return 'ADVANCED';
-}
-
-export function seedDifficulty(range: CefrRange): number {
-  return (CEFR_DIFFICULTY[range.min] + CEFR_DIFFICULTY[range.max]) / 2;
+export function seedDifficulty(level: PracticeLevel): number {
+  return PRACTICE_LEVEL_DIFFICULTY[level];
 }
 
 export function successProbability(ability: number, difficulty: number) {

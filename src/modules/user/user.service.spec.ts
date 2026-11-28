@@ -5,6 +5,11 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReadingService } from '../reading/reading.service';
 import { LocationService } from '../location/location.service';
+import {
+  LISTENING_CATALOG_QUIZ,
+  SPEAKING_CATALOG_EXERCISE,
+  WRITING_CATALOG_QUIZ,
+} from './skill-catalog.where';
 
 const mockPrismaService = {
   user: {
@@ -38,6 +43,7 @@ const mockPrismaService = {
   },
   quiz: {
     findMany: jest.fn(),
+    count: jest.fn(),
   },
   speakingExercise: {
     count: jest.fn(),
@@ -553,6 +559,81 @@ describe('UserService', () => {
       expect(speaking?.progressPercent).toBe(20);
     });
 
+    it('counts what the learner catalogs show: published items, Speaking skill-practice sets only', async () => {
+      // Owner 2026-11-26: /speaking said 23 sets, the catalog lists 21 (the 2
+      // EXAM_INTERNAL sets of the TOEIC exams were counted).
+      mockPrismaService.submission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingExercise.findMany.mockResolvedValue([]);
+      mockPrismaService.speakingExercise.count.mockResolvedValue(21);
+      mockPrismaService.quiz.count.mockResolvedValue(24);
+      mockPrismaService.userStats.findUnique.mockResolvedValue({
+        streakCount: 0,
+      });
+      mockReadingService.getTracking.mockResolvedValue(null);
+      try {
+        const result = await service.getSkillProgressSummary(21);
+
+        expect(
+          result.skills.find((skill) => skill.skill === 'SPEAKING')?.totalItems,
+        ).toBe(21);
+        expect(
+          mockPrismaService.speakingExercise.findMany,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({ where: SPEAKING_CATALOG_EXERCISE }),
+        );
+        expect(mockPrismaService.speakingExercise.count).toHaveBeenCalledWith({
+          where: SPEAKING_CATALOG_EXERCISE,
+        });
+        expect(
+          mockPrismaService.speakingSubmission.findMany,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              userId: 21,
+              status: 'COMPLETED',
+              exercise: SPEAKING_CATALOG_EXERCISE,
+            },
+          }),
+        );
+        expect(mockPrismaService.quiz.count).toHaveBeenCalledWith({
+          where: LISTENING_CATALOG_QUIZ,
+        });
+        expect(mockPrismaService.quiz.count).toHaveBeenCalledWith({
+          where: WRITING_CATALOG_QUIZ,
+        });
+        for (const quiz of [LISTENING_CATALOG_QUIZ, WRITING_CATALOG_QUIZ])
+          expect(mockPrismaService.submission.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { userId: 21, quiz } }),
+          );
+      } finally {
+        mockPrismaService.quiz.count.mockReset();
+        mockPrismaService.speakingExercise.count.mockReset();
+      }
+    });
+
+    it('keeps the catalog filters in line with the learner catalogs', () => {
+      expect(SPEAKING_CATALOG_EXERCISE).toMatchObject({
+        publicationStatus: 'PUBLISHED',
+        OR: [
+          { practiceSetId: null },
+          {
+            practiceSet: {
+              scope: 'SKILL_PRACTICE',
+              publicationStatus: 'PUBLISHED',
+            },
+          },
+        ],
+      });
+      expect(LISTENING_CATALOG_QUIZ).toEqual({
+        type: 'LISTENING_PRACTICE',
+        publicationStatus: 'PUBLISHED',
+      });
+      expect(WRITING_CATALOG_QUIZ).toMatchObject({
+        publicationStatus: 'PUBLISHED',
+      });
+    });
+
     it('returns a safe zero state for all skills without history', async () => {
       mockPrismaService.submission.findMany.mockResolvedValue([]);
       mockPrismaService.speakingSubmission.findMany.mockResolvedValue([]);
@@ -717,7 +798,13 @@ describe('UserService', () => {
       expect(
         mockPrismaService.speakingSubmission.findMany,
       ).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId: 21, status: 'COMPLETED' } }),
+        expect.objectContaining({
+          where: {
+            userId: 21,
+            status: 'COMPLETED',
+            exercise: SPEAKING_CATALOG_EXERCISE,
+          },
+        }),
       );
     });
   });

@@ -102,10 +102,12 @@ export type GrammarTopicListRow = {
   learnerAttemptCount: number;
 };
 
+/** The four practice levels in order (owner 2026-11-27; BEGINNER is gone). */
 const LEVEL_RANK: Record<string, number> = {
-  BEGINNER: 0,
-  INTERMEDIATE: 1,
-  ADVANCED: 2,
+  STARTER: 0,
+  BASIC: 1,
+  INTERMEDIATE: 2,
+  ADVANCED: 3,
 };
 
 /** Admin topic list after search, level and status, newest first. */

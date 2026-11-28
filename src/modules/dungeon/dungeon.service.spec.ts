@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DungeonService } from './dungeon.service';
 import {
   monsterHit,
+  type BankEntry,
   type DungeonQuestion,
   type RunState,
 } from './dungeon.logic';
@@ -31,6 +32,21 @@ class FakeRedis {
   }
   exists(key: string) {
     return Promise.resolve(this.store.has(key) ? 1 : 0);
+  }
+  sets = new Map<string, Set<string>>();
+  ttl = new Map<string, number>();
+  smembers(key: string) {
+    return Promise.resolve([...(this.sets.get(key) ?? [])]);
+  }
+  sadd(key: string, ...members: (string | number)[]) {
+    const set = this.sets.get(key) ?? new Set<string>();
+    for (const m of members) set.add(String(m));
+    this.sets.set(key, set);
+    return Promise.resolve(members.length);
+  }
+  expire(key: string, seconds: number) {
+    this.ttl.set(key, seconds);
+    return Promise.resolve(1);
   }
   zadd(_key: string, score: number, member: string) {
     this.zset.set(member, score);
@@ -64,7 +80,8 @@ const entries = Array.from({ length: 120 }, (_, i) => ({
 
 type Stored = {
   run: RunState;
-  question: { q: DungeonQuestion; issuedAt: number } | null;
+  bank: BankEntry[];
+  question: { q: DungeonQuestion; bankIndex: number; issuedAt: number } | null;
 };
 
 describe('DungeonService', () => {
@@ -79,6 +96,7 @@ describe('DungeonService', () => {
   let service: DungeonService;
   let now: number;
   let findMany: jest.Mock;
+  let hardWords: jest.Mock;
 
   beforeEach(() => {
     redis = new FakeRedis();
@@ -104,8 +122,11 @@ describe('DungeonService', () => {
         ),
     };
     findMany = jest.fn().mockResolvedValue(entries);
+    // The learner's hard flashcard words; none unless a test says so.
+    hardWords = jest.fn().mockResolvedValue([]);
     const prisma = {
       dictionaryEntry: { findMany },
+      userVocabWordProgress: { findMany: hardWords },
       pointHistory: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { points: 0 } }),
       },
@@ -186,6 +207,59 @@ describe('DungeonService', () => {
     const again = await service.start(1, 'daily');
     expect(again.sessionId).toBe(view.sessionId);
     expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
+  });
+
+  describe('what the page is told for the tense moments (2026-11-27)', () => {
+    it('a fresh run is not desperate and still has its last breath', async () => {
+      const view = await service.start(1, 'free');
+      expect(view.desperate).toBe(false);
+      expect(view.lastBreathLeft).toBe(true);
+      expect(view.record).toBeNull();
+    });
+
+    it('says when health is low and when the last breath is spent', async () => {
+      const view = await service.start(1, 'free');
+      patch(view.sessionId, (s) => {
+        s.run.hp = 20;
+        s.run.lastBreathUsed = true;
+      });
+      const now = await service.current(1);
+      expect(now?.desperate).toBe(true);
+      expect(now?.lastBreathLeft).toBe(false);
+    });
+
+    it("a free run tries to beat the learner's own best floor", async () => {
+      events.push({ userId: 1, type: 'DUNGEON_FREE', value: 7 });
+      const view = await service.start(1, 'free');
+      expect(view.record).toEqual({ floor: 7, whose: 'mine' });
+    });
+
+    it("the day's dungeon tries to beat today's leading floor", async () => {
+      const prisma = (
+        service as unknown as {
+          prisma: { learnerEvent: { findFirst: jest.Mock } };
+        }
+      ).prisma;
+      // Asked twice: has this learner played today (no), then the day's top floor.
+      prisma.learnerEvent.findFirst.mockImplementation(
+        ({ where }: { where: { userId?: number } }) =>
+          Promise.resolve(where.userId === undefined ? { value: 12 } : null),
+      );
+      const view = await service.start(1, 'daily');
+      expect(view.record).toEqual({ floor: 12, whose: 'today' });
+    });
+
+    it('still opens the run when the record cannot be read', async () => {
+      const prisma = (
+        service as unknown as {
+          prisma: { learnerEvent: { aggregate: jest.Mock } };
+        }
+      ).prisma;
+      prisma.learnerEvent.aggregate.mockRejectedValueOnce(new Error('db down'));
+      const view = await service.start(1, 'free');
+      expect(view.record).toBeNull();
+      expect(view.phase).toBe('fight');
+    });
   });
 
   it('a short balance takes nothing and frees the day dungeon again', async () => {
@@ -302,6 +376,8 @@ describe('DungeonService', () => {
     patch(id, (x) => {
       x.run.hp = 1;
       x.run.shieldsLeft = 0;
+      // The run's last breath is spent, so this fall ends it.
+      x.run.lastBreathUsed = true;
     });
     const end = await service.answer(1, id, wrongAnswer(id));
     expect(next.floor).toBe(6);
@@ -343,6 +419,87 @@ describe('DungeonService', () => {
     expect(await service.sweepIdle(now + 4 * 60_000)).toBe(1);
     expect(stored(view.sessionId)).toMatchObject({
       result: expect.objectContaining({ floor: 1 }),
+    });
+  });
+
+  describe("the learner's hard flashcard words (thesis supervisor 2026-11-26)", () => {
+    const hardRow = (entryId: number) => ({
+      lapses: 1,
+      easeFactor: 2.3,
+      intervalDays: 1,
+      nextReviewAt: new Date(0),
+      word: { entryId },
+    });
+
+    it('a free run asks them within the first 20 questions', async () => {
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17), hardRow(33)]);
+      const view = await service.start(1, 'free');
+      const bank = stored(view.sessionId).bank;
+      const flagged = bank
+        .map((entry, i) => (entry.oftenForgotten ? i : -1))
+        .filter((i) => i >= 0);
+      expect(flagged).toEqual([3, 10, 16]);
+      expect(
+        flagged
+          .map((i) => (bank[i].choice as { wordId: number }).wordId)
+          .sort(),
+      ).toEqual([17, 33, 5].sort());
+      // Each of the three is asked once in the bank.
+      const ids = bank.map((e) => (e.choice as { wordId: number }).wordId);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(JSON.stringify(view)).not.toMatch(/answers|bank|"display"/);
+    });
+
+    it('a second free run the same day leaves them out (rule B, owner 2026-11-27)', async () => {
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17), hardRow(33)]);
+      const flagged = (id: string) =>
+        stored(id).bank.filter((entry) => entry.oftenForgotten).length;
+      const first = await service.start(1, 'free');
+      expect(flagged(first.sessionId)).toBe(3);
+      await service.finish(1, first.sessionId, true);
+      const second = await service.start(1, 'free');
+      expect(flagged(second.sessionId)).toBe(0);
+      await service.finish(1, second.sessionId, true);
+      // The record is shared with Pháo Bánh Mì through Redis; another learner has their own.
+      const other = await service.start(2, 'free');
+      expect(flagged(other.sessionId)).toBe(3);
+    });
+
+    it('the day dungeon stays the same for everyone and reads no hard words', async () => {
+      const plain = await service.start(1, 'daily');
+      hardWords.mockResolvedValue([hardRow(5), hardRow(17)]);
+      const other = await service.start(2, 'daily');
+      expect(hardWords).not.toHaveBeenCalled();
+      expect(other.question).toEqual(plain.question);
+      expect(
+        stored(other.sessionId).bank.some((entry) => entry.oftenForgotten),
+      ).toBe(false);
+      expect(stored(other.sessionId).bank).toEqual(
+        stored(plain.sessionId).bank,
+      );
+    });
+
+    it('the result counts the hard words answered right the first time', async () => {
+      const view = await service.start(1, 'free');
+      const id = view.sessionId;
+      // Make the question now out one of the learner's hard words.
+      patch(id, (s) => {
+        const at = (s.question as { bankIndex: number }).bankIndex;
+        s.bank[at].oftenForgotten = true;
+      });
+      now += 5000;
+      await service.answer(1, id, rightAnswer(id));
+      const end = await service.finish(1, id, true);
+      expect(end.result?.hardWords).toEqual({ hit: 1, total: 1 });
+    });
+
+    it('still opens a free run when the hard words cannot be read', async () => {
+      hardWords.mockRejectedValue(new Error('db busy'));
+      const view = await service.start(1, 'free');
+      expect(view.phase).toBe('fight');
+      expect(
+        stored(view.sessionId).bank.some((entry) => entry.oftenForgotten),
+      ).toBe(false);
     });
   });
 });

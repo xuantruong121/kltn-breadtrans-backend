@@ -56,6 +56,43 @@ describe('ToeicAiExamService.getCandidate — Phase E candidate-first review', (
     expect(result.flaggedCount).toBe(0);
   });
 
+  it('reports the questions each planned Part needs and has (owner 2026-11-25)', async () => {
+    prisma.aiGenerationJob.findUnique.mockResolvedValue({
+      createdByAdminId: 7,
+      requestSnapshot: {
+        plan: { 5: [{ questionCount: 1 }, { questionCount: 1 }] },
+      },
+      draftSnapshot: {
+        version: 1,
+        lrBatches: [
+          {
+            batchKey: '5:0',
+            part: 5,
+            groupOrder: 1,
+            questionNumber: 101,
+            candidate: {
+              groups: [
+                {
+                  questions: [
+                    {
+                      text: 'The report ____ by Friday.',
+                      options: ['is due', 'due', 'dues', 'dueing'],
+                      correctIndex: 0,
+                      explanation: 'Cần động từ.',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await service.getCandidate('job-1', 7);
+    expect(result.partCoverage).toEqual([{ part: 5, expected: 2, drafted: 1 }]);
+  });
+
   it('flags a question with an invalid answer key (deterministic, no AI call)', async () => {
     prisma.aiGenerationJob.findUnique.mockResolvedValue({
       createdByAdminId: 7,

@@ -1,7 +1,8 @@
 /**
  * Review schedule of one vocabulary word for one learner: an SM-2 variant
- * with the four self-ratings of the flashcard room. Pure: no I/O, no clock
- * of its own.
+ * with four grades. The flashcard room no longer asks the learner for them:
+ * review-grade.logic decides the grade from the room's steps (2026-11-26).
+ * Pure: no I/O, no clock of its own.
  *
  * A word carries an interval (days until the next review) and an ease factor
  * (how fast that interval grows). A right answer multiplies the interval by
@@ -101,6 +102,11 @@ export function nextReviewAt(state: SrsState, now: Date): Date {
 }
 
 /** Days until the next review for each rating; 0 means "in ten minutes". */
+/** A word is due once its review time has come; a word never studied is not. */
+export function isDue(reviewAt: Date | null | undefined, now: Date): boolean {
+  return Boolean(reviewAt && reviewAt.getTime() <= now.getTime());
+}
+
 export function previewSrs(state: SrsState): Record<SrsGrade, number> {
   return {
     AGAIN: 0,

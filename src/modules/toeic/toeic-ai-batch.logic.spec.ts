@@ -1,5 +1,6 @@
 import {
   languageIssue,
+  lrPartCoverage,
   plannedGroupIssue,
   questionContentIssue,
   questionsToAvoid,
@@ -202,5 +203,29 @@ describe('plannedGroupIssue for a three-speaker dialogue', () => {
         { transcript: 'M: Shall we start? W: Yes. M: Good.' },
       ),
     ).toBe('Hội thoại cần 3 người nói, hiện có 2');
+  });
+});
+
+describe('lrPartCoverage (owner 2026-11-25: a short Part is reported)', () => {
+  it('counts the planned and drafted questions of each planned Part', () => {
+    const plan = {
+      5: [{ questionCount: 1 }, { questionCount: 1 }, { questionCount: 1 }],
+      6: [{ questionCount: 4 }, { questionCount: 4 }],
+    };
+    const groups = [
+      { part: 5, questions: [{}] },
+      { part: 5, questions: [{}] },
+      { part: 6, questions: [{}, {}, {}, {}] },
+      { part: 7, questions: [{}, {}] },
+    ];
+    expect(lrPartCoverage(plan, groups)).toEqual([
+      { part: 5, expected: 3, drafted: 2 },
+      { part: 6, expected: 8, drafted: 4 },
+    ]);
+  });
+
+  it('lists nothing without a plan, and skips a Part planned with no questions', () => {
+    expect(lrPartCoverage(undefined, [])).toEqual([]);
+    expect(lrPartCoverage({ 1: [] }, [])).toEqual([]);
   });
 });

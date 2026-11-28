@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
+  HttpCode,
   Body,
   Query,
   UseGuards,
@@ -19,6 +21,11 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
+import { LearningSummaryService } from './learning-summary.service';
+import {
+  LearningSummaryQueryDto,
+  StudyTimeDto,
+} from './dto/learning-summary.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -26,7 +33,52 @@ export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly adaptiveDailyPractice: AdaptiveDailyPracticeService,
+    private readonly learningSummary: LearningSummaryService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('me/study-time')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Ghi thời gian học trong phòng luyện (tối đa 120 giây mỗi lần)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Cộng vào ngày học hiện tại theo kỹ năng; mỗi ngày tối đa 12 giờ. Trả về số giây đã cộng.',
+  })
+  async addStudyTime(@Request() req: any, @Body() dto: StudyTimeDto) {
+    return this.learningSummary.addStudyTime(
+      req.user.id,
+      dto.skill,
+      dto.seconds,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('me/learning-summary')
+  @ApiOperation({
+    summary:
+      'Kết quả học tập theo kỳ (hôm nay, tuần, tháng, tất cả, tùy chỉnh)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'totals: studySeconds (thời gian trong phòng luyện), questions (câu đã trả lời), vocabMastered (từ đã thuộc), xp; skills: EXAM, READING, LISTENING, SPEAKING, WRITING, VOCAB mỗi mục có count, seconds, days. Ngày tính theo giờ Việt Nam, đổi ngày lúc 00:01.',
+  })
+  async getLearningSummary(
+    @Request() req: any,
+    @Query() query: LearningSummaryQueryDto,
+  ) {
+    return this.learningSummary.summary(
+      req.user.id,
+      query.period ?? 'today',
+      query.from,
+      query.to,
+    );
+  }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

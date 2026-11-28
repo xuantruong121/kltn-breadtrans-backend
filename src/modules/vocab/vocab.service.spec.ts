@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { VocabService } from './vocab.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { ReviewEvidence } from './review-grade.logic';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -17,6 +18,33 @@ describe('VocabService', () => {
     iconUrl: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+  });
+
+  /** One progress row of a deck, with its review time. */
+  const row = (topicId: number, nextReviewAt: Date | null) => ({
+    isMastered: true,
+    isStarred: false,
+    nextReviewAt,
+    word: { topicId },
+  });
+
+  const deckWord = (id: number) => ({
+    id,
+    topicId: 1,
+    order: id,
+    entry: {
+      displayWord: `word${id}`,
+      pos: 'noun',
+      ipaUs: null,
+      ipaUk: null,
+      meaningVi: `nghĩa ${id}`,
+      audioUs: null,
+      audioUk: null,
+      exampleEn: null,
+      exampleVi: null,
+      collocations: [],
+      status: 'READY',
+    },
   });
 
   function createPremiumService(
@@ -105,6 +133,59 @@ describe('VocabService', () => {
         expect.objectContaining({ id: 1, isPro: false, isLocked: false }),
         expect.objectContaining({ id: 2, isPro: false, isLocked: false }),
       ]);
+    });
+  });
+
+  describe('due words', () => {
+    const past = new Date(Date.now() - 60_000);
+    const future = new Date(Date.now() + 86_400_000);
+
+    it('counts the due words of each deck', async () => {
+      const { service, prisma } = createPremiumService(false);
+      prisma.vocabTopic.findMany = jest
+        .fn()
+        .mockResolvedValue([topic(false), topic(true)]);
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        row(1, past),
+        row(1, past),
+        row(1, future),
+        row(2, null),
+      ]);
+
+      const result = await service.getTopics(7);
+
+      expect(result.topics).toEqual([
+        expect.objectContaining({ id: 1, dueCount: 2 }),
+        expect.objectContaining({ id: 2, dueCount: 0 }),
+      ]);
+    });
+
+    it('marks the due words of a deck, and none for a guest', async () => {
+      const { service, prisma } = createPremiumService(false, topic(false));
+      prisma.vocabWord.findMany.mockResolvedValue([
+        deckWord(11),
+        deckWord(12),
+        deckWord(13),
+      ]);
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        { wordId: 11, isStarred: false, isMastered: true, nextReviewAt: past },
+        {
+          wordId: 12,
+          isStarred: false,
+          isMastered: true,
+          nextReviewAt: future,
+        },
+      ]);
+
+      const mine = await service.getTopicDetails(1, 7);
+      expect(mine.words.map((w) => [w.id, w.isDue])).toEqual([
+        [11, true],
+        [12, false],
+        [13, false],
+      ]);
+
+      const guest = await service.getTopicDetails(1);
+      expect(guest.words.every((w) => w.isDue === false)).toBe(true);
     });
   });
 
@@ -470,6 +551,106 @@ describe('VocabService', () => {
       );
       expect(days).toBe(1);
       expect(res.easeFactor).toBe(2.5);
+    });
+  });
+
+  describe('submitReview with the room steps (thesis supervisor 2026-11-26)', () => {
+    const clean: ReviewEvidence = {
+      quiz: 'CORRECT',
+      typing: 'CORRECT',
+      typingHints: 0,
+      speaking: 'SKIPPED',
+      quickCheck: false,
+    };
+    const graded = async (
+      row: Record<string, unknown> | null,
+      evidence: Partial<ReviewEvidence>,
+      grade?: 'AGAIN' | 'HARD' | 'GOOD' | 'EASY',
+    ) => {
+      const prisma = (service as any).prisma;
+      (service as any).gamification = {
+        awardVocabWordXp: jest.fn().mockResolvedValue(2),
+      };
+      prisma.learningActivity = { create: jest.fn().mockResolvedValue({}) };
+      prisma.userVocabWordProgress = {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(row === null ? null : { id: 1, ...row }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+      };
+      const before = Date.now();
+      const res = await service.submitReview(1, 10, true, grade, {
+        ...clean,
+        ...evidence,
+      });
+      return {
+        res,
+        minutes: Math.round(
+          (res.nextReviewAt!.getTime() - before) / (60 * 1000),
+        ),
+        days: Math.round(
+          (res.nextReviewAt!.getTime() - before) / (24 * 60 * 60 * 1000),
+        ),
+      };
+    };
+
+    it('a clean quick check on a new word is Dễ: four days, a higher ease, known, XP paid', async () => {
+      const { res, days } = await graded(null, { quickCheck: true });
+      expect(res.grade).toBe('EASY');
+      expect(days).toBe(4);
+      expect(res.easeFactor).toBe(2.65);
+      expect(res.isMastered).toBe(true);
+      expect(res.xpEarned).toBe(2);
+    });
+
+    it('one wrong check is Khó: one day and a lower ease', async () => {
+      const { res, days } = await graded(null, { typing: 'WRONG' });
+      expect(res.grade).toBe('HARD');
+      expect(days).toBe(1);
+      expect(res.easeFactor).toBe(2.35);
+    });
+
+    it('both checks skipped is Học lại: ten minutes, a lapse, not known', async () => {
+      const { res, minutes } = await graded(
+        {
+          reviewCount: 2,
+          isMastered: true,
+          intervalDays: 7,
+          easeFactor: 2.5,
+          lapses: 0,
+        },
+        { quiz: 'SKIPPED', typing: 'SKIPPED' },
+      );
+      expect(res.grade).toBe('AGAIN');
+      expect(minutes).toBe(10);
+      expect(res.lapses).toBe(1);
+      expect(res.isMastered).toBe(false);
+    });
+
+    it('the steps decide even when a conflicting grade is sent', async () => {
+      const { res } = await graded(null, { quiz: 'WRONG' }, 'EASY');
+      expect(res.grade).toBe('HARD');
+    });
+
+    it('an older caller with a grade still gets the grade back', async () => {
+      const prisma = (service as any).prisma;
+      prisma.userVocabWordProgress = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation(({ data }) => Promise.resolve(data)),
+      };
+      (service as any).gamification = {
+        awardVocabWordXp: jest.fn().mockResolvedValue(0),
+      };
+      prisma.learningActivity = { create: jest.fn().mockResolvedValue({}) };
+      const res = await service.submitReview(1, 10, true, 'GOOD');
+      expect(res.grade).toBe('GOOD');
     });
   });
 });

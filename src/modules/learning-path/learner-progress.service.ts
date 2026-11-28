@@ -13,8 +13,7 @@ import {
 } from '../gamification/reward-eligibility';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TtlMemo } from '../../common/utils/ttl-memo';
-import { parseCefrRange } from '../subscription/practice-level';
-import { itemLevel, seedDifficulty, updateAfterAttempt } from './ability.logic';
+import { seedDifficulty, updateAfterAttempt } from './ability.logic';
 import { ABILITY_SEED, levelsUpTo, maxLevel } from './placement.logic';
 import { progressUnlockTarget, UNPLACED_UNLOCKED } from './progression.logic';
 import { lockSkillLevel } from './skill-level-lock';
@@ -57,7 +56,7 @@ export class LearnerProgressService {
     {
       id: number;
       type: QuizType;
-      title: string;
+      practiceLevel: PracticeLevel | null;
       practiceTopicId: number | null;
       toeicWritingSetItems: { id: number }[];
     } | null
@@ -91,7 +90,7 @@ export class LearnerProgressService {
     scorePercent: number;
   }) {
     try {
-      // A quiz's type, CEFR tag and set membership: kept 60 s (see TtlMemo).
+      // A quiz's type, practice level and set membership: kept 60 s (see TtlMemo).
       const quizId = input.quizId;
       const quiz = await this.quizFacts.get(quizId, () =>
         this.prisma.quiz.findUnique({
@@ -99,7 +98,7 @@ export class LearnerProgressService {
           select: {
             id: true,
             type: true,
-            title: true,
+            practiceLevel: true,
             practiceTopicId: true,
             toeicWritingSetItems: { select: { id: true }, take: 1 },
           },
@@ -107,21 +106,21 @@ export class LearnerProgressService {
       );
       if (!quiz) return null;
       const skill = QUIZ_SKILL[quiz.type];
-      const range = parseCefrRange(quiz.title);
+      const level = quiz.practiceLevel;
       const standalone = isRewardableQuiz({
         type: quiz.type,
         practiceTopicId: quiz.practiceTopicId,
         inToeicWritingSet: quiz.toeicWritingSetItems.length > 0,
       });
-      if (!skill || !range || !standalone) return null;
+      if (!skill || !level || !standalone) return null;
       return await this.record({
         userId: input.userId,
         skill,
-        level: itemLevel(range),
+        level,
         contentType: 'QUIZ',
         contentId: quiz.id,
         difficultyId: quiz.id,
-        seedDifficulty: seedDifficulty(range),
+        seedDifficulty: seedDifficulty(level),
         sourceKey: `quiz:${input.submissionId}`,
         scorePercent: input.scorePercent,
       });
@@ -152,13 +151,11 @@ export class LearnerProgressService {
         },
       });
       if (!exercise) return null;
-      const range =
-        parseCefrRange(exercise.practiceSet?.level) ??
-        parseCefrRange(exercise.title);
+      const level = exercise.practiceSet?.level ?? null;
       const standalone = isRewardableSpeakingExercise({
         practiceSetScope: exercise.practiceSet?.scope ?? null,
       });
-      if (!range || !standalone) return null;
+      if (!level || !standalone) return null;
       // The catalog keys a set by its first exercise.
       const first = exercise.practiceSetId
         ? await this.prisma.speakingExercise.findFirst({
@@ -170,11 +167,11 @@ export class LearnerProgressService {
       return await this.record({
         userId: input.userId,
         skill: 'SPEAKING',
-        level: itemLevel(range),
+        level,
         contentType: 'SPEAKING_SET',
         contentId: exercise.id,
         difficultyId: first?.id ?? exercise.id,
-        seedDifficulty: seedDifficulty(range),
+        seedDifficulty: seedDifficulty(level),
         sourceKey: `speaking:${input.submissionId}`,
         scorePercent: Math.max(
           0,

@@ -21,11 +21,11 @@ describe('AI content levels', () => {
       .filter((error) => error.property === 'level')
       .map((error) => Object.values(error.constraints ?? {}).join(' '));
 
-  it('accepts C2 in the listening and reading full drafts and the dictation lines', async () => {
+  it('accepts ADVANCED in the listening and reading full drafts and the dictation lines', async () => {
     expect(
       await levelErrors(SuggestListeningFullDraftDto, {
         topic: 'Hỏi đường',
-        level: 'C2',
+        level: 'ADVANCED',
         mode: 'COMPREHENSION',
         count: 3,
       }),
@@ -33,24 +33,26 @@ describe('AI content levels', () => {
     expect(
       await levelErrors(SuggestReadingFullDraftDto, {
         topic: 'Biến đổi khí hậu',
-        level: 'C2',
+        level: 'ADVANCED',
       }),
     ).toEqual([]);
     expect(
       await levelErrors(SuggestDictationLinesDto, {
         topic: 'Du lịch',
-        level: 'C2',
+        level: 'ADVANCED',
       }),
     ).toEqual([]);
   });
 
-  it('still refuses a level outside A1 to C2, and says which ones are allowed', async () => {
+  it('still refuses a level outside the four practice levels', async () => {
     const errors = await levelErrors(SuggestListeningFullDraftDto, {
       topic: 'Hỏi đường',
       level: 'C3',
       mode: 'COMPREHENSION',
       count: 3,
     });
-    expect(errors).toEqual(['Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2']);
+    expect(errors).toEqual([
+      'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
+    ]);
   });
 });

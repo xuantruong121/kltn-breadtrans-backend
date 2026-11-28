@@ -58,9 +58,9 @@ describe('Speaking reference audio in the admin preview', () => {
     return { service, upload };
   };
 
-  it('signs the private clip of a B1-B2 draft for an admin', async () => {
+  it('signs the private clip of an INTERMEDIATE draft for an admin', async () => {
     const key = 'premium/speaking/reference/203.r1763800000000.mp3';
-    const { service, upload } = build(exerciseIn('B1-B2', key));
+    const { service, upload } = build(exerciseIn('INTERMEDIATE', key));
     const result: any = await service.findExerciseById(203, 1, Role.ADMIN);
     expect(result.isPremiumContent).toBe(true);
     expect(result.audioUrl).toBe(`https://signed/${key}`);
@@ -70,10 +70,10 @@ describe('Speaking reference audio in the admin preview', () => {
     );
   });
 
-  it('never hands out a public clip on paid content, which is why the CMS stores B1+ privately', async () => {
+  it('never hands out a public clip on paid content, which is why the CMS stores INTERMEDIATE+ privately', async () => {
     const { service } = build(
       exerciseIn(
-        'B1-B2',
+        'INTERMEDIATE',
         'https://pub/catalog/speaking/reference/203.r1763800000000.mp3',
       ),
     );
@@ -81,9 +81,9 @@ describe('Speaking reference audio in the admin preview', () => {
     expect(result.audioUrl).toBeNull();
   });
 
-  it('plays the public clip of a free A1-A2 draft as it is', async () => {
+  it('plays the public clip of a free STARTER draft as it is', async () => {
     const url = 'https://pub/catalog/speaking/reference/203.r1763800000000.mp3';
-    const { service, upload } = build(exerciseIn('A1-A2', url));
+    const { service, upload } = build(exerciseIn('STARTER', url));
     const result: any = await service.findExerciseById(203, 1, Role.ADMIN);
     expect(result.isPremiumContent).toBe(false);
     expect(result.audioUrl).toBe(url);

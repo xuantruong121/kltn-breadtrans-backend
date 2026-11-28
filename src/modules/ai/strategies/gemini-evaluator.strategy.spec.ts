@@ -1,5 +1,8 @@
 import {
   LESSON_COPY_RULE,
+  VOCAB_WORD_RULE,
+  briefRule,
+  draftRule,
   listeningDraftRule,
   situationRule,
 } from '../lesson-copy.logic';
@@ -271,14 +274,14 @@ describe('GeminiEvaluatorStrategy Speaking contextual authoring', () => {
       title: 'Giới thiệu bản thân',
       description: 'Luyện nói câu giới thiệu ngắn.',
       category: 'COMMUNICATION',
-      level: 'BEGINNER',
+      level: 'BASIC',
       audioUrl: 'must-not-leak.mp3',
     });
 
     await expect(
       strategy.suggestSpeakingPracticeSet({
         topic: 'Giới thiệu',
-        level: 'BEGINNER',
+        level: 'BASIC',
         trackContext: {
           code: 'OFFICE_BUSINESS',
           name: 'Văn phòng – Kinh doanh',
@@ -289,20 +292,20 @@ describe('GeminiEvaluatorStrategy Speaking contextual authoring', () => {
     ).resolves.toEqual({
       title: 'Giới thiệu bản thân',
       description: 'Luyện nói câu giới thiệu ngắn.',
-      level: 'BEGINNER',
+      level: 'BASIC',
       track: 'OFFICE_BUSINESS',
     });
   });
 
   it('rejects malformed Speaking exercise candidates instead of returning a partial draft', async () => {
     const strategy = createStrategy({
-      candidates: [{ title: 'Thiếu câu mẫu', difficulty: 'BEGINNER' }],
+      candidates: [{ title: 'Thiếu câu mẫu', difficulty: 'BASIC' }],
     });
 
     await expect(
       strategy.suggestSpeakingExercises({
         practiceSetTitle: 'Giao tiếp',
-        level: 'BEGINNER',
+        level: 'BASIC',
         count: 1,
       }),
     ).rejects.toThrow('AI không thể tạo câu luyện nói hợp lệ');
@@ -314,14 +317,14 @@ describe('GeminiEvaluatorStrategy Speaking contextual authoring', () => {
         title: 'Giao tiếp hằng ngày',
         description: 'Luyện nói trong các tình huống quen thuộc.',
         category: 'GENERAL',
-        level: 'A1-B1',
+        level: 'INTERMEDIATE',
         publicationStatus: 'PUBLISHED',
       },
       exercises: [
         {
           title: 'Giới thiệu bản thân',
           targetText: 'Hello, my name is Linh.',
-          difficulty: 'BEGINNER',
+          difficulty: 'BASIC',
           taskType: 'READ_ALOUD',
           audioUrl: 'must-not-leak.mp3',
         },
@@ -331,21 +334,21 @@ describe('GeminiEvaluatorStrategy Speaking contextual authoring', () => {
     await expect(
       strategy.suggestSpeakingFullDraft({
         topic: 'Giới thiệu bản thân',
-        level: 'A1-B1',
+        level: 'INTERMEDIATE',
         count: 1,
       }),
     ).resolves.toEqual({
       practiceSet: {
         title: 'Giao tiếp hằng ngày',
         description: 'Luyện nói trong các tình huống quen thuộc.',
-        level: 'A1-B1',
+        level: 'INTERMEDIATE',
         track: null,
       },
       exercises: [
         {
           title: 'Giới thiệu bản thân',
           targetText: 'Hello, my name is Linh.',
-          difficulty: 'BEGINNER',
+          difficulty: 'BASIC',
           taskType: 'READ_ALOUD',
         },
       ],
@@ -366,13 +369,13 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
               title: 'Hotel check-in',
               description: 'Luyện nói khi nhận phòng khách sạn.',
               category: 'GENERAL',
-              level: 'A1',
+              level: 'STARTER',
             },
             exercises: [
               {
                 title: 'Greeting',
                 targetText: 'Good evening, I have a reservation.',
-                difficulty: 'BEGINNER',
+                difficulty: 'STARTER',
                 taskType: 'READ_ALOUD',
               },
             ],
@@ -383,7 +386,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
       run({ generateContent });
     const draft = await strategy.suggestSpeakingFullDraft({
       topic: 'checking in at a hotel',
-      level: 'A1',
+      level: 'STARTER',
       count: 5,
     });
     expect(draft.exercises).toHaveLength(1);
@@ -391,7 +394,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
       generateContent.mock.calls[0][0].generationConfig.responseSchema;
     expect(
       schema.properties.exercises.items.properties.difficulty.enum,
-    ).toEqual(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']);
+    ).toEqual(['STARTER', 'BASIC', 'INTERMEDIATE', 'ADVANCED']);
   });
 
   it('asks for no category and writes for the track given as reference data', async () => {
@@ -405,13 +408,13 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
             practiceSet: {
               title: 'Hotel check-in',
               description: 'Luyện nói khi nhận phòng khách sạn.',
-              level: 'A1',
+              level: 'STARTER',
             },
             exercises: [
               {
                 title: 'Greeting',
                 targetText: 'Good evening, I have a reservation.',
-                difficulty: 'BEGINNER',
+                difficulty: 'STARTER',
                 taskType: 'READ_ALOUD',
               },
             ],
@@ -422,7 +425,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
       run({ generateContent });
     const draft = await strategy.suggestSpeakingFullDraft({
       topic: 'checking in at a hotel',
-      level: 'A1',
+      level: 'STARTER',
       trackContext: {
         code: 'HOSPITALITY_TOURISM',
         name: 'Nhà hàng – Khách sạn – Du lịch',
@@ -433,7 +436,7 @@ describe('GeminiEvaluatorStrategy Speaking drafts', () => {
     expect(draft.practiceSet).toEqual({
       title: 'Hotel check-in',
       description: 'Luyện nói khi nhận phòng khách sạn.',
-      level: 'A1',
+      level: 'STARTER',
       track: 'HOSPITALITY_TOURISM',
     });
     const request = generateContent.mock.calls[0][0];
@@ -459,7 +462,7 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
           JSON.stringify({
             title: 'At the clinic',
             description: 'A short visit.',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             mode: 'DIALOGUE',
             turns: [
               {
@@ -489,7 +492,7 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
       run({ generateContent });
     const draft = await strategy.suggestListeningFullDraft({
       topic: 'a clinic visit',
-      level: 'B1',
+      level: 'INTERMEDIATE',
       mode: 'DIALOGUE',
       count: 1,
     });
@@ -508,9 +511,9 @@ describe('GeminiEvaluatorStrategy Listening drafts are bilingual', () => {
     // (owner 2026-11-24); only the lesson content is English.
     expect(text).toContain(LESSON_COPY_RULE);
     expect(text).not.toMatch(/title, description[^.;]*in English/i);
-    // Written about the title at the chosen level, with a dialogue length for B1 (owner 2026-11-25).
-    expect(text).toContain(listeningDraftRule('B1', 'DIALOGUE'));
-    expect(text).toMatch(/Dialogue: 8 to 12 turns/);
+    // Written about the title at the chosen level, with a dialogue length for INTERMEDIATE (owner 2026-11-25).
+    expect(text).toContain(listeningDraftRule('INTERMEDIATE', 'DIALOGUE'));
+    expect(text).toMatch(/Dialogue: 8 to 14 turns/);
   });
 });
 
@@ -540,7 +543,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
   const draftOf = (questions: unknown[], mode = 'COMPREHENSION') => ({
     title: 'Getting around town',
     description: 'Short sentences about places in a town.',
-    level: 'A2',
+    level: 'BASIC',
     mode,
     // A shared transcript has no place in this form; it must not leak.
     text: 'must not leak',
@@ -560,14 +563,14 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     );
     const draft = await strategy.suggestListeningFullDraft({
       topic: 'getting around town',
-      level: 'A2',
+      level: 'BASIC',
       mode: 'COMPREHENSION',
       count: 2,
     });
     expect(draft).toEqual({
       title: 'Getting around town',
       description: 'Short sentences about places in a town.',
-      level: 'A2',
+      level: 'BASIC',
       mode: 'COMPREHENSION',
       questions: [
         {
@@ -596,7 +599,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     expect(prompt).toMatch(/exactly 2 separate short listening items/);
     expect(prompt).toMatch(/answerable from its own audioText alone/);
     expect(prompt).toMatch(/explanationEn in English/);
-    expect(prompt).toContain(listeningDraftRule('A2', 'COMPREHENSION'));
+    expect(prompt).toContain(listeningDraftRule('BASIC', 'COMPREHENSION'));
   });
 
   it('drops a question whose sentence is missing, blank or too long, and caps the count', async () => {
@@ -613,7 +616,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     );
     const draft = await strategy.suggestListeningFullDraft({
       topic: 'getting around town',
-      level: 'A2',
+      level: 'BASIC',
       mode: 'COMPREHENSION',
       count: 1,
     });
@@ -638,7 +641,7 @@ describe('GeminiEvaluatorStrategy "Nghe hiểu" full draft (COMPREHENSION)', () 
     );
     const draft = await strategy.suggestListeningFullDraft({
       topic: 'getting around town',
-      level: 'A2',
+      level: 'BASIC',
       mode: 'COMPREHENSION',
       count: 2,
     });
@@ -794,7 +797,7 @@ describe('GeminiEvaluatorStrategy Reading drafts store the question type in uppe
     const { strategy, generateContent } = answering({
       title: 'Remote work',
       description: 'Bài đọc về làm việc từ xa.',
-      level: 'B1',
+      level: 'INTERMEDIATE',
       passage: 'Many people work from home now.',
       questions: [
         question('detail', 'Q1'),
@@ -807,7 +810,7 @@ describe('GeminiEvaluatorStrategy Reading drafts store the question type in uppe
     });
     const draft = await strategy.suggestReadingFullDraft({
       topic: 'Remote work',
-      level: 'B1',
+      level: 'INTERMEDIATE',
       count: 5,
     });
     expect(draft.questions.map((q: any) => [q.prompt, q.questionType])).toEqual(
@@ -868,12 +871,12 @@ describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
     });
     await strategy.suggestDictationLines({
       topic: 'đặt lịch hẹn',
-      level: 'B1',
+      level: 'INTERMEDIATE',
       count: 20,
     });
     const text = generateContent.mock.calls[0][0].contents[0].parts[0]
       .text as string;
-    expect(text).toMatch(/CEFR level B1/);
+    expect(text).toMatch(/everyday, work and travel words/);
     expect(text).toMatch(/Every sentence is in English, whatever language/);
   });
 
@@ -885,7 +888,7 @@ describe('GeminiEvaluatorStrategy dictation sentences are English', () => {
     await expect(
       english.strategy.suggestListeningContent({
         mode: 'DICTATION',
-        level: 'A2',
+        level: 'BASIC',
         topic: 'nhà',
       }),
     ).resolves.toEqual({
@@ -923,7 +926,7 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
     await strategy
       .suggestListeningFullDraft({
         topic: 'Du lịch lữ hành',
-        level: 'B2',
+        level: 'INTERMEDIATE',
         mode: 'DIALOGUE',
         count: 5,
         brief: `  ${BRIEF}  `,
@@ -939,7 +942,7 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
     await dictation.strategy
       .suggestDictationLines({
         topic: 'Du lịch',
-        level: 'A2',
+        level: 'BASIC',
         count: 20,
         brief: BRIEF,
       })
@@ -950,7 +953,7 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
     await reading.strategy
       .suggestReadingFullDraft({
         topic: 'Du lịch',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         count: 3,
         brief: BRIEF,
       })
@@ -964,13 +967,265 @@ describe('GeminiEvaluatorStrategy lesson drafts carry the typed description (own
     await strategy
       .suggestListeningFullDraft({
         topic: 'Du lịch lữ hành',
-        level: 'B2',
+        level: 'INTERMEDIATE',
         mode: 'COMPREHENSION',
         count: 3,
       })
       .catch(() => undefined);
     expect(promptOf()).not.toContain('"situation"');
     expect(promptOf()).not.toContain('Situation:');
+  });
+});
+
+describe('GeminiEvaluatorStrategy full drafts follow title, level and description in every area (owner 2026-11-25)', () => {
+  const capture = (answer: unknown = {}) => {
+    const strategy = new GeminiEvaluatorStrategy() as any;
+    strategy.hasKeys = () => true;
+    strategy.recordUsage = jest.fn();
+    const generateContent = jest
+      .fn()
+      .mockResolvedValue({ response: { text: () => JSON.stringify(answer) } });
+    strategy.executeWithRotation = (run: (model: unknown) => unknown) =>
+      run({ generateContent });
+    const request = () => generateContent.mock.calls[0][0];
+    const promptOf = () => request().contents[0].parts[0].text as string;
+    return { strategy, promptOf, request };
+  };
+  const BRIEF = 'Viết email cho đồng nghiệp để dời cuộc họp sang thứ Sáu.';
+
+  it('a Writing draft carries the topic and level rule, and the description as its situation', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestWritingFullDraft({
+        topic: 'Công việc văn phòng',
+        level: 'INTERMEDIATE',
+        kind: 'EMAIL',
+        count: 3,
+        brief: BRIEF,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).toContain(draftRule('WRITING', 'INTERMEDIATE'));
+    expect(promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('a Reading draft carries the rule; a Speaking draft turns its objective into the situation', async () => {
+    const reading = capture();
+    await reading.strategy
+      .suggestReadingFullDraft({
+        topic: 'Du lịch',
+        level: 'INTERMEDIATE',
+        count: 3,
+      })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain(draftRule('READING', 'INTERMEDIATE'));
+    const speaking = capture();
+    await speaking.strategy
+      .suggestSpeakingFullDraft({
+        topic: 'Nhận phòng khách sạn',
+        level: 'INTERMEDIATE',
+        objective: BRIEF,
+        count: 3,
+      })
+      .catch(() => undefined);
+    expect(speaking.promptOf()).toContain(
+      draftRule('SPEAKING', 'INTERMEDIATE'),
+    );
+    expect(speaking.promptOf()).toContain(`"situation":"${BRIEF}"`);
+    expect(speaking.promptOf()).not.toContain('"objective"');
+    expect(speaking.promptOf()).toContain(situationRule(BRIEF).trim());
+  });
+
+  it('a Grammar draft carries the rule and the typed key formula as its focus', async () => {
+    const { strategy, promptOf } = capture();
+    await strategy
+      .suggestGrammarFullDraft({
+        topicTitle: 'Thì hiện tại hoàn thành',
+        level: 'INTERMEDIATE',
+        objective: 'S + have/has + V3',
+        count: 5,
+      })
+      .catch(() => undefined);
+    expect(promptOf()).toContain(draftRule('GRAMMAR', 'INTERMEDIATE'));
+    expect(promptOf()).toContain('"focus":"S + have/has + V3"');
+    expect(promptOf()).toContain(briefRule('GRAMMAR', 'x').trim());
+  });
+
+  it('a Vocabulary draft asks for Vietnamese meanings and US phonetics, and uses the description', async () => {
+    const { strategy, promptOf, request } = capture({
+      title: 'Họp',
+      categoryName: 'Công sở',
+      words: [
+        {
+          word: 'agenda',
+          pos: 'noun',
+          meaning: 'chương trình họp',
+          ipaUs: '/əˈdʒendə/',
+          exampleEn: 'Here is the agenda.',
+          exampleVi: 'Đây là chương trình họp.',
+        },
+      ],
+    });
+    const draft = await strategy.suggestVocabFullDraft({
+      topic: 'Office meetings',
+      level: 'BASIC',
+      context: 'Từ để họp nhóm.',
+      count: 1,
+    });
+    expect(draft.words[0].ipaUs).toBe('/əˈdʒendə/');
+    expect(promptOf()).toContain(draftRule('VOCAB', 'BASIC'));
+    expect(promptOf()).toContain('"situation":"Từ để họp nhóm."');
+    expect(promptOf()).not.toContain('"context"');
+    const word =
+      request().generationConfig.responseSchema.properties.words.items;
+    expect(word.required).toContain('ipaUs');
+  });
+
+  it('decks from a document must bring phonetics for every word', async () => {
+    const { strategy, promptOf, request } = capture({ decks: [] });
+    await strategy.suggestVocabDecksFromDocument({
+      text: 'The agenda for the meeting.',
+      maxDecks: 3,
+      maxWordsPerDeck: 10,
+    });
+    const word =
+      request().generationConfig.responseSchema.properties.decks.items
+        .properties.words.items;
+    expect(word.required).toContain('ipaUs');
+    expect(promptOf()).toContain(VOCAB_WORD_RULE);
+    // Each deck brings a CMS level the import keeps (owner 2026-11-25).
+    expect(
+      request().generationConfig.responseSchema.properties.decks.items
+        .properties.level.enum,
+    ).toEqual(['STARTER', 'BASIC', 'INTERMEDIATE', 'ADVANCED']);
+  });
+
+  it('"Tạo câu khác" sends the items to avoid, and a repeated word never comes back', async () => {
+    const reading = capture({ candidates: [] });
+    await reading.strategy
+      .suggestReadingQuestions({
+        passage: 'We travelled to Hue by train.',
+        count: 1,
+        avoid: ['How did they travel?'],
+      })
+      .catch(() => undefined);
+    expect(reading.promptOf()).toContain('AVOID LIST');
+    expect(reading.promptOf()).toContain('"How did they travel?"');
+    const grammar = capture({ candidates: [] });
+    await grammar.strategy
+      .suggestGrammarQuestions({
+        topicTitle: 'Thì hiện tại hoàn thành',
+        level: 'BASIC',
+        count: 1,
+        avoid: ['She ____ here for years.'],
+      })
+      .catch(() => undefined);
+    expect(grammar.promptOf()).toMatch(
+      /already has the questions in the avoid list above/,
+    );
+    const writing = capture();
+    await writing.strategy
+      .suggestWritingFullDraft({
+        topic: 'Văn phòng',
+        level: 'INTERMEDIATE',
+        kind: 'TRANSLATION',
+        count: 1,
+        avoid: ['Tôi đã gửi email.'],
+      })
+      .catch(() => undefined);
+    expect(writing.promptOf()).toContain('"avoid":["Tôi đã gửi email."]');
+    expect(writing.promptOf()).toMatch(
+      /already has the tasks in the avoid list/,
+    );
+    const vocab = capture({
+      title: 'Họp',
+      categoryName: 'Công sở',
+      words: [
+        {
+          word: 'Agenda',
+          pos: 'noun',
+          meaning: 'chương trình họp',
+          ipaUs: '/x/',
+          exampleEn: 'a',
+          exampleVi: 'b',
+        },
+        {
+          word: 'minutes',
+          pos: 'noun',
+          meaning: 'biên bản',
+          ipaUs: '/y/',
+          exampleEn: 'c',
+          exampleVi: 'd',
+        },
+      ],
+    });
+    const draft = await vocab.strategy.suggestVocabFullDraft({
+      topic: 'Office meetings',
+      count: 2,
+      avoid: ['agenda'],
+    });
+    expect(draft.words.map((word: { word: string }) => word.word)).toEqual([
+      'minutes',
+    ]);
+  });
+
+  it('a Part 5 suggestion carries the exam difficulty', async () => {
+    const { strategy, promptOf } = capture({
+      candidates: [
+        {
+          prompt: 'The report ____ by Friday.',
+          options: ['is due', 'due', 'dues', 'dueing'],
+          correctIndex: 0,
+          explanation: 'Cần động từ.',
+        },
+      ],
+    });
+    await strategy.suggestToeicPart5({ difficulty: 'hard', count: 1 });
+    expect(promptOf()).toMatch(/Difficulty: hard: less common business words/);
+  });
+
+  it('Reading, Speaking and Grammar drafts labelled with another level keep the chosen one', async () => {
+    const reading = capture({
+      title: 'Du lịch',
+      description: 'Đọc thông tin về chuyến đi.',
+      level: 'ADVANCED',
+      passage: 'We travelled to Hue by train.',
+      questions: [
+        {
+          prompt: 'How did they travel?',
+          options: ['By train', 'By bus', 'By car', 'By plane'],
+          correctIndex: 0,
+          explanation: 'Đoạn văn nói họ đi tàu.',
+        },
+      ],
+    });
+    const draft = await reading.strategy.suggestReadingFullDraft({
+      topic: 'Du lịch',
+      level: 'INTERMEDIATE',
+      count: 1,
+    });
+    expect(draft.level).toBe('INTERMEDIATE');
+    const speaking = capture({
+      practiceSet: {
+        title: 'Nhận phòng',
+        description: 'Luyện nói khi nhận phòng khách sạn.',
+        level: 'INTERMEDIATE',
+      },
+      exercises: [
+        {
+          title: 'Chào lễ tân',
+          targetText: 'Good evening, I have a reservation.',
+          difficulty: 'STARTER',
+          taskType: 'READ_ALOUD',
+        },
+      ],
+    });
+    const set = await speaking.strategy.suggestSpeakingFullDraft({
+      topic: 'Nhận phòng',
+      level: 'BASIC',
+      count: 1,
+    });
+    expect(set.practiceSet.level).toBe('BASIC');
   });
 });
 
@@ -989,7 +1244,7 @@ describe('GeminiEvaluatorStrategy dictation replacements (owner 2026-11-25)', ()
       run({ generateContent });
     await strategy.suggestDictationLines({
       topic: 'Gia đình',
-      level: 'A2',
+      level: 'BASIC',
       count: 1,
       avoid: ['We eat dinner at six.'],
     });

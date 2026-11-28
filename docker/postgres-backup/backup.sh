@@ -5,8 +5,9 @@
 # versions always match the server. Writes custom-format archives to the
 # host-mounted /backups directory (outside the Postgres data volume).
 #
-# Schedule (owner 2026-11-16): one backup a day at BACKUP_AT (default 00:00)
-# in Vietnam time (UTC+7, no DST). Each loop compares the last VERIFIED
+# Schedule (owner 2026-11-16): one backup a day at BACKUP_AT (default 00:01;
+# 00:00 until 2026-11-27, when every job moved off midnight) in Vietnam time
+# (UTC+7, no DST). Each loop compares the last VERIFIED
 # automatic backup in the persistent backup directory with the most recent
 # daily slot: if the backup is older than that slot it runs now, otherwise the
 # loop sleeps until the next slot. So a machine switched on at 08:00 with no
@@ -30,7 +31,7 @@ set -u
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 # Daily slot, local wall time HH:MM, and the local offset from UTC in minutes.
-BACKUP_AT="${BACKUP_AT:-00:00}"
+BACKUP_AT="${BACKUP_AT:-00:01}"
 UTC_OFFSET_MINUTES="${BACKUP_UTC_OFFSET_MINUTES:-420}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 DB="${PGDATABASE:-kltn_db}"

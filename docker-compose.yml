@@ -59,9 +59,10 @@ services:
       PGUSER: postgres
       PGPASSWORD: password
       PGDATABASE: kltn_db
-      # One backup a day at 00:00 Vietnam time (owner 2026-11-16); a machine
-      # that was off at midnight gets it as soon as Docker starts.
-      BACKUP_AT: '00:00'
+      # One backup a day at 00:01 Vietnam time (owner 2026-11-16; moved off
+      # 00:00 on 2026-11-27, nothing runs at midnight); a machine that was off
+      # then gets it as soon as Docker starts. The R2 copy follows at 00:02.
+      BACKUP_AT: '00:01'
       BACKUP_UTC_OFFSET_MINUTES: '420'
       BACKUP_RETENTION_DAYS: '14'
       # Weekly restore drill into the throwaway postgres-drill service.

@@ -89,13 +89,12 @@ export type ArenaQuestion = {
   explanation: string;
 };
 
+/** A deck's practice level as a rank (owner 2026-11-27; CEFR A1-C2 before). */
 const LEVEL_RANK: Record<string, number> = {
-  A1: 1,
-  A2: 2,
-  B1: 3,
-  B2: 4,
-  C1: 5,
-  C2: 6,
+  STARTER: 1,
+  BASIC: 2,
+  INTERMEDIATE: 3,
+  ADVANCED: 4,
 };
 
 export function levelRank(level: string | null | undefined): number | null {
@@ -167,16 +166,17 @@ export function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 }
 
 /**
- * Allowed CEFR ranks for a round: the first 30 % A2–B1, the middle B1, the
- * last 30 % B2, widened to B1 and C1 when B2 runs out (for 10 rounds: 1–3,
- * 4–7, 8–10). The decks hold about twice as many B1 words as B2, so a B1–B2
- * range made the last rounds mostly B1.
+ * Allowed level ranks for a round (owner 2026-11-27, four practice levels):
+ * the first 30 % Mất gốc–Cơ bản, the middle 40 % Cơ bản–Trung cấp, the last
+ * 30 % Trung cấp–Nâng cao, widened by `widen` when a stage runs out (for 10
+ * rounds: 1–3, 4–7, 8–10). Before, the stages were CEFR A2–B1, B1 and B2; B1
+ * and B2 are now one level, so the last rounds mix them.
  */
 export function stageLevels(roundIndex: number, count: number): number[] {
   const position = roundIndex / count;
-  if (position < 0.3) return [2, 3];
-  if (position < 0.7) return [3];
-  return [4];
+  if (position < 0.3) return [1, 2];
+  if (position < 0.7) return [2, 3];
+  return [3, 4];
 }
 
 /** Kinds for a match: each kind at least count/3 times, in random order. */
@@ -253,9 +253,23 @@ export function buildArenaQuestions(
   pool: readonly ArenaWord[],
   count: number,
   rng: () => number,
+  /**
+   * Round index → word id: that round asks this word (the learner's hard
+   * words in the free Hầm Bánh Mì, 2026-11-26). The other rounds do not
+   * take these words. Without it the output is what it always was.
+   */
+  opts: { pinned?: ReadonlyMap<number, number> } = {},
 ): ArenaQuestion[] {
   const words = pool.filter(isDuelWord);
   const kinds = kindsFor(count, rng);
+  const pinnedWord = new Map<number, ArenaWord>();
+  for (const [round, id] of opts.pinned ?? []) {
+    const w = words.find((x) => x.id === id);
+    if (w) pinnedWord.set(round, w);
+  }
+  const reserved = new Set(
+    [...pinnedWord.values()].map((w) => w.headword.toLowerCase()),
+  );
 
   // 1. Targets, round by round, distinct headwords.
   const usedHeadwords = new Set<string>();
@@ -263,20 +277,28 @@ export function buildArenaQuestions(
   for (let round = 0; round < count; round += 1) {
     let kind = kinds[round];
     let picked: ArenaWord | undefined;
-    // No word left for this kind (e.g. no usable example): any other kind.
-    const tryKinds = [kind, ...kindsFor(3, rng).filter((k) => k !== kind)];
-    search: for (const accepts of widen(stageLevels(round, count))) {
-      for (const k of tryKinds) {
-        const candidates = words.filter(
-          (w) =>
-            accepts(w) &&
-            fitsKind(w, k) &&
-            !usedHeadwords.has(w.headword.toLowerCase()),
-        );
-        if (candidates.length) {
-          picked = candidates[Math.floor(rng() * candidates.length)];
-          kind = k;
-          break search;
+    const pin = pinnedWord.get(round);
+    if (pin && !usedHeadwords.has(pin.headword.toLowerCase())) {
+      picked = pin;
+      if (!fitsKind(pin, kind))
+        kind = kind === 'fill_blank' ? 'meaning_to_word' : kind;
+    } else {
+      // No word left for this kind (e.g. no usable example): any other kind.
+      const tryKinds = [kind, ...kindsFor(3, rng).filter((k) => k !== kind)];
+      search: for (const accepts of widen(stageLevels(round, count))) {
+        for (const k of tryKinds) {
+          const candidates = words.filter(
+            (w) =>
+              accepts(w) &&
+              fitsKind(w, k) &&
+              !usedHeadwords.has(w.headword.toLowerCase()) &&
+              !reserved.has(w.headword.toLowerCase()),
+          );
+          if (candidates.length) {
+            picked = candidates[Math.floor(rng() * candidates.length)];
+            kind = k;
+            break search;
+          }
         }
       }
     }

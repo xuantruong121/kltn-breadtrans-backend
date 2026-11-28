@@ -34,7 +34,7 @@ export class ContentService {
               thumbnail:
                 'https://img.youtube.com/vi/jWM0ct-OLsM/maxresdefault.jpg',
               duration: '3:45',
-              level: 'BEGINNER',
+              level: 'BASIC',
               description:
                 'Luyện nghe phản xạ giao tiếp tiếng Anh công sở qua đoạn hội thoại tuyển dụng trong phim Zootopia.',
             },
@@ -109,7 +109,7 @@ export class ContentService {
               thumbnail:
                 'https://img.youtube.com/vi/yRUAzGQ3nSY/maxresdefault.jpg',
               duration: '3:50',
-              level: 'BEGINNER',
+              level: 'BASIC',
               description:
                 'Học các tính từ và danh từ miêu tả cảm xúc con người qua các nhân vật Joy, Sadness, Anger, Fear, Disgust.',
             },
@@ -168,7 +168,7 @@ export class ContentService {
               thumbnail:
                 'https://img.youtube.com/vi/Yc6T9iY9rs8/maxresdefault.jpg',
               duration: '3:15',
-              level: 'BEGINNER',
+              level: 'BASIC',
               description:
                 'Học các cụm từ đếm số, thì hiện tại đơn và câu điều kiện loại 1 qua ca khúc kinh điển về tình bạn.',
             },

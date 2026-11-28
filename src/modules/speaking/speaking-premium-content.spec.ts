@@ -14,7 +14,7 @@ describe('Speaking premium content boundary', () => {
     imageUrl: null,
     audioUrl: 'premium/speaking/exercise-1.mp3',
     isPremiumContent: true,
-    difficulty: 'BEGINNER',
+    difficulty: 'BASIC',
     createdAt: new Date(),
   };
 

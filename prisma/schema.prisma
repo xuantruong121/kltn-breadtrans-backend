@@ -201,6 +201,7 @@ model User {
   userQuizRewards                 UserQuizReward[]
   userQuestionRewards             UserQuestionReward[]
   learningActivities              LearningActivity[]
+  studyTimes                      StudyTime[]
   diagnosticAttempts              DiagnosticAttempt[]
   diagnosticSpeakingResponses     DiagnosticSpeakingResponse[]
   diagnosticWritingResponses      DiagnosticWritingResponse[]
@@ -636,6 +637,10 @@ model Quiz {
   theoryContent     String?               @db.Text
   bilingualContent  Json? // Array of { en: string, vi: string }
   type              QuizType              @default(TOEIC)
+  /// Practice level of a standalone skill practice (owner 2026-11-27: the
+  /// four levels replace the CEFR tag once read from the title). Null for a
+  /// TOEIC exam and for a writing task inside an exam: the exam decides access.
+  practiceLevel     PracticeLevel?
   isPremiumContent  Boolean               @default(false)
   publicationStatus QuizPublicationStatus @default(PUBLISHED)
   publishedAt       DateTime?
@@ -650,6 +655,8 @@ model Quiz {
   listeningTranscriptReveals ListeningTranscriptReveal[]
   listeningAudioUsages       ListeningAudioUsage[]
   toeicWritingSetItems       ToeicWritingSetItem[]
+
+  @@index([type, practiceLevel])
 }
 
 /// Immutable, quiz-level production audio with an authoritative turn timeline.
@@ -892,7 +899,7 @@ model SpeakingExercise {
   imageUrl          String? // Dùng cho TOEIC Part 1 (Mô tả tranh)
   audioUrl          String? // Dùng cho TOEIC Part 2/3 (Nghe và phản hồi)
   isPremiumContent  Boolean                   @default(false)
-  difficulty        String                    @default("BEGINNER") // BEGINNER, INTERMEDIATE, ADVANCED
+  difficulty        PracticeLevel             @default(BASIC)
   taskType          SpeakingExerciseTaskType?
   practiceSetId     String?
   order             Int?
@@ -915,7 +922,7 @@ model SpeakingPracticeSet {
   id                String                @id
   title             String
   description       String
-  level             String
+  level             PracticeLevel
   scope             SpeakingPracticeScope @default(SKILL_PRACTICE)
   publicationStatus QuizPublicationStatus @default(DRAFT)
   createdAt         DateTime              @default(now())
@@ -1103,6 +1110,25 @@ model ContentTopic {
 
 /// Immutable learning timeline. Each business feature writes a factual activity
 /// after its own transaction succeeds; the UI never fabricates a history row.
+/// Time a learner spends in practice rooms, per learner day and skill
+/// (owner 2026-11-26: the dashboard's "Thời gian học" had no data behind it).
+/// The browser sends what it counted while the room was open and in use.
+model StudyTime {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Learner day "YYYY-MM-DD" (Vietnam time, turning at 00:01).
+  dayKey    String   @db.VarChar(10)
+  /// LISTENING | READING | WRITING | SPEAKING | VOCAB | GRAMMAR | EXAM | DIAGNOSTIC
+  skill     String   @db.VarChar(16)
+  seconds   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dayKey, skill])
+  @@index([userId, dayKey])
+}
+
 model LearningActivity {
   id          Int      @id @default(autoincrement())
   userId      Int
@@ -1710,8 +1736,9 @@ model VocabTopic {
   title             String
   /// Short line shown on the learner's deck card.
   description       String?               @db.Text
-  /// CEFR tag (A1–C2) for filtering and personalization.
-  level             String?
+  /// Practice level for filtering and personalization (owner 2026-11-27; was
+  /// a CEFR tag).
+  level             PracticeLevel?
   categoryName      String                @default("600 TỪ VỰNG TOEIC")
   totalWords        Int                   @default(12)
   isPro             Boolean               @default(false)
@@ -2226,7 +2253,7 @@ model UserQuestProgress {
 model GrammarTopic {
   id                Int                   @id @default(autoincrement())
   title             String
-  level             String                @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  level             PracticeLevel         @default(BASIC)
   description       String?               @db.Text
   videoYoutubeId    String?
   keyFormula        String?               @db.Text

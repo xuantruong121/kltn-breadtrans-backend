@@ -7,8 +7,12 @@ import {
   MaxLength,
 } from 'class-validator';
 
-export const VOCAB_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import type { PracticeLevel } from '@prisma/client';
+import { PRACTICE_LEVELS } from '../../subscription/practice-level';
+
+/** A deck's level: one of the four practice levels (owner 2026-11-27). */
+export const VOCAB_LEVELS = PRACTICE_LEVELS;
 
 export class CreateVocabTopicDto {
   @ApiProperty({ example: 'Contracts & Agreements' })
@@ -36,8 +40,8 @@ export class CreateVocabTopicDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiPropertyOptional({ example: 'B1', enum: VOCAB_LEVELS })
-  @IsIn(VOCAB_LEVELS)
+  @ApiPropertyOptional({ example: 'INTERMEDIATE', enum: VOCAB_LEVELS })
+  @IsIn([...VOCAB_LEVELS])
   @IsOptional()
-  level?: string;
+  level?: PracticeLevel;
 }

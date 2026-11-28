@@ -14,7 +14,11 @@ import {
   mainSense,
   blasterPayout,
   blasterXp,
+  BLASTER_PACE,
+  BLASTER_STAKES,
+  blasterPace,
   buildBlasterRound,
+  hardWordTally,
   landsAt,
   matchShot,
   missingLetters,
@@ -124,7 +128,6 @@ describe('buildBlasterRound', () => {
         else if (b.kind === 'vi_to_en')
           expect(b.hint).toBe(letterHint(b.word.displayWord));
         else expect(b.hint).toBeNull();
-        expect(b.word.displayWord).not.toBe('the');
         if (i > 0) expect(b.spawnAtMs).toBeGreaterThan(blocks[i - 1].spawnAtMs);
         if (b.kind === 'copy' || b.kind === 'missing' || b.kind === 'vi_to_en')
           expect(b.answers).toContain(normalizeAnswer(b.word.displayWord));
@@ -163,9 +166,66 @@ describe('buildBlasterRound', () => {
       'id',
       'kind',
       'lane',
+      'oftenForgotten',
       'prompt',
       'spawnAtMs',
     ]);
+    expect(view.every((b) => b.oftenForgotten === false)).toBe(true);
+  });
+});
+
+describe("buildBlasterRound with the learner's hard words (2026-11-26)", () => {
+  // Level 4 words: by level alone they would only come in the last blocks.
+  const hard = pool.filter((w) => w.level === 4).slice(0, 8);
+  const hardIds = hard.map((w) => w.id);
+
+  it.each(BLASTER_MODES)(
+    '%s: six hard words at spread places, the rest chosen as before',
+    (mode) => {
+      const blocks = buildBlasterRound(pool, seeded(5), mode, { hardIds });
+      expect(blocks).toHaveLength(BLASTER_BLOCKS);
+      expect(new Set(blocks.map((b) => b.word.id)).size).toBe(20);
+      const flagged = blocks
+        .map((b, i) => (b.oftenForgotten ? i : -1))
+        .filter((i) => i >= 0);
+      expect(flagged).toEqual([1, 5, 8, 11, 15, 18]);
+      // In the order given: the first six of the list.
+      expect(flagged.map((i) => blocks[i].word.id)).toEqual(
+        hardIds.slice(0, 6),
+      );
+      // The two left over are not asked as ordinary blocks before their stage.
+      for (const b of blocks.filter((x) => !x.oftenForgotten))
+        expect(hardIds.slice(0, 6)).not.toContain(b.word.id);
+      expect(publicBlocks(blocks).filter((b) => b.oftenForgotten)).toHaveLength(
+        6,
+      );
+    },
+  );
+
+  it('skips ids that are unknown or do not suit the mode', () => {
+    const short = pool.find((w) => w.headword === 'the')!;
+    const blocks = buildBlasterRound(pool, seeded(2), 'missing', {
+      hardIds: [999_999, short.id, hardIds[0]],
+    });
+    const flagged = blocks.filter((b) => b.oftenForgotten);
+    expect(flagged.map((b) => b.word.id)).toEqual([hardIds[0]]);
+    expect(blocks.indexOf(flagged[0])).toBe(10);
+  });
+
+  it('no hard words: the game is exactly what it was', () => {
+    expect(buildBlasterRound(pool, seeded(9), 'copy', { hardIds: [] })).toEqual(
+      buildBlasterRound(pool, seeded(9), 'copy'),
+    );
+  });
+
+  it('counts the hard words broken, never the words themselves', () => {
+    const blocks = buildBlasterRound(pool, seeded(5), 'copy', { hardIds });
+    const flagged = blocks.filter((b) => b.oftenForgotten);
+    const hits = { [flagged[0].id]: 5000, [flagged[2].id]: 9000, 1: 4000 };
+    expect(hardWordTally(blocks, hits)).toEqual({ hit: 2, total: 6 });
+    expect(
+      hardWordTally(buildBlasterRound(pool, seeded(5), 'copy'), hits),
+    ).toEqual({ hit: 0, total: 0 });
   });
 });
 
@@ -338,5 +398,45 @@ describe('pullForward', () => {
       destroyed: 1,
       landed: 0,
     });
+  });
+});
+
+describe('pace by stake (2026-11-27)', () => {
+  it('has a pace for every stake, rising with it, and 1 for anything else', () => {
+    expect(BLASTER_STAKES.map((s) => blasterPace(s))).toEqual([1, 1.15, 1.3]);
+    expect(
+      Object.keys(BLASTER_PACE)
+        .map(Number)
+        .sort((a, b) => a - b),
+    ).toEqual([...BLASTER_STAKES]);
+    expect(blasterPace(999)).toBe(1);
+  });
+
+  it('leaves the lowest stake as the game was', () => {
+    expect(buildBlasterRound(pool, seeded(4), 'copy', { pace: 1 })).toEqual(
+      buildBlasterRound(pool, seeded(4), 'copy'),
+    );
+  });
+
+  it('shortens every fall by the pace and changes nothing else', () => {
+    for (const mode of ['copy', 'missing', 'vi_to_en', 'en_to_vi'] as const) {
+      const plain = buildBlasterRound(pool, seeded(6), mode);
+      const fast = buildBlasterRound(pool, seeded(6), mode, { pace: 1.3 });
+      expect(fast).toHaveLength(plain.length);
+      fast.forEach((b, i) => {
+        const { fallMs, ...rest } = b;
+        const { fallMs: plainFall, ...plainRest } = plain[i];
+        // Same word, prompt, lane and spawn time; only the fall is shorter.
+        expect(rest).toEqual(plainRest);
+        expect(fallMs).toBeLessThan(plainFall);
+        expect(Math.abs(fallMs - plainFall / 1.3)).toBeLessThanOrEqual(1);
+      });
+    }
+  });
+
+  it('never slows the game down', () => {
+    expect(buildBlasterRound(pool, seeded(4), 'copy', { pace: 0.5 })).toEqual(
+      buildBlasterRound(pool, seeded(4), 'copy'),
+    );
   });
 });

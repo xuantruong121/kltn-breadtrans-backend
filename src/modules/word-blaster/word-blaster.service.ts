@@ -13,7 +13,14 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { ARENA_XP_REASON } from '../events/arena-questions.logic';
-import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
+import {
+  loadAllReviewedWords,
+  loadDeckWords,
+  hardWordsShownToday,
+  loadHardWords,
+  markHardWordsShown,
+} from '../events/arena-word-pool';
+import { hardWordOrder, type HardTally } from '../events/hard-words.logic';
 import {
   BLASTER_BLOCKS,
   BLASTER_MODES,
@@ -23,7 +30,9 @@ import {
   blasterDeadline,
   blasterPayout,
   blasterXp,
+  blasterPace,
   buildBlasterRound,
+  hardWordTally,
   matchShot,
   publicBlocks,
   pullForward,
@@ -59,6 +68,12 @@ export type BlasterResult = {
   /** Part of the bonus withheld by the 150 a day cap. */
   bonusCapped: number;
   xp: number;
+  /**
+   * The learner's hard flashcard words in this game: broken out of asked.
+   * Counts only; the result never lists words (owner 2026-11-08). Missing
+   * on results stored before 2026-11-26.
+   */
+  hardWords?: HardTally;
 };
 
 export type BlasterView = {
@@ -147,11 +162,15 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
     const open = await this.current(userId);
     if (open) return open;
 
+    // The learner day of the hard words (rule B) follows the server's clock.
+    const now = new Date(Date.now());
+    const hardIds = await this.hardWordIds(userId, now);
     let words = await loadDeckWords(this.prisma);
-    let blocks = buildBlasterRound(words, Math.random, mode);
+    const pace = blasterPace(stake);
+    let blocks = buildBlasterRound(words, Math.random, mode, { hardIds, pace });
     if (blocks.length < BLASTER_BLOCKS) {
       words = await loadAllReviewedWords(this.prisma);
-      blocks = buildBlasterRound(words, Math.random, mode);
+      blocks = buildBlasterRound(words, Math.random, mode, { hardIds, pace });
     }
     if (blocks.length < BLASTER_BLOCKS)
       throw new BadRequestException(
@@ -205,7 +224,63 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
         'Không mở được ván, Bánh Mì đã được hoàn lại.',
       );
     }
+    await this.rememberHardWords(
+      userId,
+      now,
+      blocks.filter((b) => b.oftenForgotten).map((b) => b.word.id),
+    );
     return this.view(session);
+  }
+
+  /**
+   * The learner's hard flashcard words, due ones first (thesis supervisor
+   * 2026-11-26). A game never fails to open because this read failed.
+   */
+  private async hardWordIds(userId: number, now: Date): Promise<number[]> {
+    try {
+      const rows = await loadHardWords(this.prisma, userId);
+      return hardWordOrder(
+        rows,
+        now,
+        Math.random,
+        await this.hardWordsShownToday(userId, now),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[Blaster] hard words of user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return [];
+    }
+  }
+
+  /** Rule B (owner 2026-11-27): the hard words already put into a game today. */
+  private async hardWordsShownToday(
+    userId: number,
+    now: Date,
+  ): Promise<Set<number>> {
+    try {
+      return await hardWordsShownToday(this.redis, userId, now);
+    } catch (err) {
+      this.logger.warn(
+        `[Blaster] hard words shown today to user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return new Set();
+    }
+  }
+
+  /** Notes the hard words this game was given; a failure only means they may come again today. */
+  private async rememberHardWords(
+    userId: number,
+    now: Date,
+    entryIds: number[],
+  ): Promise<void> {
+    try {
+      await markHardWordsShown(this.redis, userId, now, entryIds);
+    } catch (err) {
+      this.logger.warn(
+        `[Blaster] hard words shown to user ${userId} not kept: ${(err as Error)?.message}`,
+      );
+    }
   }
 
   /** The learner's open game, if any (e.g. after a page reload). */
@@ -360,6 +435,7 @@ export class WordBlasterService implements OnModuleInit, OnModuleDestroy {
       net: outcome === 'win' ? bonusGranted : -session.stake,
       bonusCapped: bonus - bonusGranted,
       xp,
+      hardWords: hardWordTally(session.blocks, session.hits),
     };
     await this.save(session, RESULT_TTL_S);
     await this.redis.zrem(KEY.open, session.id);

@@ -31,7 +31,7 @@ describeWithIsolatedDatabase('learning tracks on the database', () => {
         id: setId,
         title: `QA track set ${suffix}`,
         description: '',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         scope: 'SKILL_PRACTICE',
         publicationStatus: QuizPublicationStatus.DRAFT,
       },

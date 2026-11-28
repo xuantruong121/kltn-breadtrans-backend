@@ -122,13 +122,13 @@ describe('NotificationsCronService', () => {
         expect.objectContaining({
           userId: 202,
           type: 'vocab_review',
-          url: '/flashcard/1',
+          url: '/flashcard/1?due=1',
         }),
       );
       expect(notificationsService.sendPushToUser).toHaveBeenCalledWith(
         202,
         expect.objectContaining({
-          url: '/flashcard/1',
+          url: '/flashcard/1?due=1',
         }),
       );
     });

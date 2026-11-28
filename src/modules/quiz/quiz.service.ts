@@ -1260,7 +1260,6 @@ export class QuizService {
         requiredPlan: accessByQuiz.get(quiz.id)?.requiredPlan ?? 'FREE',
         isLevelLocked: accessByQuiz.get(quiz.id)?.isLevelLocked ?? false,
         practiceLevel: accessByQuiz.get(quiz.id)?.practiceLevel ?? null,
-        cefrLevel: accessByQuiz.get(quiz.id)?.cefrLevel ?? null,
       };
     };
 

@@ -5,6 +5,7 @@ import {
   DictionaryEntrySource,
   DictionaryEntryStatus,
   ExamType,
+  PracticeLevel,
   Prisma,
   PrismaClient,
   QuizPublicationStatus,
@@ -19,37 +20,47 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureCanonicalPlanCatalog } from '../src/modules/subscription/canonical-plan-catalog';
 import {
-  LEVEL_GROUP_DIFFICULTY,
-  levelGroup,
+  legacyPracticeLevel,
   parseCefrRange,
-  practiceRequiresPlus,
+  practiceLevelRank,
+  requiredPracticePlan,
 } from '../src/modules/subscription/practice-level';
 
 /**
  * Reviewed CEFR tags of the Speaking practice items (Checkpoint 51,
  * scripts/practice-level-normalization.ts). The seed keeps the original
  * titles for task-type and media inference, then stores the tagged title,
- * the level group and the owner access policy (A1/A2 free, B1+ PLUS).
+ * the PracticeLevel difficulty and the owner access policy (A1/A2 free, B1+ PLUS).
  * Sets, the extra tasks and their reference audio are seeded further down.
  */
 function speakingPracticeLevelFields(id: number, title: string) {
   const tagged = SPEAKING_PRACTICE_RETITLE[id]?.[1] ?? title;
   const range = parseCefrRange(tagged);
   if (!range) return { title: tagged };
-  const group = levelGroup(range);
+  const difficulty = legacyPracticeLevel(tagged);
   return {
     title: tagged,
-    isPremiumContent: practiceRequiresPlus(range),
-    ...(group ? { difficulty: LEVEL_GROUP_DIFFICULTY[group] } : {}),
+    isPremiumContent: difficulty
+      ? requiredPracticePlan('SPEAKING', difficulty) !== 'FREE'
+      : false,
+    ...(difficulty ? { difficulty } : {}),
   };
 }
+
+function skillPracticeLevelForQuiz(
+  type: keyof typeof QuizType,
+  title: string,
+): PracticeLevel | undefined {
+  if (type === 'TOEIC') return undefined;
+  return legacyPracticeLevel(title) ?? PracticeLevel.BASIC;
+}
+
 import {
   SPEAKING_DICTIONARY_ENTRIES,
   SPEAKING_DICTIONARY_METADATA,
   tokenizeSpeakingDictionaryText,
 } from './data/speaking-dictionary';
 import {
-  DIFFICULTY as SPEAKING_SET_DIFFICULTY,
   EXTRA as SPEAKING_PRACTICE_EXTRA,
   RETITLE as SPEAKING_PRACTICE_RETITLE,
   SETS as SPEAKING_PRACTICE_SETS,
@@ -1375,7 +1386,7 @@ async function main() {
     1: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['A2'],
+      levels: ['BASIC'],
       topics: ['Đời sống', 'Lịch hẹn', 'Mua sắm'],
       accents: ['US', 'UK'],
       durationMinutes: 12,
@@ -1383,7 +1394,7 @@ async function main() {
     5: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['B1'],
+      levels: ['INTERMEDIATE'],
       topics: ['Công việc', 'Cuộc họp'],
       accents: ['US', 'UK'],
       durationMinutes: 15,
@@ -1391,7 +1402,7 @@ async function main() {
     9: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['A1'],
+      levels: ['STARTER'],
       topics: ['Đời sống hằng ngày'],
       accents: ['US', 'UK'],
       durationMinutes: 12,
@@ -1399,7 +1410,7 @@ async function main() {
     10: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['A2'],
+      levels: ['BASIC'],
       topics: ['Du lịch', 'Dịch vụ'],
       accents: ['US', 'UK'],
       durationMinutes: 14,
@@ -1407,7 +1418,7 @@ async function main() {
     11: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['B1'],
+      levels: ['INTERMEDIATE'],
       topics: ['Công việc', 'Cuộc họp'],
       accents: ['US', 'UK'],
       durationMinutes: 16,
@@ -1415,7 +1426,7 @@ async function main() {
     12: {
       track: 'GENERAL_ENGLISH',
       mode: 'COMPREHENSION',
-      levels: ['B2'],
+      levels: ['INTERMEDIATE'],
       topics: ['Suy luận', 'Thông báo'],
       accents: ['US', 'UK'],
       durationMinutes: 18,
@@ -1423,7 +1434,7 @@ async function main() {
     23: {
       track: 'GENERAL_ENGLISH',
       mode: 'DICTATION',
-      levels: ['A1'],
+      levels: ['STARTER'],
       topics: ['Đời sống hằng ngày', 'Tin nhắn'],
       accents: ['UK'],
       durationMinutes: 10,
@@ -1431,7 +1442,7 @@ async function main() {
     24: {
       track: 'GENERAL_ENGLISH',
       mode: 'DICTATION',
-      levels: ['A2'],
+      levels: ['BASIC'],
       topics: ['Du lịch', 'Chỉ đường'],
       accents: ['US'],
       durationMinutes: 12,
@@ -1439,7 +1450,7 @@ async function main() {
     25: {
       track: 'GENERAL_ENGLISH',
       mode: 'DICTATION',
-      levels: ['B1'],
+      levels: ['INTERMEDIATE'],
       topics: ['Công việc', 'Cập nhật'],
       accents: ['US', 'UK'],
       durationMinutes: 14,
@@ -1447,7 +1458,7 @@ async function main() {
     26: {
       track: 'GENERAL_ENGLISH',
       mode: 'DIALOGUE',
-      levels: ['A2'],
+      levels: ['BASIC'],
       topics: ['Ăn uống', 'Dịch vụ'],
       accents: ['US'],
       durationMinutes: 12,
@@ -1455,7 +1466,7 @@ async function main() {
     27: {
       track: 'GENERAL_ENGLISH',
       mode: 'DIALOGUE',
-      levels: ['B1'],
+      levels: ['INTERMEDIATE'],
       topics: ['Công việc', 'Lập kế hoạch'],
       accents: ['US', 'UK'],
       durationMinutes: 15,
@@ -1463,7 +1474,7 @@ async function main() {
     28: {
       track: 'GENERAL_ENGLISH',
       mode: 'DIALOGUE',
-      levels: ['B2'],
+      levels: ['INTERMEDIATE'],
       topics: ['Dịch vụ khách hàng', 'Giải quyết vấn đề'],
       accents: ['US'],
       durationMinutes: 18,
@@ -1549,11 +1560,11 @@ async function main() {
     { level: string; questionTypes: string[] }
   > = {
     2: {
-      level: 'A2',
+      level: 'BASIC',
       questionTypes: ['DETAIL', 'DETAIL', 'PROMOTION', 'DETAIL', 'DETAIL'],
     },
     6: {
-      level: 'B1',
+      level: 'INTERMEDIATE',
       questionTypes: ['PURPOSE', 'DETAIL', 'PURPOSE'],
     },
   };
@@ -2263,7 +2274,7 @@ async function main() {
       bilingualContent: {
         mode: 'DICTATION',
         track: 'GENERAL_ENGLISH',
-        levels: ['A1'],
+        levels: ['STARTER'],
         topics: ['Sinh hoạt hằng ngày', 'Tin nhắn ngắn'],
         accents: ['UK'],
         durationMinutes: 10,
@@ -2273,7 +2284,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'Please call me after lunch.',
             correctAnswer: 'Please call me after lunch.',
@@ -2290,7 +2301,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'The bus leaves at seven fifteen.',
             correctAnswer: 'The bus leaves at seven fifteen.',
@@ -2307,7 +2318,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'It is sunny but cold today.',
             correctAnswer: 'It is sunny but cold today.',
@@ -2324,7 +2335,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: "Let's meet near the library.",
             correctAnswer: "Let's meet near the library.",
@@ -2341,7 +2352,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'My sister works on Saturdays.',
             correctAnswer: 'My sister works on Saturdays.',
@@ -2366,7 +2377,7 @@ async function main() {
       bilingualContent: {
         mode: 'DICTATION',
         track: 'GENERAL_ENGLISH',
-        levels: ['A2'],
+        levels: ['BASIC'],
         topics: ['Du lịch', 'Chỉ đường'],
         accents: ['US'],
         durationMinutes: 12,
@@ -2376,7 +2387,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'The museum is across from the train station.',
             correctAnswer: 'The museum is across from the train station.',
@@ -2393,7 +2404,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'Your flight boards at gate twelve.',
             correctAnswer: 'Your flight boards at gate twelve.',
@@ -2410,7 +2421,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'Turn left after the second traffic light.',
             correctAnswer: 'Turn left after the second traffic light.',
@@ -2427,7 +2438,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'The hotel breakfast starts at six thirty.',
             correctAnswer: 'The hotel breakfast starts at six thirty.',
@@ -2444,7 +2455,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'You can buy tickets online in advance.',
             correctAnswer: 'You can buy tickets online in advance.',
@@ -2469,7 +2480,7 @@ async function main() {
       bilingualContent: {
         mode: 'DICTATION',
         track: 'GENERAL_ENGLISH',
-        levels: ['B1'],
+        levels: ['INTERMEDIATE'],
         topics: ['Công việc', 'Cuộc họp'],
         accents: ['US', 'UK'],
         durationMinutes: 14,
@@ -2479,7 +2490,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText: 'The client asked us to revise the proposal by Friday.',
             correctAnswer:
@@ -2498,7 +2509,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText: 'Please upload the final report before the meeting.',
             correctAnswer: 'Please upload the final report before the meeting.',
@@ -2515,7 +2526,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText: 'We need to postpone the presentation until next week.',
             correctAnswer:
@@ -2533,7 +2544,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText: 'The finance team has approved the new budget.',
             correctAnswer: 'The finance team has approved the new budget.',
@@ -2550,7 +2561,7 @@ async function main() {
           type: 'DICTATION',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText: 'Could you send the updated schedule this afternoon?',
             correctAnswer:
@@ -2576,7 +2587,7 @@ async function main() {
       bilingualContent: {
         mode: 'DIALOGUE',
         track: 'GENERAL_ENGLISH',
-        levels: ['A2'],
+        levels: ['BASIC'],
         topics: ['Đồ ăn', 'Dịch vụ'],
         accents: ['US'],
         durationMinutes: 12,
@@ -2586,7 +2597,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText:
               'Good morning. Can I have a latte and a cheese sandwich? Of course. Would you like the latte hot or iced? Iced, please. That will be eight dollars. Your order will be ready in five minutes.',
@@ -2634,7 +2645,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText:
               'Good morning. Can I have a latte and a cheese sandwich? Of course. Would you like the latte hot or iced? Iced, please. That will be eight dollars. Your order will be ready in five minutes.',
@@ -2690,7 +2701,7 @@ async function main() {
       bilingualContent: {
         mode: 'DIALOGUE',
         track: 'GENERAL_ENGLISH',
-        levels: ['B1'],
+        levels: ['INTERMEDIATE'],
         topics: ['Công việc', 'Lập kế hoạch'],
         accents: ['UK'],
         durationMinutes: 15,
@@ -2700,7 +2711,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'Linh: Are we still presenting the project on Wednesday? Mark: Not anymore. The client moved the meeting to Thursday morning. Linh: Then I will finish the budget slides today. Mark: Great. I will update the timeline and send it to everyone before noon.',
@@ -2749,7 +2760,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'Linh: Are we still presenting the project on Wednesday? Mark: Not anymore. The client moved the meeting to Thursday morning. Linh: Then I will finish the budget slides today. Mark: Great. I will update the timeline and send it to everyone before noon.',
@@ -2806,7 +2817,7 @@ async function main() {
       bilingualContent: {
         mode: 'DIALOGUE',
         track: 'GENERAL_ENGLISH',
-        levels: ['B2'],
+        levels: ['INTERMEDIATE'],
         topics: ['Dịch vụ khách hàng', 'Giải quyết vấn đề'],
         accents: ['US'],
         durationMinutes: 18,
@@ -2816,7 +2827,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'My package was supposed to arrive yesterday, but the tracking page has not changed. I am sorry about that. I can see that the delivery was delayed because of severe weather. Will it arrive tomorrow? Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
@@ -2865,7 +2876,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'My package was supposed to arrive yesterday, but the tracking page has not changed. I am sorry about that. I can see that the delivery was delayed because of severe weather. Will it arrive tomorrow? Yes. It is scheduled for delivery before 6 P.M., and I have sent you a confirmation email.',
@@ -2919,12 +2930,17 @@ async function main() {
   for (const definition of practiceQuizDefinitions.filter(
     (item) => item.id < 23,
   )) {
+    const practiceLevel = skillPracticeLevelForQuiz(
+      definition.type as keyof typeof QuizType,
+      definition.title,
+    );
     const quiz = await prisma.quiz.upsert({
       where: { id: definition.id },
       update: {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -2937,6 +2953,7 @@ async function main() {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -3013,7 +3030,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'The shop opens at nine o’clock.',
             text: 'When does the shop open?',
@@ -3031,7 +3048,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'US',
             audioText: 'Please put the books on the table by the window.',
             text: 'Where should the books be placed?',
@@ -3054,7 +3071,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'I’d like two bottles of water, please.',
             text: 'What does the speaker want?',
@@ -3078,7 +3095,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'US',
             audioText: 'My bus arrives in five minutes.',
             text: 'What will arrive soon?',
@@ -3096,7 +3113,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'US',
             audioText:
               'The restroom is on the first floor, next to the elevator.',
@@ -3121,7 +3138,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'I usually have lunch at twelve thirty.',
             text: 'When does the speaker usually have lunch?',
@@ -3139,7 +3156,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'US',
             audioText: 'Today is cloudy, but it is not raining.',
             text: 'What is the weather like?',
@@ -3158,7 +3175,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A1',
+            level: 'STARTER',
             accent: 'UK',
             audioText: 'Please call me after dinner.',
             text: 'When should the listener call?',
@@ -3191,7 +3208,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'UK',
             audioText:
               'The train to Bristol will depart from platform three instead of platform five.',
@@ -3215,7 +3232,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText:
               'Your room is ready now, and breakfast is included in the price.',
@@ -3235,7 +3252,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'UK',
             audioText: 'Could I see your passport and boarding pass, please?',
             text: 'What is the listener asked to show?',
@@ -3259,7 +3276,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText:
               'We are fully booked tonight, but a room is available tomorrow.',
@@ -3279,7 +3296,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'UK',
             audioText:
               'The museum ticket includes a guided tour at two o’clock.',
@@ -3304,7 +3321,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'Please return the rental car with a full tank of fuel.',
             text: 'What should the customer do before returning the car?',
@@ -3328,7 +3345,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'UK',
             audioText:
               'The flight has been delayed by forty minutes because of strong winds.',
@@ -3352,7 +3369,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'A2',
+            level: 'BASIC',
             accent: 'US',
             audioText: 'You can collect your luggage from carousel six.',
             text: 'Where should the listener go?',
@@ -3386,7 +3403,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'I’ve moved our weekly meeting to Thursday because the sales director will be visiting on Wednesday.',
@@ -3412,7 +3429,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'Please review the contract before lunch so I can send it to the client this afternoon.',
@@ -3436,7 +3453,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'The technician fixed the network issue, but we still need to restart all the meeting-room computers.',
@@ -3462,7 +3479,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'We received 120 applications, and the hiring team has selected twelve people for interviews next week.',
@@ -3482,7 +3499,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'I can finish the report today if accounting sends me the final expense figures by three.',
@@ -3508,7 +3525,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'The supplier offered a five-percent discount if we increase the order to five hundred units.',
@@ -3533,7 +3550,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'Because Friday’s workshop is full, we’ve added another session next Monday morning.',
@@ -3558,7 +3575,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'Could you update the customer list and remove anyone who has already canceled their subscription?',
@@ -3594,7 +3611,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'I expected the prototype to be ready today, but the design team says they need another forty-eight hours to test the new material. I’d rather delay the presentation than show the client something unfinished.',
@@ -3620,7 +3637,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'We could renew the current lease, but the landlord’s proposed increase would make the new office across town almost the same price. Since the new place is twice as large, we should at least inspect it before deciding.',
@@ -3645,7 +3662,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'The survey response rate is only thirty percent. Instead of sending another general reminder, let’s ask department managers to mention it during tomorrow’s team meetings.',
@@ -3670,7 +3687,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'Our afternoon train arrives only twenty minutes before the conference begins. Even a small delay could make us late, so I think the morning train is safer despite the earlier departure.',
@@ -3695,7 +3712,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'The client liked the proposal overall, but she asked for clearer cost estimates before signing anything. If finance can update the numbers today, I think we can close the deal this week.',
@@ -3721,7 +3738,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'We’ve had fewer support tickets since the tutorial videos went online. Let’s translate the three most popular videos next, because international users still ask many of the same questions.',
@@ -3747,7 +3764,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'US',
             audioText:
               'I know the cheaper printer has lower running costs, but it can only handle half our monthly volume. Buying it would probably mean replacing it sooner, so the more expensive model may be better value over time.',
@@ -3773,7 +3790,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'LISTENING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             accent: 'UK',
             audioText:
               'The training room is available Friday, but several new employees won’t start until Monday. If we wait until Tuesday, everyone can attend the same session and we won’t need to repeat it.',
@@ -3810,7 +3827,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'A1',
+            level: 'STARTER',
             questionType: 'DETAIL',
             passage:
               'NOTICE: The community center opens at 8 A.M. Monday to Friday and at 9 A.M. on Saturday. It is closed on Sunday.',
@@ -3824,7 +3841,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'A1',
+            level: 'STARTER',
             questionType: 'DETAIL',
             passage:
               'NOTICE: The community center opens at 8 A.M. Monday to Friday and at 9 A.M. on Saturday. It is closed on Sunday.',
@@ -3838,7 +3855,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'A2',
+            level: 'BASIC',
             questionType: 'DETAIL',
             passage:
               'EMAIL: Hi Sam, The study group will meet in Room 204 instead of the library today because the library is hosting an event. We’ll start at the usual time, 4:30 P.M. Please bring your notes from Chapter 6. — Maya',
@@ -3857,7 +3874,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'A2',
+            level: 'BASIC',
             questionType: 'INFERENCE',
             passage:
               'EMAIL: Hi Sam, The study group will meet in Room 204 instead of the library today because the library is hosting an event. We’ll start at the usual time, 4:30 P.M. Please bring your notes from Chapter 6. — Maya',
@@ -3887,7 +3904,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'MAIN_IDEA',
             passage:
               'MEMO: Beginning next month, employees who use company bicycles must reserve them through the staff portal. Reservations can be made up to three days in advance. Helmets will continue to be available at reception, and there is no charge for using a bicycle. The new system is intended to reduce scheduling conflicts during busy periods.',
@@ -3906,7 +3923,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'MEMO: Beginning next month, employees who use company bicycles must reserve them through the staff portal. Reservations can be made up to three days in advance. Helmets will continue to be available at reception, and there is no charge for using a bicycle. The new system is intended to reduce scheduling conflicts during busy periods.',
@@ -3920,7 +3937,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'PURPOSE',
             passage:
               'MEMO: Beginning next month, employees who use company bicycles must reserve them through the staff portal. Reservations can be made up to three days in advance. Helmets will continue to be available at reception, and there is no charge for using a bicycle. The new system is intended to reduce scheduling conflicts during busy periods.',
@@ -3939,7 +3956,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'ARTICLE: A small neighborhood bakery recently introduced online ordering. Before the change, customers often had to wait in line during the morning rush. Now, many regular customers place orders on their phones and collect them from a separate counter. The owner says wait times have fallen and staff can prepare popular items more efficiently.',
@@ -3958,7 +3975,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'ARTICLE: A small neighborhood bakery recently introduced online ordering. Before the change, customers often had to wait in line during the morning rush. Now, many regular customers place orders on their phones and collect them from a separate counter. The owner says wait times have fallen and staff can prepare popular items more efficiently.',
@@ -3977,7 +3994,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             questionType: 'VOCAB_IN_CONTEXT',
             passage:
               'ARTICLE: A small neighborhood bakery recently introduced online ordering. Before the change, customers often had to wait in line during the morning rush. Now, many regular customers place orders on their phones and collect them from a separate counter. The owner says wait times have fallen and staff can prepare popular items more efficiently.',
@@ -4002,7 +4019,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'MAIN_IDEA',
             passage:
               'EMAIL: Team, The pilot mentoring program has produced encouraging results, especially among employees in their first year. Participants reported greater confidence in handling client meetings, and managers observed fewer onboarding questions after the third month. However, only 40 percent of eligible employees joined the pilot. Before expanding the program company-wide, we should simplify registration and explain the time commitment more clearly. Please send suggestions by Friday.',
@@ -4021,7 +4038,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'EMAIL: Team, The pilot mentoring program has produced encouraging results, especially among employees in their first year. Participants reported greater confidence in handling client meetings, and managers observed fewer onboarding questions after the third month. However, only 40 percent of eligible employees joined the pilot. Before expanding the program company-wide, we should simplify registration and explain the time commitment more clearly. Please send suggestions by Friday.',
@@ -4041,7 +4058,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'INFERENCE',
             passage:
               'EMAIL: Team, The pilot mentoring program has produced encouraging results, especially among employees in their first year. Participants reported greater confidence in handling client meetings, and managers observed fewer onboarding questions after the third month. However, only 40 percent of eligible employees joined the pilot. Before expanding the program company-wide, we should simplify registration and explain the time commitment more clearly. Please send suggestions by Friday.',
@@ -4061,7 +4078,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'REPORT EXCERPT: During the first quarter, online sales increased by 18 percent while in-store sales remained nearly unchanged. The largest online growth came from returning customers using the new mobile checkout. Delivery complaints also decreased after the company added estimated arrival times to order-confirmation messages. Management plans to test the mobile checkout in two additional markets next quarter.',
@@ -4081,7 +4098,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'DETAIL',
             passage:
               'REPORT EXCERPT: During the first quarter, online sales increased by 18 percent while in-store sales remained nearly unchanged. The largest online growth came from returning customers using the new mobile checkout. Delivery complaints also decreased after the company added estimated arrival times to order-confirmation messages. Management plans to test the mobile checkout in two additional markets next quarter.',
@@ -4101,7 +4118,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             questionType: 'INFERENCE',
             passage:
               'REPORT EXCERPT: During the first quarter, online sales increased by 18 percent while in-store sales remained nearly unchanged. The largest online growth came from returning customers using the new mobile checkout. Delivery complaints also decreased after the company added estimated arrival times to order-confirmation messages. Management plans to test the mobile checkout in two additional markets next quarter.',
@@ -4132,7 +4149,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'MAIN_IDEA',
             passage:
               'ARTICLE: Organizations often assume that adding more communication channels improves collaboration. In practice, the opposite can occur when employees must monitor email, messaging platforms, project boards, and video calls simultaneously. The problem is not the number of tools alone but the absence of shared expectations about which channel should be used for which purpose. Teams that define clear communication norms often respond more quickly while experiencing fewer interruptions. Therefore, technology investment should be accompanied by deliberate decisions about communication behavior.',
@@ -4152,7 +4169,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'INFERENCE',
             passage:
               'ARTICLE: Organizations often assume that adding more communication channels improves collaboration. In practice, the opposite can occur when employees must monitor email, messaging platforms, project boards, and video calls simultaneously. The problem is not the number of tools alone but the absence of shared expectations about which channel should be used for which purpose. Teams that define clear communication norms often respond more quickly while experiencing fewer interruptions. Therefore, technology investment should be accompanied by deliberate decisions about communication behavior.',
@@ -4172,7 +4189,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'PURPOSE',
             passage:
               'ARTICLE: Organizations often assume that adding more communication channels improves collaboration. In practice, the opposite can occur when employees must monitor email, messaging platforms, project boards, and video calls simultaneously. The problem is not the number of tools alone but the absence of shared expectations about which channel should be used for which purpose. Teams that define clear communication norms often respond more quickly while experiencing fewer interruptions. Therefore, technology investment should be accompanied by deliberate decisions about communication behavior.',
@@ -4191,7 +4208,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'INFERENCE',
             passage:
               'MEMO: Our pilot four-day workweek maintained overall output, but the aggregate figure hides important differences between teams. Customer support handled the same number of cases but reported higher pressure on peak days, whereas product design reduced meeting time and completed slightly more project work. Before considering a broader rollout, we need team-level scheduling models rather than a single company-wide template. The next pilot should also measure service quality and employee recovery, not productivity alone.',
@@ -4211,7 +4228,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'DETAIL',
             passage:
               'MEMO: Our pilot four-day workweek maintained overall output, but the aggregate figure hides important differences between teams. Customer support handled the same number of cases but reported higher pressure on peak days, whereas product design reduced meeting time and completed slightly more project work. Before considering a broader rollout, we need team-level scheduling models rather than a single company-wide template. The next pilot should also measure service quality and employee recovery, not productivity alone.',
@@ -4231,7 +4248,7 @@ async function main() {
           type: 'MULTIPLE_CHOICE',
           content: {
             skill: 'READING',
-            level: 'C1',
+            level: 'ADVANCED',
             questionType: 'DETAIL',
             passage:
               'MEMO: Our pilot four-day workweek maintained overall output, but the aggregate figure hides important differences between teams. Customer support handled the same number of cases but reported higher pressure on peak days, whereas product design reduced meeting time and completed slightly more project work. Before considering a broader rollout, we need team-level scheduling models rather than a single company-wide template. The next pilot should also measure service quality and employee recovery, not productivity alone.',
@@ -4260,7 +4277,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'A2',
+            level: 'BASIC',
             taskType: 'SHORT_MESSAGE',
             prompt:
               'Bạn đến trễ 15 phút cho một buổi học nhóm. Viết 40–60 từ nhắn cho bạn cùng nhóm: xin lỗi, giải thích ngắn gọn và cho biết giờ bạn sẽ đến.',
@@ -4280,7 +4297,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'A2',
+            level: 'BASIC',
             taskType: 'EMAIL',
             prompt:
               'Viết 50–70 từ cho khách sạn để xác nhận bạn sẽ đến sau 9 P.M. và hỏi liệu lễ tân còn mở không.',
@@ -4300,7 +4317,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'A2',
+            level: 'BASIC',
             taskType: 'INVITATION',
             prompt:
               'Viết 50–70 từ mời một người bạn tham gia hoạt động cuối tuần. Nêu địa điểm, thời gian và một lý do nên tham gia.',
@@ -4320,7 +4337,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'A2',
+            level: 'BASIC',
             taskType: 'REQUEST',
             prompt:
               'Viết 40–60 từ gửi bộ phận hỗ trợ của khoá học về một tài liệu bạn không mở được.',
@@ -4344,7 +4361,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'A2',
+            level: 'BASIC',
             taskType: 'THANK_YOU',
             prompt:
               'Viết 50–70 từ cảm ơn một đồng nghiệp đã giúp bạn hoàn thành nhiệm vụ.',
@@ -4375,7 +4392,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             taskType: 'EMAIL',
             prompt:
               'Bạn có cuộc họp với chị Hà (trưởng nhóm) lúc 2 P.M. thứ Năm, nhưng bạn có lịch khám bác sĩ đúng giờ đó. Viết email 100–140 từ xin đổi lịch: nêu lý do, đề xuất hai giờ thay thế và đề nghị chị xác nhận.',
@@ -4399,7 +4416,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             taskType: 'STATUS_UPDATE',
             prompt:
               'Bạn phụ trách dự án làm lại website của công ty. Viết email 110–150 từ gửi quản lý cập nhật tiến độ: hai việc đã xong (thiết kế trang chủ, khảo sát người dùng), một việc đang chậm (ảnh sản phẩm, do nhà cung cấp giao trễ) và kế hoạch xử lý kèm ngày mới.',
@@ -4419,7 +4436,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             taskType: 'CUSTOMER_EMAIL',
             prompt:
               'Một khách hàng hỏi khi nào đơn hàng #BT2048 (đặt hôm thứ Hai) sẽ đến. Viết email 100–140 từ trả lời: nêu trạng thái đơn hàng, ngày giao dự kiến và cách theo dõi đơn.',
@@ -4439,7 +4456,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             taskType: 'INFORMATION_REQUEST',
             prompt:
               'Bạn muốn tham gia workshop "Thuyết trình bằng tiếng Anh" vào thứ Bảy tới. Viết email 100–140 từ cho ban tổ chức để hỏi về học phí, địa điểm và những gì cần chuẩn bị trước.',
@@ -4463,7 +4480,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B1',
+            level: 'INTERMEDIATE',
             taskType: 'MEETING_FOLLOWUP',
             prompt:
               'Sau cuộc họp nhóm sáng nay, cả nhóm quyết định dời ngày ra mắt sản phẩm sang 15/11. Viết email 120–150 từ gửi đồng nghiệp: tóm tắt quyết định và nêu ba việc cần làm, mỗi việc có người phụ trách và hạn chót.',
@@ -4497,7 +4514,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             taskType: 'OPINION',
             prompt:
               'Một công ty đang cân nhắc cho nhân viên làm việc từ xa ba ngày mỗi tuần. Viết 180–220 từ nêu quan điểm, hai lợi ích/rủi ro và đề xuất chính sách phù hợp.',
@@ -4521,7 +4538,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'B2',
+            level: 'INTERMEDIATE',
             taskType: 'PROPOSAL',
             prompt:
               'Viết 180–220 từ đề xuất cách giảm số cuộc họp không cần thiết trong một nhóm dự án mà vẫn giữ thông tin minh bạch.',
@@ -4545,7 +4562,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'C1',
+            level: 'ADVANCED',
             taskType: 'ANALYTICAL_RESPONSE',
             prompt:
               'Viết 200–250 từ phản hồi một báo cáo cho thấy khách hàng hài lòng với sản phẩm nhưng phàn nàn về thời gian hỗ trợ. Phân tích nguyên nhân có thể và đề xuất hai giải pháp.',
@@ -4569,7 +4586,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'C1',
+            level: 'ADVANCED',
             taskType: 'ARGUMENT',
             prompt:
               'Viết 220–280 từ: doanh nghiệp nên ưu tiên đào tạo kỹ năng chuyên môn hay kỹ năng giao tiếp cho nhân viên mới? Nêu quan điểm có cân nhắc mặt đối lập.',
@@ -4594,7 +4611,7 @@ async function main() {
           type: 'WRITING',
           content: {
             skill: 'WRITING',
-            level: 'C1',
+            level: 'ADVANCED',
             taskType: 'PROPOSAL',
             prompt:
               'Viết 200–250 từ đề xuất cách một nền tảng tự học có thể giúp người học duy trì thói quen mà không làm gamification lấn át mục tiêu học tập.',
@@ -4619,12 +4636,17 @@ async function main() {
     },
   ];
   for (const definition of skillExpansionQuizDefinitions) {
+    const practiceLevel = skillPracticeLevelForQuiz(
+      definition.type as keyof typeof QuizType,
+      definition.title,
+    );
     const quiz = await prisma.quiz.upsert({
       where: { id: definition.id },
       update: {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -4637,6 +4659,7 @@ async function main() {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -5134,12 +5157,17 @@ async function main() {
   for (const definition of practiceQuizDefinitions.filter(
     (item) => item.id >= 23,
   )) {
+    const practiceLevel = skillPracticeLevelForQuiz(
+      definition.type as keyof typeof QuizType,
+      definition.title,
+    );
     const quiz = await prisma.quiz.upsert({
       where: { id: definition.id },
       update: {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -5150,6 +5178,7 @@ async function main() {
         title: definition.title,
         description: definition.description,
         type: QuizType[definition.type as keyof typeof QuizType],
+        ...(practiceLevel ? { practiceLevel } : {}),
         timeLimit: definition.timeLimit,
         practiceTopicId: definition.practiceTopicId,
         bilingualContent:
@@ -5165,7 +5194,7 @@ async function main() {
             ...createDictationQuestions(
               String(
                 (definition.questions[0]?.content as { level?: string })
-                  ?.level ?? 'A1',
+                  ?.level ?? 'STARTER',
               ),
               String(
                 (definition.questions[0]?.content as { accent?: string })
@@ -5270,14 +5299,14 @@ async function main() {
   // conversation quizzes 23+ are appended above), so a fresh database gets
   // all audio on the first run.
   // Listening practice audio is materialized once in R2 and relinked on every
-  // canonical seed from prisma/seed-data/practice-media.json, a read-only
+  // canonical seed from prisma/data/practice-media.json, a read-only
   // export of the keys that really exist (scripts/export-seed-media-manifest.ts).
   // B1+ quizzes keep their audio under private `premium/` keys, served only as
   // signed URLs, so their stored url stays ''. The seed never invokes TTS and
   // never guesses a public key: a premium quiz that would end up with a public
   // active asset stops the seed instead of silently exposing the audio.
   const practiceMedia = JSON.parse(
-    readFileSync(join(__dirname, 'seed-data', 'practice-media.json'), 'utf8'),
+    readFileSync(join(__dirname, 'data', 'practice-media.json'), 'utf8'),
   ) as PracticeMediaManifest;
   const manifestAssetsByQuestion = new Map<
     number,
@@ -5299,8 +5328,11 @@ async function main() {
   });
   const premiumListeningQuizIds = new Set<number>();
   for (const question of seededListeningQuestions) {
-    const range = parseCefrRange(question.quiz.title);
-    if (range && practiceRequiresPlus(range)) {
+    const level = legacyPracticeLevel(question.quiz.title);
+    if (
+      level &&
+      practiceLevelRank(level) >= practiceLevelRank('INTERMEDIATE')
+    ) {
       premiumListeningQuizIds.add(question.quizId);
     }
   }
@@ -5313,7 +5345,7 @@ async function main() {
     const assets = manifestAssetsByQuestion.get(question.id) ?? [];
     if (assets.length === 0) {
       throw new Error(
-        `Listening question ${question.id} (quiz ${question.quizId}) has audio text but no entry in prisma/seed-data/practice-media.json`,
+        `Listening question ${question.id} (quiz ${question.quizId}) has audio text but no entry in prisma/data/practice-media.json`,
       );
     }
     for (const asset of assets) {
@@ -5458,31 +5490,31 @@ async function main() {
       title: 'Read Aloud A1 — Daily Schedule',
       targetText:
         'The library opens at eight o’clock and closes at six in the evening.',
-      difficulty: 'BEGINNER',
+      difficulty: 'STARTER',
     },
     {
       title: 'Read Aloud A1 — Weather',
       targetText:
         'It will be sunny this morning, but light rain is expected after lunch.',
-      difficulty: 'BEGINNER',
+      difficulty: 'STARTER',
     },
     {
       title: 'Read Aloud A2 — Appointment',
       targetText:
         'Your appointment is scheduled for Thursday, September seventeenth, at two thirty in the afternoon.',
-      difficulty: 'BEGINNER',
+      difficulty: 'BASIC',
     },
     {
       title: 'Read Aloud A2 — Travel',
       targetText:
         'Passengers for Flight 318 should proceed to Gate 12 with their boarding passes ready.',
-      difficulty: 'BEGINNER',
+      difficulty: 'BASIC',
     },
     {
       title: 'Read Aloud A2 — Store Notice',
       targetText:
         'Customers may return unused items within thirty days if they have the original receipt.',
-      difficulty: 'BEGINNER',
+      difficulty: 'BASIC',
     },
     {
       title: 'Read Aloud B1 — Office Announcement',
@@ -5506,13 +5538,13 @@ async function main() {
       title: 'Read Aloud B2 — Training',
       targetText:
         'Employees who wish to attend the leadership workshop should register online before Friday and obtain approval from their department manager.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'Read Aloud B2 — Customer Policy',
       targetText:
         'To improve response times, customer requests received after five p.m. will be reviewed at the beginning of the next business day.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'Pronunciation — Final Consonants',
@@ -5547,12 +5579,12 @@ async function main() {
     {
       title: 'Question Response A2 — Weekend',
       targetText: 'What do you usually do on weekends?',
-      difficulty: 'BEGINNER',
+      difficulty: 'BASIC',
     },
     {
       title: 'Question Response A2 — Transport',
       targetText: 'How do you normally travel to school or work?',
-      difficulty: 'BEGINNER',
+      difficulty: 'BASIC',
     },
     {
       title: 'Question Response B1 — Study Habit',
@@ -5569,7 +5601,7 @@ async function main() {
       title: 'Question Response B2 — Customer Service',
       targetText:
         'What should a company do when a customer receives a damaged product?',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'Opinion B1 — Online Learning',
@@ -5587,13 +5619,13 @@ async function main() {
       title: 'Opinion B2 — Remote Work',
       targetText:
         'Should employees be allowed to work remotely several days each week? Support your opinion.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'Opinion B2 — Training',
       targetText:
         'Is professional training more effective during work hours or outside work hours? Explain.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'TOEIC Speaking — Read Aloud 1',
@@ -5623,15 +5655,15 @@ async function main() {
       title: 'TOEIC Speaking — Information Response',
       targetText:
         'A seminar schedule shows registration at 9:00, a presentation at 10:00, lunch at 12:30, and a workshop at 2:00. Explain the afternoon schedule.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
     {
       title: 'TOEIC Speaking — Express Opinion',
       targetText:
         'Do you think companies should provide employees with free language training? Give reasons and examples.',
-      difficulty: 'ADVANCED',
+      difficulty: 'INTERMEDIATE',
     },
-  ];
+  ] as const;
   const seminarStimulus = await prisma.speakingStimulus.upsert({
     where: { id: 1 },
     update: {
@@ -5687,7 +5719,7 @@ async function main() {
   // Speaking practice sets (Checkpoint 51 grouping, prisma/data/
   // speaking-practice-sets.ts): one task type and one level group per set, at
   // least five tasks, the original extra tasks at their fixed ids. Reference
-  // audio comes from prisma/seed-data/practice-media.json; a premium (B1+)
+  // audio comes from prisma/data/practice-media.json; a premium (B1+)
   // task must use a private premium/ key, so a public one stops the seed.
   await prisma.$executeRaw`
     SELECT setval(
@@ -5700,7 +5732,7 @@ async function main() {
     const key = practiceMedia.speakingAudio[String(id)];
     if (!key) {
       throw new Error(
-        `Speaking task ${id} has no reference audio in prisma/seed-data/practice-media.json`,
+        `Speaking task ${id} has no reference audio in prisma/data/practice-media.json`,
       );
     }
     const isPrivate = key.startsWith('premium/');
@@ -5712,9 +5744,8 @@ async function main() {
     return isPrivate ? key : seedAssetUrl(key);
   };
   for (const set of SPEAKING_PRACTICE_SETS) {
-    const range = parseCefrRange(set.level)!;
-    const premium = practiceRequiresPlus(range);
-    const difficulty = SPEAKING_SET_DIFFICULTY[levelGroup(range)!];
+    const premium = set.level === 'INTERMEDIATE' || set.level === 'ADVANCED';
+    const difficulty = set.level;
     const setData = {
       title: set.title,
       description: set.description,
@@ -6914,7 +6945,7 @@ async function main() {
   const grammarTopics = [
     {
       title: 'Present Simple & Adverbs of Frequency',
-      level: 'BEGINNER',
+      level: 'BASIC',
       description: 'Thói quen, sự thật và lịch trình cố định.',
       keyFormula: 'S + V(s/es); do/does; always/usually/often/sometimes/never',
       questions: [
@@ -6952,7 +6983,7 @@ async function main() {
     },
     {
       title: 'Past Simple & Time Expressions',
-      level: 'BEGINNER',
+      level: 'BASIC',
       description: 'Hành động đã kết thúc trong quá khứ.',
       keyFormula: 'S + V2/V-ed; did + V; yesterday/last/ago',
       questions: [
@@ -7028,7 +7059,7 @@ async function main() {
     },
     {
       title: 'Future Forms',
-      level: 'BEGINNER',
+      level: 'BASIC',
       description: 'Kế hoạch, dự đoán và lịch tương lai.',
       keyFormula:
         'will + V; be going to + V; present continuous for arrangements',
@@ -11773,16 +11804,30 @@ async function main() {
         ],
       },
     },
-    select: { id: true, title: true, isPremiumContent: true },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      practiceLevel: true,
+      isPremiumContent: true,
+      bilingualContent: true,
+    },
   });
   for (const quiz of standalonePracticeQuizzes) {
-    const range = parseCefrRange(quiz.title);
-    if (!range) continue;
-    const premium = practiceRequiresPlus(range);
-    if (quiz.isPremiumContent !== premium) {
+    const practiceLevel = legacyPracticeLevel(quiz.title);
+    if (!practiceLevel) continue;
+    // The stored flag keeps its old meaning, "B1 and above" (practiceRequiresPlus
+    // before 2026-11-27): Trung cấp and above, for every skill. Access itself
+    // comes from requiredPracticePlan at run time.
+    const premium =
+      practiceLevelRank(practiceLevel) >= practiceLevelRank('INTERMEDIATE');
+    if (
+      quiz.isPremiumContent !== premium ||
+      quiz.practiceLevel !== practiceLevel
+    ) {
       await prisma.quiz.update({
         where: { id: quiz.id },
-        data: { isPremiumContent: premium },
+        data: { isPremiumContent: premium, practiceLevel },
       });
     }
   }

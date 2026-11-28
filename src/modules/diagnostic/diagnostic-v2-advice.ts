@@ -1,3 +1,5 @@
+import type { PracticeLevel } from '@prisma/client';
+
 /**
  * D1 advice for FOUR_SKILL_PLACEMENT_V2 (DEF-004 decided as D1: advisory
  * scores and evidence-based advice, never a named level).
@@ -38,8 +40,8 @@ export type ResolvedResource = ResourceRef & {
   lockedBy?: 'LEVEL' | 'PLAN' | null;
   /** Speaking: the practice set the exercise belongs to (the catalog unit). */
   setKey?: string | null;
-  /** Speaking: the set's authored CEFR level, for the display title. */
-  cefrLevel?: string | null;
+  /** Speaking: the set's practice level, for the display title. */
+  practiceLevel?: PracticeLevel | null;
 };
 
 export type ResourceResolver = (ref: ResourceRef) => ResolvedResource | null;

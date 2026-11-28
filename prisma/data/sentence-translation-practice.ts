@@ -25,7 +25,7 @@ export type TranslationSentenceSeed = {
 export type TranslationExerciseSeed = {
   title: string;
   description: string;
-  level: 'A1' | 'A2';
+  level: 'STARTER' | 'BASIC';
   sentences: TranslationSentenceSeed[];
 };
 
@@ -36,7 +36,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Gia đình (A1)',
     description:
       'Dịch sáu câu ngắn về gia đình sang tiếng Anh: động từ "be", "have" và tính từ sở hữu.',
-    level: 'A1',
+    level: 'STARTER',
     sentences: [
       {
         vi: 'Tôi có một người anh trai.',
@@ -103,7 +103,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Thói quen hằng ngày (A1)',
     description:
       'Dịch sáu câu về một ngày bình thường: thì hiện tại đơn, giờ giấc và trạng từ tần suất.',
-    level: 'A1',
+    level: 'STARTER',
     sentences: [
       {
         vi: 'Tôi thức dậy lúc sáu giờ.',
@@ -187,7 +187,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Đồ ăn (A1)',
     description:
       'Dịch sáu câu về món ăn và bữa ăn: "there is/are", số nhiều và câu hỏi "Do you...?".',
-    level: 'A1',
+    level: 'STARTER',
     sentences: [
       {
         vi: 'Tôi thích ăn cơm với cá.',
@@ -259,7 +259,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Ở trường (A1)',
     description:
       'Dịch sáu câu về lớp học: "has/have", giới từ chỉ thời gian và vị trí, "đang" và "không được".',
-    level: 'A1',
+    level: 'STARTER',
     sentences: [
       {
         vi: 'Lớp học của tôi có ba mươi học sinh.',
@@ -346,7 +346,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Mua sắm (A2)',
     description:
       'Dịch sáu câu khi đi mua sắm: quá khứ đơn, tương lai với "will", so sánh hơn và so sánh nhất.',
-    level: 'A2',
+    level: 'BASIC',
     sentences: [
       {
         vi: 'Hôm qua tôi đã mua một đôi giày mới.',
@@ -439,7 +439,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Du lịch (A2)',
     description:
       'Dịch sáu câu về chuyến đi: quá khứ đơn, "will", so sánh hơn, "should" và "may".',
-    level: 'A2',
+    level: 'BASIC',
     sentences: [
       {
         vi: 'Năm ngoái chúng tôi đã đi Đà Nẵng.',
@@ -533,7 +533,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Công việc (A2)',
     description:
       'Dịch sáu câu ở nơi làm việc: hiện tại hoàn thành, "will", "have to", so sánh hơn và lời nhờ lịch sự.',
-    level: 'A2',
+    level: 'BASIC',
     sentences: [
       {
         vi: 'Chị ấy đã làm việc ở công ty này ba năm.',
@@ -622,7 +622,7 @@ export const SENTENCE_TRANSLATION_EXERCISES: TranslationExerciseSeed[] = [
     title: 'Dịch câu: Sức khỏe (A2)',
     description:
       'Dịch sáu câu về sức khỏe: hiện tại hoàn thành với "since", "should", "tell sb to", V-ing làm chủ ngữ và câu "if".',
-    level: 'A2',
+    level: 'BASIC',
     sentences: [
       {
         vi: 'Tôi bị đau đầu từ sáng nay.',

@@ -174,6 +174,7 @@ describe('ReadingService', () => {
         title: 'Reading A2 — Notices',
         description: 'Read short notices.',
         type: 'BILINGUAL_READING',
+        practiceLevel: 'BASIC',
         practiceTopicId: 4,
         isPremiumContent: false,
         timeLimit: 15,
@@ -184,8 +185,8 @@ describe('ReadingService', () => {
           order: 4,
         },
         questions: [
-          { id: 11, content: { level: 'A2', questionType: 'DETAIL' } },
-          { id: 12, content: { level: 'A2', questionType: 'PURPOSE' } },
+          { id: 11, content: { level: 'BASIC', questionType: 'DETAIL' } },
+          { id: 12, content: { level: 'BASIC', questionType: 'PURPOSE' } },
         ],
       },
       {
@@ -193,6 +194,7 @@ describe('ReadingService', () => {
         title: 'Reading B1 — Practical English',
         description: null,
         type: 'BILINGUAL_READING',
+        practiceLevel: 'INTERMEDIATE',
         practiceTopicId: 5,
         isPremiumContent: true,
         timeLimit: 20,
@@ -203,7 +205,10 @@ describe('ReadingService', () => {
           order: 5,
         },
         questions: [
-          { id: 13, content: { level: 'B1', questionType: 'DETAIL' } },
+          {
+            id: 13,
+            content: { level: 'INTERMEDIATE', questionType: 'DETAIL' },
+          },
         ],
       },
     ]);
@@ -237,7 +242,7 @@ describe('ReadingService', () => {
       }),
       expect.objectContaining({
         quizId: 13,
-        level: 'B1',
+        level: 'INTERMEDIATE',
         completionStatus: 'NOT_STARTED',
         isPremiumContent: true,
         isLocked: true,
@@ -250,14 +255,14 @@ describe('ReadingService', () => {
     expect(result[0]).not.toHaveProperty('explanation');
   });
 
-  it('resolves authoritative CEFR levels for reading topics', () => {
-    expect(resolveReadingTopicLevel('Reading A1–A2')).toBe('BEGINNER');
-    expect(resolveReadingTopicLevel('Reading A1-A2')).toBe('BEGINNER');
+  it('resolves authoritative practice levels for reading topics', () => {
+    expect(resolveReadingTopicLevel('Reading A1–A2')).toBe('STARTER');
+    expect(resolveReadingTopicLevel('Reading A1-A2')).toBe('STARTER');
     expect(resolveReadingTopicLevel('Reading B1–B2')).toBe('INTERMEDIATE');
     expect(resolveReadingTopicLevel('Reading B1-B2')).toBe('INTERMEDIATE');
     expect(resolveReadingTopicLevel('Reading C1')).toBe('ADVANCED');
     expect(resolveReadingTopicLevel('Reading C2')).toBe('ADVANCED');
-    expect(resolveReadingTopicLevel('General Reading')).toBe('BEGINNER');
+    expect(resolveReadingTopicLevel('General Reading')).toBe('BASIC');
   });
 
   it('derives Reading subskills, mistakes, trend and a deterministic recommendation from completed submissions', async () => {

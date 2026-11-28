@@ -19,6 +19,21 @@ class FakeRedis {
     this.store.delete(key);
     return Promise.resolve(1);
   }
+  sets = new Map<string, Set<string>>();
+  ttl = new Map<string, number>();
+  smembers(key: string) {
+    return Promise.resolve([...(this.sets.get(key) ?? [])]);
+  }
+  sadd(key: string, ...members: (string | number)[]) {
+    const set = this.sets.get(key) ?? new Set<string>();
+    for (const m of members) set.add(String(m));
+    this.sets.set(key, set);
+    return Promise.resolve(members.length);
+  }
+  expire(key: string, seconds: number) {
+    this.ttl.set(key, seconds);
+    return Promise.resolve(1);
+  }
   /** The lock release script only: delete KEYS[1] while it holds ARGV[1]. */
   eval(_script: string, _n: number, key: string, owner: string) {
     if (this.store.get(key) !== owner) return Promise.resolve(0);
@@ -67,6 +82,11 @@ describe('WordBlasterService', () => {
   };
   let service: WordBlasterService;
   let now: number;
+  let prisma: {
+    dictionaryEntry: { findMany: jest.Mock };
+    pointHistory: { aggregate: jest.Mock };
+    userVocabWordProgress: { findMany: jest.Mock };
+  };
 
   beforeEach(() => {
     redis = new FakeRedis();
@@ -90,11 +110,13 @@ describe('WordBlasterService', () => {
             Promise.resolve(xpFor(0)),
         ),
     };
-    const prisma = {
+    prisma = {
       dictionaryEntry: { findMany: jest.fn().mockResolvedValue(entries) },
       pointHistory: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { points: 0 } }),
       },
+      // The learner's hard flashcard words; none unless a test says so.
+      userVocabWordProgress: { findMany: jest.fn().mockResolvedValue([]) },
     };
     service = new WordBlasterService(
       prisma as never,
@@ -140,6 +162,20 @@ describe('WordBlasterService', () => {
     const again = await service.start(1, 50, 'copy');
     expect(again.sessionId).toBe(view.sessionId);
     expect(gamification.deductBanh).toHaveBeenCalledTimes(1);
+  });
+
+  it('a higher stake makes the blocks fall faster (owner 2026-11-27)', async () => {
+    // "copy" blocks fall for 9000 ms at the start of the plain game.
+    const low = await service.start(1, 20, 'copy');
+    expect(low.blocks[0].fallMs).toBe(9000);
+    const mid = await service.start(2, 50, 'copy');
+    expect(mid.blocks[0].fallMs).toBe(Math.round(9000 / 1.15));
+    const high = await service.start(3, 100, 'copy');
+    expect(high.blocks[0].fallMs).toBe(Math.round(9000 / 1.3));
+    // The blocks come at the same moments at every stake.
+    expect(high.blocks.map((b) => b.spawnAtMs)).toEqual(
+      low.blocks.map((b) => b.spawnAtMs),
+    );
   });
 
   it('only the owner can shoot', async () => {
@@ -212,6 +248,104 @@ describe('WordBlasterService', () => {
     await service.finish(1, view.sessionId, false);
     expect(gamification.awardBanh).toHaveBeenCalledTimes(2);
     expect(redis.store.has('blaster:user:1')).toBe(false);
+  });
+
+  describe("the learner's hard flashcard words (thesis supervisor 2026-11-26)", () => {
+    const hardRow = (entryId: number, lapses = 1) => ({
+      lapses,
+      easeFactor: 2.3,
+      intervalDays: 1,
+      nextReviewAt: new Date(0),
+      word: { entryId },
+    });
+
+    it('asks them in the game, marks their blocks, and the result counts them', async () => {
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        hardRow(3),
+        hardRow(7),
+        // The same entry in a second deck: asked once.
+        hardRow(7),
+        // A word of an unpublished deck: not in the pool, skipped.
+        hardRow(9_999),
+      ]);
+      const view = await service.start(1, 20, 'copy');
+      expect(prisma.userVocabWordProgress.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: 1,
+            intervalDays: { lt: 7 },
+            OR: [{ lapses: { gt: 0 } }, { easeFactor: { lt: 2.5 } }],
+          },
+        }),
+      );
+      const blocks = stored(view.sessionId).blocks;
+      const flagged = blocks.filter((b) => b.oftenForgotten);
+      expect(flagged.map((b) => b.word.id).sort()).toEqual([3, 7]);
+      expect(view.blocks.filter((b) => b.oftenForgotten)).toHaveLength(2);
+      expect(JSON.stringify(view)).not.toContain('meaningVi');
+
+      // Break one of the two hard words and nothing else, then let the rest land.
+      now = 1_000_000 + flagged[0].spawnAtMs + 100;
+      await service.shot(1, view.sessionId, flagged[0].answers[0]);
+      now = 1_000_000 + 10 * 60_000;
+      const last = await service.finish(1, view.sessionId, false);
+      expect(last.result?.hardWords).toEqual({ hit: 1, total: 2 });
+      expect(last.result).not.toHaveProperty('words');
+    });
+
+    it('puts each hard word into one game a learner day (rule B, owner 2026-11-27)', async () => {
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([
+        hardRow(3),
+        hardRow(7),
+      ]);
+      const flaggedOf = (id: string) =>
+        stored(id)
+          .blocks.filter((b) => b.oftenForgotten)
+          .map((b) => b.word.id);
+      const first = await service.start(1, 20, 'copy');
+      expect(flaggedOf(first.sessionId).sort()).toEqual([3, 7]);
+      now = 1_000_000 + 10 * 60_000;
+      await service.finish(1, first.sessionId, false);
+      // The same learner day: both wait for tomorrow.
+      const second = await service.start(1, 20, 'copy');
+      expect(flaggedOf(second.sessionId)).toEqual([]);
+      now += 10 * 60_000;
+      await service.finish(1, second.sessionId, false);
+      // Another learner has a record of their own.
+      const other = await service.start(2, 20, 'copy');
+      expect(flaggedOf(other.sessionId).sort()).toEqual([3, 7]);
+      now += 10 * 60_000;
+      await service.finish(2, other.sessionId, false);
+      // The next learner day they come back.
+      now += 86_400_000;
+      const third = await service.start(1, 20, 'copy');
+      expect(flaggedOf(third.sessionId).sort()).toEqual([3, 7]);
+    });
+
+    it('still asks them when the day record cannot be read', async () => {
+      prisma.userVocabWordProgress.findMany.mockResolvedValue([hardRow(3)]);
+      (redis as unknown as { smembers: () => Promise<string[]> }).smembers =
+        () => Promise.reject(new Error('redis busy'));
+      const view = await service.start(1, 20, 'copy');
+      expect(view.blocks.filter((b) => b.oftenForgotten)).toHaveLength(1);
+    });
+
+    it('a learner without hard words gets an ordinary game and a zero count', async () => {
+      const view = await service.start(1, 20, 'copy');
+      expect(view.blocks.some((b) => b.oftenForgotten)).toBe(false);
+      now = 1_000_000 + 10 * 60_000;
+      const last = await service.finish(1, view.sessionId, false);
+      expect(last.result?.hardWords).toEqual({ hit: 0, total: 0 });
+    });
+
+    it('still opens a game when the hard words cannot be read', async () => {
+      prisma.userVocabWordProgress.findMany.mockRejectedValue(
+        new Error('db busy'),
+      );
+      const view = await service.start(1, 20, 'copy');
+      expect(view.blocks).toHaveLength(20);
+      expect(view.blocks.some((b) => b.oftenForgotten)).toBe(false);
+    });
   });
 
   it('a wrong answer breaks nothing', async () => {

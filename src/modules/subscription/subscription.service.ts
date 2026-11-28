@@ -218,7 +218,13 @@ export class SubscriptionService {
         where: { userId, submittedAt: { gte: running.startsAt } },
         distinct: ['quizId'],
         select: {
-          quiz: { select: { type: true, title: true, bilingualContent: true } },
+          quiz: {
+            select: {
+              type: true,
+              practiceLevel: true,
+              bilingualContent: true,
+            },
+          },
         },
       }),
       this.prisma.speakingSubmission.findMany({
@@ -237,14 +243,14 @@ export class SubscriptionService {
       if (skill)
         items.push({
           skill,
-          levelSource: quiz.title,
+          level: quiz.practiceLevel,
           dictation: isDictationContent(quiz.bilingualContent),
         });
     }
     for (const { exercise } of speaking) {
       const set = exercise.practiceSet;
       if (set?.scope === 'SKILL_PRACTICE')
-        items.push({ skill: 'SPEAKING', levelSource: set.level });
+        items.push({ skill: 'SPEAKING', level: set.level });
     }
     return {
       isPaid: true,

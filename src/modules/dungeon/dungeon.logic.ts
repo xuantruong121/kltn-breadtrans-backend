@@ -20,6 +20,7 @@ import {
   meaningsClash,
   POS_VI,
 } from '../events/arena-questions.logic';
+import type { HardTally } from '../events/hard-words.logic';
 import {
   letterHint,
   normalizeAnswer,
@@ -308,6 +309,33 @@ export function monsterHit(floor: number, boss: boolean, t: Toppings): number {
   return Math.max(1, Math.round(raw * guard));
 }
 
+/**
+ * Low health (owner 2026-11-27: the game had no tense moment). At or under a
+ * quarter of health the learner fights "liều mạng": right answers hit harder,
+ * so a run about to end can still turn.
+ */
+export const DESPERATE_SHARE = 0.25;
+export const DESPERATE_BOOST = 1.3;
+export const isDesperate = (hp: number, maxHp: number) =>
+  hp > 0 && maxHp > 0 && hp / maxHp <= DESPERATE_SHARE;
+
+/**
+ * A boss winds up and strikes on every third question of its floor, and the
+ * page counts it down. A right answer on the strike breaks it and hits twice
+ * as hard; a miss costs one and a half hits. It depends only on the count of
+ * questions, so the day's dungeon stays the same for everyone.
+ */
+export const BOSS_STRIKE_EVERY = 3;
+export const STRIKE_BREAK_BOOST = 2;
+export const STRIKE_HIT_BOOST = 1.5;
+/** Questions before the boss strikes: 2, 1, then 0 on the strike itself; null off a boss floor. */
+export function strikeIn(boss: boolean, floorAnswered: number): number | null {
+  if (!boss) return null;
+  return (
+    BOSS_STRIKE_EVERY - 1 - (Math.max(0, floorAnswered) % BOSS_STRIKE_EVERY)
+  );
+}
+
 export const healOnCorrect = (t: Toppings) => 3 * level(t, 'sesame');
 export const shieldsPerFloor = (t: Toppings) => level(t, 'cheese');
 export const flossQuestions = (t: Toppings) => level(t, 'floss');
@@ -396,8 +424,12 @@ export const typedIsRight = (
   text: string,
 ) => q.answers.includes(normalizeAnswer(text));
 
-/** What the browser sees of a question: no answer. `removed`: options a topping struck out. */
-export type PublicQuestion =
+/**
+ * What the browser sees of a question: no answer. `removed`: options a topping
+ * struck out. `oftenForgotten`: one of the learner's hard flashcard words
+ * (free dungeon only, thesis supervisor 2026-11-26).
+ */
+export type PublicQuestion = (
   | {
       type: 'choice';
       kind: ArenaQuestion['kind'];
@@ -412,7 +444,12 @@ export type PublicQuestion =
       pos: string | null;
       hint: string;
       revealed: string;
-    };
+    }
+) & {
+  oftenForgotten?: boolean;
+  /** Boss floors: questions before the boss strikes; 0 means this one is the strike. */
+  strikeIn?: number;
+};
 
 export function publicQuestion(
   q: DungeonQuestion,
@@ -492,7 +529,12 @@ export function dungeonXp(correct: number, earnedToday: number): number {
 // ---------------------------------------------------------------- a run
 
 /** Each word of the run, as a monster question and as a boss question. */
-export type BankEntry = { choice: DungeonQuestion; typed: DungeonQuestion };
+export type BankEntry = {
+  choice: DungeonQuestion;
+  typed: DungeonQuestion;
+  /** One of the learner's hard flashcard words (free dungeon only). */
+  oftenForgotten?: boolean;
+};
 
 export type Monster = {
   kind: MonsterKind;
@@ -524,7 +566,25 @@ export type RunState = {
   bossesDown: number;
   bankCursor: number;
   retries: Retry[];
+  /**
+   * Bank places of the learner's hard words already asked, and how many of
+   * them were answered right the first time. Missing on runs stored before
+   * 2026-11-26.
+   */
+  hardSeen?: number[];
+  hardRight?: number;
+  /** Questions answered on this floor (the boss's strike counts them). Missing on runs stored before 2026-11-27. */
+  floorAnswered?: number;
+  /** The one lethal hit a run survives with 1 health has been used. */
+  lastBreathUsed?: boolean;
 };
+
+/** "Đúng 3/4 từ bạn hay quên": first answers only, a retry does not count again. */
+export function hardWordsOfRun(
+  run: Pick<RunState, 'hardSeen' | 'hardRight'>,
+): HardTally {
+  return { hit: run.hardRight ?? 0, total: (run.hardSeen ?? []).length };
+}
 
 function enterFloor(run: RunState, floor: number): RunState {
   const hp = monsterHp(floor);
@@ -542,6 +602,7 @@ function enterFloor(run: RunState, floor: number): RunState {
     shieldsLeft: shieldsPerFloor(run.toppings),
     flossLeft: flossQuestions(run.toppings),
     firstHitDone: false,
+    floorAnswered: 0,
   };
 }
 
@@ -605,11 +666,13 @@ export function issueQuestion(
     },
     bankIndex,
     question,
-    publicView: publicQuestion(
-      question,
-      removed,
-      bossHintLetters(run.toppings),
-    ),
+    publicView: {
+      ...publicQuestion(question, removed, bossHintLetters(run.toppings)),
+      ...(entry.oftenForgotten ? { oftenForgotten: true } : {}),
+      ...(run.monster.boss
+        ? { strikeIn: strikeIn(true, run.floorAnswered ?? 0) ?? 0 }
+        : {}),
+    },
   };
 }
 
@@ -625,11 +688,19 @@ export type AnswerOutcome = {
   revived: boolean;
   /** The right answer, shown after a miss so the learner sees it. */
   answer: string;
+  /** This question was the boss's strike: broken when right, a heavier hit when missed. */
+  strike?: boolean;
+  /** The right answer was given at low health and hit harder. */
+  desperate?: boolean;
+  /** A lethal hit left 1 health: the run's one last breath. */
+  lastBreath?: boolean;
 };
 
 /**
  * Applies one answer. `given` is the option index or the typed text; null is
  * a timeout. `elapsedMs` is the server's time since the question went out.
+ * `oftenForgotten`: the question asks one of the learner's hard words; its
+ * first answer is counted for the result.
  */
 export function applyAnswer(
   run: RunState,
@@ -637,6 +708,7 @@ export function applyAnswer(
   bankIndex: number,
   given: number | string | null,
   elapsedMs: number,
+  oftenForgotten = false,
 ): { run: RunState; outcome: AnswerOutcome } {
   const limit = questionTimeMs(run.floor, run.monster.boss, run.toppings);
   const timedOut = given === null || elapsedMs > limit + ANSWER_GRACE_MS;
@@ -649,11 +721,20 @@ export function applyAnswer(
     question.type === 'choice'
       ? question.options[question.correct]
       : question.display;
+  const floorAnswered = run.floorAnswered ?? 0;
+  const strike = strikeIn(run.monster.boss, floorAnswered) === 0;
+  const desperate = isDesperate(run.hp, run.maxHp);
   const next: RunState = {
     ...run,
     answered: run.answered + 1,
+    floorAnswered: floorAnswered + 1,
     retries: [...run.retries],
   };
+  const seen = run.hardSeen ?? [];
+  if (oftenForgotten && !seen.includes(bankIndex)) {
+    next.hardSeen = [...seen, bankIndex];
+    next.hardRight = (run.hardRight ?? 0) + (right ? 1 : 0);
+  }
   const outcome: AnswerOutcome = {
     right,
     timedOut,
@@ -665,19 +746,25 @@ export function applyAnswer(
     died: false,
     revived: false,
     answer,
+    ...(strike ? { strike: true } : {}),
   };
 
   if (right) {
     const crit =
       floorRng(run.seed, run.answered, 'crit')() < critChance(run.toppings);
-    const damage = hitDamage({
-      remainingShare: 1 - elapsedMs / limit,
-      combo: run.combo,
-      toppings: run.toppings,
-      boss: run.monster.boss,
-      firstHitOfFloor: !run.firstHitDone,
-      crit,
-    });
+    const damage = Math.round(
+      hitDamage({
+        remainingShare: 1 - elapsedMs / limit,
+        combo: run.combo,
+        toppings: run.toppings,
+        boss: run.monster.boss,
+        firstHitOfFloor: !run.firstHitDone,
+        crit,
+      }) *
+        (strike ? STRIKE_BREAK_BOOST : 1) *
+        (desperate ? DESPERATE_BOOST : 1),
+    );
+    if (desperate) outcome.desperate = true;
     next.monster = { ...run.monster, hp: Math.max(0, run.monster.hp - damage) };
     next.combo = run.combo + 1;
     next.bestCombo = Math.max(run.bestCombo, next.combo);
@@ -696,11 +783,19 @@ export function applyAnswer(
       next.shieldsLeft = run.shieldsLeft - 1;
       outcome.shielded = true;
     } else {
-      const taken = monsterHit(run.floor, run.monster.boss, run.toppings);
+      const taken = Math.round(
+        monsterHit(run.floor, run.monster.boss, run.toppings) *
+          (strike ? STRIKE_HIT_BOOST : 1),
+      );
       next.hp = run.hp - taken;
       outcome.taken = taken;
       if (next.hp <= 0) {
-        if (level(run.toppings, 'egg') > 0 && !run.revived) {
+        if (!run.lastBreathUsed) {
+          // The first lethal hit of a run leaves 1 health.
+          next.hp = 1;
+          next.lastBreathUsed = true;
+          outcome.lastBreath = true;
+        } else if (level(run.toppings, 'egg') > 0 && !run.revived) {
           next.hp = 30;
           next.revived = true;
           outcome.revived = true;

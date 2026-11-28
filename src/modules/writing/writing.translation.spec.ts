@@ -9,7 +9,7 @@ import { WritingService } from './writing.service';
 const task = (prompt: string, acceptedAnswers: string[]) => ({
   skill: 'WRITING',
   taskType: 'SENTENCE_TRANSLATION',
-  level: 'A1',
+  level: 'STARTER',
   prompt,
   acceptedAnswers,
   hints: [{ vi: 'giáo viên', en: 'teacher' }],

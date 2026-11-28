@@ -35,14 +35,14 @@ import {
   Role,
   SpeakingPracticeScope,
 } from '@prisma/client';
-import type { SpeakingSubmission } from '@prisma/client';
+import type { PracticeLevel, SpeakingSubmission } from '@prisma/client';
 import { SpeakingContentAccessService } from './speaking-content-access.service';
 import { TrialService } from '../subscription/trial.service';
 import { resolveSpeakingPracticeSet } from './speaking-practice-set';
 import {
-  levelGroup,
-  levelLabel,
-  parseCefrRange,
+  PRACTICE_LEVEL_LABEL,
+  practiceLevelLabel,
+  practiceLevelRank,
 } from '../subscription/practice-level';
 import { activeTrackChips } from '../learning-track/learning-track.logic';
 import { notFoundIfGone } from '../../common/prisma/not-found-if-gone';
@@ -211,22 +211,13 @@ export function buildDialogueSsml(
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>${body}</speak>`;
 }
 
-function difficultyLabel(values: string[]) {
-  const rank: Record<string, number> = {
-    BEGINNER: 1,
-    INTERMEDIATE: 2,
-    ADVANCED: 3,
-  };
-  const labels: Record<string, string> = {
-    BEGINNER: 'Cơ bản',
-    INTERMEDIATE: 'Trung cấp',
-    ADVANCED: 'Nâng cao',
-  };
-  const unique = [...new Set(values.map((value) => value.toUpperCase()))]
-    .filter((value) => rank[value])
-    .sort((a, b) => rank[a] - rank[b]);
-  if (unique.length <= 1) return labels[unique[0]] ?? 'Cơ bản';
-  return `${labels[unique[0]]} – ${labels[unique[unique.length - 1]]}`;
+/** "Cơ bản", or "Cơ bản – Trung cấp" when a group's items span levels. */
+function difficultyLabel(values: PracticeLevel[]) {
+  const unique = [...new Set(values)].sort(
+    (a, b) => practiceLevelRank(a) - practiceLevelRank(b),
+  );
+  if (unique.length <= 1) return PRACTICE_LEVEL_LABEL[unique[0] ?? 'BASIC'];
+  return `${PRACTICE_LEVEL_LABEL[unique[0]]} – ${PRACTICE_LEVEL_LABEL[unique[unique.length - 1]]}`;
 }
 
 /** A recording plus one retake; the exam room shows the same limit. */
@@ -456,7 +447,6 @@ export class SpeakingService {
       requiredPlan?: string;
       isLevelLocked?: boolean;
       practiceLevel?: string | null;
-      cefrLevel?: string | null;
     },
   ) {
     const safeMetadata = {
@@ -473,7 +463,6 @@ export class SpeakingService {
       isLevelLocked: access.isLevelLocked ?? false,
       practiceLevel: access.practiceLevel ?? null,
       requiredPlan: access.requiredPlan ?? 'FREE',
-      cefrLevel: access.cefrLevel ?? null,
     };
     if (access.isLocked) return safeMetadata;
 
@@ -499,7 +488,7 @@ export class SpeakingService {
       isPremiumContent: access.isPremiumContent,
       isLocked: false,
       requiredPlan: access.requiredPlan ?? 'FREE',
-      cefrLevel: access.cefrLevel ?? null,
+      practiceLevel: access.practiceLevel ?? null,
     };
   }
 
@@ -609,9 +598,9 @@ export class SpeakingService {
         completedCount: number;
         exerciseIds: number[];
         difficultyLabel: string;
-        /** Authored CEFR span of the set ("A1-A2"), when the set has one. */
-        level: string | null;
-        levelGroup: string | null;
+        /** The set's practice level, when the group is a set. */
+        level: PracticeLevel | null;
+        levelGroup: PracticeLevel | null;
       }
     >();
 
@@ -637,13 +626,10 @@ export class SpeakingService {
         // A practice set carries its authored level; derived groups fall back
         // to the coarse difficulty of their items.
         difficultyLabel:
-          levelLabel(parseCefrRange(items[0].practiceSet?.level)) ??
+          practiceLevelLabel(items[0].practiceSet?.level) ??
           difficultyLabel(items.map((item) => item.difficulty)),
         level: items[0].practiceSet?.level ?? null,
-        levelGroup: (() => {
-          const range = parseCefrRange(items[0].practiceSet?.level);
-          return range ? levelGroup(range) : null;
-        })(),
+        levelGroup: items[0].practiceSet?.level ?? null,
       });
     }
 

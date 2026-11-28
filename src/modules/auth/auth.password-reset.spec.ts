@@ -54,6 +54,7 @@ describe('AuthService password reset', () => {
   let email: {
     sendPasswordResetEmail: jest.Mock;
     sendPasswordChanged: jest.Mock;
+    canDeliver: jest.Mock;
   };
   let service: AuthService;
   const tokenFrom = () =>
@@ -66,7 +67,7 @@ describe('AuthService password reset', () => {
     prisma = {
       user: {
         findUnique: jest.fn(async ({ where }: any) =>
-          where.email === user.email ? user : null,
+          where.email === user.email || where.id === user.id ? user : null,
         ),
         update: jest.fn(async () => user),
       },
@@ -74,6 +75,7 @@ describe('AuthService password reset', () => {
     email = {
       sendPasswordResetEmail: jest.fn(async () => undefined),
       sendPasswordChanged: jest.fn(async () => undefined),
+      canDeliver: jest.fn(() => true),
     };
     service = new AuthService(prisma, {} as any, redis as any, email as any);
   });
@@ -175,6 +177,100 @@ describe('AuthService password reset', () => {
           html: expect.stringContaining('đăng xuất trên các thiết bị khác'),
         }),
       );
+    });
+  });
+  describe('an admin sends the reset link (owner 2026-11-28)', () => {
+    const resetKeys = () =>
+      [...redis.store.keys()].filter((k) =>
+        k.startsWith('auth:password-reset:'),
+      );
+
+    it('sends the link, stores only the hash, and the link resets once', async () => {
+      await expect(service.sendPasswordResetForAdmin(user.id)).resolves.toEqual(
+        {
+          status: 'SENT',
+          email: user.email,
+        },
+      );
+      expect(email.sendPasswordResetEmail).toHaveBeenCalledWith(
+        user.email,
+        expect.stringContaining('/reset-password?token='),
+      );
+      const token = tokenFrom();
+      expect(token).toHaveLength(64);
+      expect([...redis.store.keys()].some((k) => k.includes(token))).toBe(
+        false,
+      );
+
+      await service.resetPassword(token, 'New-Password-1!');
+      await expect(
+        service.resetPassword(token, 'Another-1!'),
+      ).rejects.toThrow();
+    });
+
+    it('answers COOLDOWN for a second request within a minute, sending nothing', async () => {
+      await service.sendPasswordResetForAdmin(user.id);
+      await expect(service.sendPasswordResetForAdmin(user.id)).resolves.toEqual(
+        {
+          status: 'COOLDOWN',
+          email: user.email,
+        },
+      );
+      expect(email.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares the minute with the learner own request', async () => {
+      await service.requestPasswordReset(user.email);
+      await expect(service.sendPasswordResetForAdmin(user.id)).resolves.toEqual(
+        {
+          status: 'COOLDOWN',
+          email: user.email,
+        },
+      );
+      expect(email.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not issue a token for a test domain that cannot receive mail', async () => {
+      email.canDeliver.mockReturnValue(false);
+      await expect(service.sendPasswordResetForAdmin(user.id)).resolves.toEqual(
+        {
+          status: 'UNDELIVERABLE',
+          email: user.email,
+        },
+      );
+      expect(email.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(resetKeys()).toEqual([]);
+    });
+
+    it('answers EMAIL_FAILED when the mail cannot be sent', async () => {
+      email.sendPasswordResetEmail.mockRejectedValue(new Error('SMTP down'));
+      await expect(service.sendPasswordResetForAdmin(user.id)).resolves.toEqual(
+        {
+          status: 'EMAIL_FAILED',
+          email: user.email,
+        },
+      );
+    });
+
+    it('a newer admin link makes the older one useless', async () => {
+      await service.sendPasswordResetForAdmin(user.id);
+      const older = tokenFrom();
+      redis.store.delete(`auth:password-reset:cooldown:${user.email}`);
+      await service.sendPasswordResetForAdmin(user.id);
+      const newer = tokenFrom();
+      await expect(
+        service.resetPassword(older, 'X-Password-1!'),
+      ).rejects.toThrow();
+      await expect(
+        service.resetPassword(newer, 'Y-Password-1!'),
+      ).resolves.toBeDefined();
+    });
+
+    it('is a 404 for a user that does not exist', async () => {
+      await expect(service.sendPasswordResetForAdmin(999)).rejects.toThrow(
+        'không tồn tại',
+      );
+      expect(email.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
   });
 });

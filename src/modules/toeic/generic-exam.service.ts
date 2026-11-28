@@ -1123,7 +1123,9 @@ export class GenericExamService {
             title: `${title} — Speaking`,
             description:
               'Nguồn Speaking nội bộ của đề thi; chưa có câu hỏi production.',
-            level: 'B1-C1',
+            // An exam's own speaking source: the exam decides access, the
+            // level only fills the required column (B1-C1 before 2026-11-27).
+            level: 'ADVANCED',
             scope: SpeakingPracticeScope.EXAM_INTERNAL,
             publicationStatus: QuizPublicationStatus.DRAFT,
           },

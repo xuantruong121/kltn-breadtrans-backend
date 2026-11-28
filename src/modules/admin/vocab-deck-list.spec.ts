@@ -12,10 +12,14 @@ const deck = (id: number, extra: Record<string, unknown> = {}) => ({
 
 describe('vocab deck list rules', () => {
   const decks = [
-    deck(1, { title: 'Office', level: 'B1', publicationStatus: 'PUBLISHED' }),
+    deck(1, {
+      title: 'Office',
+      level: 'INTERMEDIATE',
+      publicationStatus: 'PUBLISHED',
+    }),
     deck(2, {
       title: 'Airport',
-      level: 'A2',
+      level: 'BASIC',
       categoryName: 'Travel',
       _count: { words: 4 },
     }),

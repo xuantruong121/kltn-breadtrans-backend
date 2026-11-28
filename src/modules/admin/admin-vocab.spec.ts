@@ -69,12 +69,12 @@ describe('AdminService vocab decks', () => {
     await build(prisma).createVocabTopic({
       title: 'Office meetings',
       description: '  Từ vựng khi họp  ',
-      level: 'B1',
+      level: 'INTERMEDIATE',
     });
     expect(prisma.vocabTopic.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         description: 'Từ vựng khi họp',
-        level: 'B1',
+        level: 'INTERMEDIATE',
         totalWords: 0,
       }),
     });

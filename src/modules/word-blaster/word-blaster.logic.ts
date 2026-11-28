@@ -20,10 +20,29 @@ import {
   stageLevels,
   type ArenaWord,
 } from '../events/arena-questions.logic';
+import {
+  pickHardWords,
+  spreadIndexes,
+  type HardTally,
+} from '../events/hard-words.logic';
 
 export const BLASTER_BLOCKS = 20;
 export const BLASTER_LIVES = 3;
 export const BLASTER_STAKES = [20, 50, 100] as const;
+/**
+ * How much faster the blocks fall at each stake (owner 2026-11-27). The three
+ * stakes played the same, so the highest was always the better pick; now the
+ * bigger win asks for faster typing. Only the fall time changes: the words,
+ * the gaps between blocks, the lives and the payout are the same at every stake.
+ */
+export const BLASTER_PACE: Record<number, number> = {
+  20: 1,
+  50: 1.15,
+  100: 1.3,
+};
+export function blasterPace(stake: number): number {
+  return BLASTER_PACE[stake] ?? 1;
+}
 /** A shot this long after a block's landing still counts (network delay). */
 export const LANDING_GRACE_MS = 400;
 export const BLASTER_XP_PER_BLOCK = 2;
@@ -73,24 +92,44 @@ export type BlasterBlock = {
    */
   hint: string | null;
   word: { id: number; displayWord: string; meaningVi: string };
+  /**
+   * One of the learner's hard flashcard words (thesis supervisor
+   * 2026-11-26). Missing on games stored before that day.
+   */
+  oftenForgotten?: boolean;
 };
 
 export type PublicBlock = Pick<
   BlasterBlock,
   'id' | 'kind' | 'prompt' | 'spawnAtMs' | 'fallMs' | 'lane' | 'hint'
->;
+> & { oftenForgotten: boolean };
 
 /** What the browser may see: no answers, no word behind the prompt. */
 export function publicBlocks(blocks: BlasterBlock[]): PublicBlock[] {
-  return blocks.map(({ id, kind, prompt, spawnAtMs, fallMs, lane, hint }) => ({
-    id,
-    kind,
-    prompt,
-    spawnAtMs,
-    fallMs,
-    lane,
-    hint,
-  }));
+  return blocks.map(
+    ({ id, kind, prompt, spawnAtMs, fallMs, lane, hint, oftenForgotten }) => ({
+      id,
+      kind,
+      prompt,
+      spawnAtMs,
+      fallMs,
+      lane,
+      hint,
+      oftenForgotten: Boolean(oftenForgotten),
+    }),
+  );
+}
+
+/** Hard-word blocks broken out of those in the game. Counts only, never the words. */
+export function hardWordTally(
+  blocks: BlasterBlock[],
+  hits: Record<number, number>,
+): HardTally {
+  const hard = blocks.filter((b) => b.oftenForgotten);
+  return {
+    hit: hard.filter((b) => hits[b.id] !== undefined).length,
+    total: hard.length,
+  };
 }
 
 /** The meaning the hint stands for: the first sense, without notes in brackets. */
@@ -205,43 +244,67 @@ export function pullForward(
 }
 
 /**
- * Builds a game: distinct words, levels by stage (A2-B1 first, B2 last),
+ * Builds a game: distinct words, levels by stage (Mất gốc–Cơ bản first,
+ * Trung cấp–Nâng cao last),
  * every kind five times. Returns fewer blocks only when the pool is too small.
+ *
+ * `hardIds`: the learner's hard flashcard words, in order (hardWordOrder).
+ * Up to six that suit the mode take places spread over the game; the other
+ * blocks are chosen by level as before (thesis supervisor 2026-11-26).
+ *
+ * `pace`: how much faster every block falls, from the stake (blasterPace).
  */
 export function buildBlasterRound(
   pool: readonly ArenaWord[],
   rng: () => number,
   mode: BlasterMode,
-  count = BLASTER_BLOCKS,
+  opts: { count?: number; hardIds?: readonly number[]; pace?: number } = {},
 ): BlasterBlock[] {
+  const count = opts.count ?? BLASTER_BLOCKS;
+  // The stake's pace (blasterPace); never slower than the plain game.
+  const pace = Math.max(1, opts.pace ?? 1);
   const all = pool.filter(isDuelWord);
   // Words that suit the mode: a gap needs a few letters, a hint a short meaning.
-  const words = all.filter((w) =>
+  const suits = (w: ArenaWord) =>
     mode === 'missing'
       ? w.displayWord.trim().length >= 4
       : mode === 'en_to_vi'
         ? mainSense(w.meaningVi).length <= MAX_HINT_LENGTH
-        : true,
-  );
+        : true;
+  const words = all.filter(suits);
+  const hard = pickHardWords(all, opts.hardIds ?? [], suits);
+  const places = spreadIndexes(hard.length, count);
+  const hardAt = new Map(places.map((place, k) => [place, hard[k]]));
+  const reserved = new Set(hard.map((w) => w.headword.toLowerCase()));
   const used = new Set<string>();
   const blocks: BlasterBlock[] = [];
   let at = FIRST_SPAWN_MS;
   let lastLane = -1;
   for (let i = 0; i < count; i += 1) {
-    const levels = stageLevels(i, count);
-    const lo = Math.min(...levels);
-    const hi = Math.max(...levels);
-    const fresh = words.filter((w) => !used.has(w.headword.toLowerCase()));
-    const tiers = [
-      fresh.filter((w) => w.level !== null && w.level >= lo && w.level <= hi),
-      fresh.filter(
-        (w) => w.level === null || (w.level >= lo - 1 && w.level <= hi + 1),
-      ),
-      fresh,
-    ];
-    const candidates = tiers.find((t) => t.length > 0);
-    if (!candidates) break;
-    const word = candidates[Math.floor(rng() * candidates.length)];
+    const mine = hardAt.get(i);
+    let word: ArenaWord;
+    if (mine) {
+      word = mine;
+    } else {
+      const levels = stageLevels(i, count);
+      const lo = Math.min(...levels);
+      const hi = Math.max(...levels);
+      const fresh = words.filter(
+        (w) =>
+          !used.has(w.headword.toLowerCase()) &&
+          !reserved.has(w.headword.toLowerCase()),
+      );
+      const tiers = [
+        fresh.filter((w) => w.level !== null && w.level >= lo && w.level <= hi),
+        fresh.filter(
+          (w) => w.level === null || (w.level >= lo - 1 && w.level <= hi + 1),
+        ),
+        fresh,
+      ];
+      const candidates = tiers.find((t) => t.length > 0);
+      if (!candidates) break;
+      word = candidates[Math.floor(rng() * candidates.length)];
+    }
     used.add(word.headword.toLowerCase());
 
     const kind = mode;
@@ -286,10 +349,11 @@ export function buildBlasterRound(
       prompt,
       answers,
       spawnAtMs: at,
-      fallMs: Math.round(BASE_FALL_MS[kind] / speed),
+      fallMs: Math.round(BASE_FALL_MS[kind] / (speed * pace)),
       lane: LANES[lane],
       hint,
       word: { id: word.id, displayWord: display, meaningVi: word.meaningVi },
+      ...(mine ? { oftenForgotten: true } : {}),
     });
   }
   return blocks;

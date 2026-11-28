@@ -8,6 +8,7 @@ function catalogDb() {
           id: 5,
           type: 'BILINGUAL_READING',
           title: 'Reading B1 — Office memo',
+          practiceLevel: 'INTERMEDIATE',
           bilingualContent: null,
         },
       ]),
@@ -17,7 +18,7 @@ function catalogDb() {
         {
           id: 'set-1',
           title: 'Phản hồi câu hỏi',
-          level: 'B1-B2',
+          level: 'INTERMEDIATE',
           // Published exercises only, in order: 40 is the set's key.
           exercises: [
             { id: 40, taskType: 'RESPOND_TO_QUESTION' },
@@ -28,7 +29,7 @@ function catalogDb() {
         {
           id: 'set-2',
           title: 'Chưa gắn',
-          level: 'A1-A2',
+          level: 'STARTER',
           exercises: [{ id: 50, taskType: 'READ_ALOUD' }],
           tracks: [],
         },

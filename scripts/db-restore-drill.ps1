@@ -129,7 +129,9 @@ Write-Host '  _prisma_migrations present: PASS'
 #    One single-quoted SQL statement: PowerShell 5.1 mangles embedded double
 #    quotes when passing args to native commands, so quoted identifiers are
 #    built server-side with quote_ident() instead.
-$coreTables = @('User', 'Course', 'Lesson', 'Exam', 'ToeicExamSet', 'ToeicQuestionGroup', 'ToeicQuestion', 'ToeicAssessment', 'ToeicAttempt')
+# Course and Lesson went with the courses (2026-11-01); a drill that asked for
+# them failed on every dump made since.
+$coreTables = @('User', 'Exam', 'ToeicExamSet', 'ToeicQuestionGroup', 'ToeicQuestion', 'ToeicAssessment', 'ToeicAttempt')
 $inList = ($coreTables | ForEach-Object { "'$_'" }) -join ','
 $countSql = 'SELECT relname || ''='' || (xpath(''/row/c/text()'', query_to_xml(''SELECT count(*) AS c FROM '' || quote_ident(relname), false, true, '''')))[1]::text FROM pg_class WHERE relnamespace = ''public''::regnamespace AND relkind = ''r'' AND relname IN (' + $inList + ') ORDER BY relname'
 
@@ -177,7 +179,6 @@ if ($ExpectCounts) {
 if ($LearnerCatalogAssertions) {
   $assertSql = @'
 SELECT 'flashcard_published_topics=' || count(*) FROM "VocabTopic" WHERE "categoryName" <> 'SYSTEM_DICTIONARY' AND "publicationStatus" = 'PUBLISHED';
-SELECT 'course_non_beginner=' || count(*) FROM "Course" WHERE "level" <> 'BEGINNER';
 SELECT 'general_speaking_visible=' || count(*) FROM "SpeakingExercise" WHERE "practiceSetId" IS NULL AND "publicationStatus" = 'PUBLISHED';
 SELECT 'listening_q27_audio_refs=' || count(*) FROM "QuizAudioAsset" WHERE "questionId" = 27 AND "isActive" = true AND "key" = 'catalog/listening/practice/audio/quiz-9/question-27/v1.mp3';
 SELECT 'toeic_published_products=' || count(*) FROM "Exam" WHERE "variantCode" IN ('TOEIC_LR', 'TOEIC_SW', 'TOEIC_4_SKILLS') AND "publicationStatus" = 'PUBLISHED';
@@ -189,7 +190,7 @@ SELECT 'toeic_published_products=' || count(*) FROM "Exam" WHERE "variantCode" I
   if ($LASTEXITCODE -ne 0) { Fail 'Could not copy learner assertion SQL into the drill container.' }
   $assertLines = docker exec $drillId psql -U postgres -d $restoreDb -tAf /tmp/learner-assertions.sql
   if ($LASTEXITCODE -ne 0) { Fail 'Learner catalog assertions could not run.' }
-  $expectedAssertions = @{ flashcard_published_topics = 8; course_non_beginner = 0; general_speaking_visible = 30; listening_q27_audio_refs = 1; toeic_published_products = 3 }
+  $expectedAssertions = @{ flashcard_published_topics = 8; general_speaking_visible = 30; listening_q27_audio_refs = 1; toeic_published_products = 3 }
   foreach ($line in $assertLines) {
     $parts = "$line".Trim().Split('=')
     if ($parts.Count -ne 2) { continue }

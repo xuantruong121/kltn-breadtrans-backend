@@ -38,6 +38,7 @@ import {
   PICTURE_WRITING_TOPIC,
   pictureTaskContent,
 } from '../prisma/data/picture-writing-practice';
+import { legacyPracticeLevel } from '../src/modules/subscription/practice-level';
 import { pictureTaskIssues } from '../src/modules/writing/practice-writing-grading';
 
 const KEY = new RegExp(
@@ -195,6 +196,7 @@ async function main() {
             description: exercise.description,
             type: QuizType.WRITING_PICTURE,
             practiceTopicId: topic.id,
+            practiceLevel: legacyPracticeLevel(exercise.title) ?? 'BASIC',
             isPremiumContent: exercise.isPremiumContent,
             publishedAt: new Date(),
             questions: {

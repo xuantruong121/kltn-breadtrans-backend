@@ -3,16 +3,16 @@ import { daysLeft, lockedAfterExpiry } from './expiry-summary.logic';
 describe('lockedAfterExpiry', () => {
   it('lists only what FREE does not open, grouped by skill and level label, most used first', () => {
     const groups = lockedAfterExpiry([
-      { skill: 'WRITING', levelSource: 'Writing B1 — Complaint Email' },
-      { skill: 'WRITING', levelSource: 'Writing B2 — Problem & Solution' },
-      { skill: 'SPEAKING', levelSource: 'B1-B2' },
-      { skill: 'SPEAKING', levelSource: 'C1' },
-      { skill: 'WRITING', levelSource: 'Writing A2 — Postcard' },
-      { skill: 'READING', levelSource: 'Reading C1 — Policy' },
-      { skill: 'LISTENING', levelSource: 'Conversation B1 — Hotel' },
+      { skill: 'WRITING', level: 'INTERMEDIATE' },
+      { skill: 'WRITING', level: 'INTERMEDIATE' },
+      { skill: 'SPEAKING', level: 'INTERMEDIATE' },
+      { skill: 'SPEAKING', level: 'ADVANCED' },
+      { skill: 'WRITING', level: 'BASIC' },
+      { skill: 'READING', level: 'ADVANCED' },
+      { skill: 'LISTENING', level: 'INTERMEDIATE' },
       {
         skill: 'LISTENING',
-        levelSource: 'Dictation B1 — Office',
+        level: 'INTERMEDIATE',
         dictation: true,
       },
     ]);
@@ -48,10 +48,8 @@ describe('lockedAfterExpiry', () => {
     ]);
   });
 
-  it('an item without a level tag is left out rather than guessed', () => {
-    expect(
-      lockedAfterExpiry([{ skill: 'WRITING', levelSource: 'Untitled' }]),
-    ).toEqual([]);
+  it('an item without a level is left out rather than guessed', () => {
+    expect(lockedAfterExpiry([{ skill: 'WRITING', level: null }])).toEqual([]);
   });
 });
 

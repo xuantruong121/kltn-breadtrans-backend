@@ -1,8 +1,6 @@
 import {
   decksToLearn,
-  deckLevel,
   foundationPlan,
-  grammarLevel,
   grammarToStudy,
   type DeckInput,
   type GrammarInput,
@@ -10,27 +8,16 @@ import {
 
 const topic = (over: Partial<GrammarInput> & { id: number }): GrammarInput => ({
   title: `Topic ${over.id}`,
-  level: 'BEGINNER',
+  level: 'BASIC',
   best: null,
   ...over,
 });
 const deck = (over: Partial<DeckInput> & { id: number }): DeckInput => ({
   title: `Deck ${over.id}`,
-  level: 'A2',
+  level: 'BASIC',
   total: 10,
   mastered: 0,
   ...over,
-});
-
-describe('foundation levels', () => {
-  it('maps grammar and deck tags to practice levels', () => {
-    expect(grammarLevel('BEGINNER')).toBe('BASIC');
-    expect(grammarLevel('ADVANCED')).toBe('ADVANCED');
-    expect(deckLevel('A1')).toBe('STARTER');
-    expect(deckLevel('A2')).toBe('BASIC');
-    expect(deckLevel('B2')).toBe('INTERMEDIATE');
-    expect(deckLevel(null)).toBeNull();
-  });
 });
 
 describe('grammarToStudy', () => {
@@ -53,7 +40,7 @@ describe('grammarToStudy', () => {
       [
         topic({ id: 1, level: 'ADVANCED' }),
         topic({ id: 2, level: 'INTERMEDIATE' }),
-        topic({ id: 3, level: 'BEGINNER' }),
+        topic({ id: 3, level: 'BASIC' }),
       ],
       'INTERMEDIATE',
     );
@@ -94,6 +81,7 @@ describe('foundationPlan', () => {
   const input = {
     learner: 'BASIC' as const,
     dueWords: 0,
+    dueDeckId: null,
     readingToReview: false,
     grammar: [topic({ id: 1 }), topic({ id: 2 }), topic({ id: 3 })],
     decks: [deck({ id: 7 }), deck({ id: 8 })],
@@ -110,11 +98,16 @@ describe('foundationPlan', () => {
   });
 
   it('puts due words first with a matching count', () => {
-    const [first] = foundationPlan({ ...input, dueWords: 7 }, 3);
+    const [first] = foundationPlan({ ...input, dueWords: 7, dueDeckId: 4 }, 3);
     expect(first.kind).toBe('VOCAB_REVIEW');
     expect(first.title).toBe('Ôn 7 từ đến hạn');
     expect(first.minutes).toBe(4);
-    expect(first.route).toBe('/vocabulary/study');
+    expect(first.route).toBe('/flashcard/4?due=1');
+  });
+
+  it('falls back to the deck list when the due deck is unknown', () => {
+    const [first] = foundationPlan({ ...input, dueWords: 2 }, 3);
+    expect(first.route).toBe('/flashcard');
   });
 
   it('adds the Reading review after due words', () => {

@@ -19,7 +19,7 @@ function strategyAnswering(answer: unknown) {
 const draftSet = {
   title: 'Phản hồi câu hỏi — Nơi công sở',
   description: 'Trả lời câu hỏi thường gặp ở văn phòng bằng câu ngắn, rõ ý.',
-  level: 'B1-B2',
+  level: 'INTERMEDIATE',
 };
 const readAloud = {
   title: 'Read Aloud B1 — Meeting Notice',
@@ -36,7 +36,7 @@ describe('Speaking full draft (QA 2026-11-22: a picture task left a half-created
     });
     await strategy.suggestSpeakingFullDraft({
       topic: 'Nơi công sở',
-      level: 'B1-B2',
+      level: 'INTERMEDIATE',
       count: 3,
     });
     const taskEnum: string[] =
@@ -68,7 +68,7 @@ describe('Speaking full draft (QA 2026-11-22: a picture task left a half-created
     });
     const draft = await strategy.suggestSpeakingFullDraft({
       topic: 'Nơi công sở',
-      level: 'B1-B2',
+      level: 'INTERMEDIATE',
       count: 3,
     });
     expect(draft.exercises.map((e: { title: string }) => e.title)).toEqual([
@@ -84,7 +84,7 @@ describe('Speaking full draft (QA 2026-11-22: a picture task left a half-created
     await expect(
       strategy.suggestSpeakingFullDraft({
         topic: 'Nơi công sở',
-        level: 'B1-B2',
+        level: 'INTERMEDIATE',
         count: 1,
       }),
     ).rejects.toThrow('AI không soạn được bộ luyện nói hợp lệ');
@@ -97,7 +97,7 @@ describe('Speaking full draft (QA 2026-11-22: a picture task left a half-created
     });
     await strategy.suggestSpeakingFullDraft({
       topic: 'Nơi công sở',
-      level: 'B1-B2',
+      level: 'INTERMEDIATE',
       count: 1,
     });
     expect(prompt()).toContain(SPEAKING_SET_COPY_RULE);
@@ -114,7 +114,7 @@ describe('Speaking full draft (QA 2026-11-22: a picture task left a half-created
     await expect(
       strategy.suggestSpeakingFullDraft({
         topic: 'Office',
-        level: 'B1-B2',
+        level: 'INTERMEDIATE',
         count: 1,
       }),
     ).rejects.toThrow('không phải tiếng Việt');
@@ -127,7 +127,7 @@ describe('Speaking set suggestion ("Gợi ý tên & mô tả")', () => {
     await expect(
       strategy.suggestSpeakingPracticeSet({
         topic: 'Office small talk',
-        level: 'B1-B2',
+        level: 'INTERMEDIATE',
       }),
     ).resolves.toEqual({ ...draftSet, track: null });
     expect(prompt()).toContain(SPEAKING_SET_COPY_RULE);
@@ -141,7 +141,7 @@ describe('Speaking set suggestion ("Gợi ý tên & mô tả")', () => {
     await expect(
       strategy.suggestSpeakingPracticeSet({
         topic: 'Office small talk',
-        level: 'B1-B2',
+        level: 'INTERMEDIATE',
       }),
     ).rejects.toThrow('không phải tiếng Việt');
   });
@@ -157,7 +157,7 @@ describe('Speaking exercise suggestions inside the form', () => {
     });
     const result = await strategy.suggestSpeakingExercises({
       practiceSetTitle: 'Nơi công sở',
-      level: 'B1-B2',
+      level: 'INTERMEDIATE',
       count: 2,
     });
     expect(result.candidates.map((c: { title: string }) => c.title)).toEqual([
@@ -178,7 +178,7 @@ describe('Speaking exercise suggestions inside the form', () => {
     const { strategy, request } = strategyAnswering({ candidates: [picture] });
     const result = await strategy.suggestSpeakingExercises({
       practiceSetTitle: 'Nơi công sở',
-      level: 'B1-B2',
+      level: 'INTERMEDIATE',
       taskType: 'DESCRIBE_PICTURE',
       count: 1,
     });

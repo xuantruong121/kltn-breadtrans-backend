@@ -1,7 +1,7 @@
 import type { PracticeLevel, PracticeSkill } from '@prisma/client';
 
 import {
-  dailyPlan,
+  contentKey,
   moreChoices,
   recommend,
   type Candidate,
@@ -192,20 +192,6 @@ describe('recommend', () => {
     expect(locked[0].status).toBe('LOCKED_LEVEL');
   });
 
-  it('fills the day up to the learner minutes, at least one item', () => {
-    const ranked = recommend(
-      [
-        item('READING', 'BASIC', { minutes: 10 }),
-        item('LISTENING', 'BASIC', { minutes: 10 }),
-        item('WRITING', 'BASIC', { minutes: 10 }),
-      ],
-      learner(),
-      { limit: 3 },
-    );
-    expect(dailyPlan(ranked, 20)).toHaveLength(2);
-    expect(dailyPlan(ranked, 5)).toHaveLength(1);
-  });
-
   it('moves skills that serve the goal up and says why', () => {
     const level = {
       level: 'BASIC',
@@ -264,19 +250,20 @@ describe('recommend', () => {
     expect(top.score - other.score).toBeCloseTo(0.2);
   });
 
-  it('offers other open items beside the daily plan', () => {
+  it('offers other open items beside the ones already shown', () => {
     const open = [1, 2, 3, 4].map(() => item('LISTENING', 'BASIC'));
     const locked = item('LISTENING', 'ADVANCED');
     const ranked = recommend([...open, locked], learner(), {
       limit: 5,
       includeLocked: true,
     });
-    const plan = dailyPlan(ranked, 10);
-    const more = moreChoices(ranked, plan, 2);
-    expect(plan).toHaveLength(1);
+    const taken = new Set([contentKey(ranked[0].candidate)]);
+    const more = moreChoices(ranked, taken, 2);
     expect(more).toHaveLength(2);
     expect(more.every((r) => r.status === 'OPEN')).toBe(true);
-    expect(more.map((r) => r.candidate.id)).not.toContain(plan[0].candidate.id);
+    expect(more.map((r) => r.candidate.id)).not.toContain(
+      ranked[0].candidate.id,
+    );
   });
 
   it('names no weakest skill when skills are level', () => {

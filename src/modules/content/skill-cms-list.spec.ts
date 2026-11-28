@@ -97,24 +97,27 @@ describe('skill CMS list rules', () => {
   const rows = [
     quiz(1, {
       title: 'Hội thoại B1 — Đặt phòng',
+      practiceLevel: 'INTERMEDIATE',
       publicationStatus: 'PUBLISHED',
       bilingualContent: { mode: 'DIALOGUE' },
       listeningAudioArtifacts: [{ version: 2, status: 'PUBLISHED' }],
     }),
     quiz(2, {
       title: 'Nghe hiểu A2 — Sân bay',
+      practiceLevel: 'BASIC',
       bilingualContent: { mode: 'COMPREHENSION' },
       questionsWithAudio: 1,
       _count: { questions: 3 },
     }),
     quiz(3, {
       title: 'Chép chính tả A1 — Số đếm',
+      practiceLevel: 'STARTER',
       bilingualContent: { mode: 'DICTATION' },
       _count: { questions: 1 },
     }),
     quiz(4, {
       type: 'WRITING_EMAIL',
-      level: 'B2',
+      practiceLevel: 'ADVANCED',
       description: 'Email xin nghỉ',
     }),
   ];
@@ -132,14 +135,14 @@ describe('skill CMS list rules', () => {
     ).toBe('error');
   });
 
-  it('filters by search, status, level from the title, mode, audio and type', () => {
+  it('filters by search, status, practice level, mode, audio and type', () => {
     const ids = (query: Record<string, string>) =>
       filterQuizList(rows, query).map((row) => row.id);
     expect(ids({ q: 'sân BAY' })).toEqual([2]);
     expect(ids({ q: 'xin nghỉ' })).toEqual([4]);
     expect(ids({ status: 'PUBLISHED' })).toEqual([1]);
-    expect(ids({ level: 'A1' })).toEqual([3]);
-    expect(ids({ level: 'B2' })).toEqual([4]);
+    expect(ids({ level: 'STARTER' })).toEqual([3]);
+    expect(ids({ level: 'ADVANCED' })).toEqual([4]);
     expect(ids({ mode: 'COMPREHENSION' })).toEqual([4, 2]);
     expect(ids({ audio: 'none' })).toEqual([4, 3]);
     expect(ids({ type: 'WRITING_EMAIL', status: 'ALL' })).toEqual([4]);
@@ -160,7 +163,7 @@ describe('skill CMS list rules', () => {
       total: 4,
       published: 1,
       modes: { COMPREHENSION: 2, DICTATION: 1, DIALOGUE: 1 },
-      levels: ['A1', 'A2', 'B1', 'B2'],
+      levels: ['STARTER', 'BASIC', 'INTERMEDIATE', 'ADVANCED'],
     });
   });
 
@@ -186,7 +189,7 @@ describe('speaking set list rules', () => {
     {
       id: 'a',
       title: 'Giới thiệu bản thân',
-      level: 'A1',
+      level: 'STARTER',
       publicationStatus: 'PUBLISHED',
       createdAt: '2026-10-01',
       // Edited last: an edit must not move it up the list.
@@ -196,7 +199,7 @@ describe('speaking set list rules', () => {
     {
       id: 'b',
       title: 'Phỏng vấn xin việc',
-      level: 'B2',
+      level: 'INTERMEDIATE',
       publicationStatus: 'DRAFT',
       createdAt: '2026-10-20',
       updatedAt: '2026-10-20',
@@ -220,9 +223,9 @@ describe('speaking set list rules', () => {
     expect(
       filterSpeakingSets(sets, { category: 'Work' }).map((s) => s.id),
     ).toEqual(['b', 'a']);
-    expect(filterSpeakingSets(sets, { level: 'A1' }).map((s) => s.id)).toEqual([
-      'a',
-    ]);
+    expect(
+      filterSpeakingSets(sets, { level: 'STARTER' }).map((s) => s.id),
+    ).toEqual(['a']);
     expect(
       filterSpeakingSets(sets, { sort: 'TITLE' }).map((s) => s.id),
     ).toEqual(['a', 'b']);
@@ -232,7 +235,7 @@ describe('speaking set list rules', () => {
     expect(speakingSetFacets(sets)).toEqual({
       total: 2,
       published: 1,
-      levels: ['A1', 'B2'],
+      levels: ['STARTER', 'INTERMEDIATE'],
     });
   });
 });

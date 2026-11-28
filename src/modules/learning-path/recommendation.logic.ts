@@ -260,31 +260,18 @@ export function recommend(
   return picked;
 }
 
-/** Open items beyond the daily plan, so the learner can pick something else. */
+/**
+ * Open items beyond the daily frame, so the learner can pick something else.
+ * `taken`: content keys already shown (the frame's picks, today's items).
+ * The daily list is the four-skill frame of today-frame.logic (2026-11-26);
+ * it no longer fills the learner's minutes per day.
+ */
 export function moreChoices(
   ranked: Recommendation[],
-  plan: Recommendation[],
+  taken: ReadonlySet<string>,
   max: number,
 ): Recommendation[] {
-  const planned = new Set(plan.map((r) => contentKey(r.candidate)));
   return ranked
-    .filter((r) => r.status === 'OPEN' && !planned.has(contentKey(r.candidate)))
+    .filter((r) => r.status === 'OPEN' && !taken.has(contentKey(r.candidate)))
     .slice(0, max);
-}
-
-/** Fills a daily list up to the learner's minutes (at least one item). */
-export function dailyPlan(
-  ranked: Recommendation[],
-  minutesPerDay: number,
-): Recommendation[] {
-  const plan: Recommendation[] = [];
-  let used = 0;
-  for (const r of ranked) {
-    if (r.status !== 'OPEN') continue;
-    if (plan.length && used + r.candidate.minutes > minutesPerDay) continue;
-    plan.push(r);
-    used += r.candidate.minutes;
-    if (used >= minutesPerDay) break;
-  }
-  return plan;
 }

@@ -77,10 +77,15 @@ function setup(overrides: { skillRow?: Record<string, unknown> | null } = {}) {
       },
     },
   };
-  const quiz = (id: number, title = 'Reading A2 — Trip') => ({
+  const quiz = (
+    id: number,
+    title = 'Reading A2 — Trip',
+    practiceLevel: string | null = 'BASIC',
+  ) => ({
     id,
     type: 'BILINGUAL_READING',
     title,
+    practiceLevel,
     practiceTopicId: null,
     toeicWritingSetItems: [],
   });
@@ -190,7 +195,10 @@ describe('LearnerProgressService', () => {
 
   it.each([
     ['an exam writing item', { toeicWritingSetItems: [{ id: 1 }] }],
-    ['an item with no level tag', { title: 'Untagged practice' }],
+    [
+      'an item with no level tag',
+      { title: 'Untagged practice', practiceLevel: null },
+    ],
   ])('ignores %s', async (_name, facts) => {
     const t = setup();
     t.prisma.quiz.findUnique.mockResolvedValue({ ...t.quiz(1), ...facts });
@@ -225,7 +233,7 @@ describe('LearnerProgressService', () => {
       title: 'Giới thiệu',
       practiceSetId: 'set-1',
       practiceSet: {
-        level: 'A2',
+        level: 'BASIC',
         scope: 'SKILL_PRACTICE',
       },
       ...overrides,
@@ -275,7 +283,7 @@ describe('LearnerProgressService', () => {
       t.prisma.speakingExercise.findUnique.mockResolvedValue(
         exercise({
           practiceSet: {
-            level: 'A2',
+            level: 'BASIC',
             scope: 'EXAM_INTERNAL',
           },
         }),

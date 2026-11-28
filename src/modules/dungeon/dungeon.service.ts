@@ -19,7 +19,20 @@ import {
   vietnamDayStart,
   type ArenaWord,
 } from '../events/arena-questions.logic';
-import { loadAllReviewedWords, loadDeckWords } from '../events/arena-word-pool';
+import {
+  loadAllReviewedWords,
+  loadDeckWords,
+  hardWordsShownToday,
+  loadHardWords,
+  markHardWordsShown,
+} from '../events/arena-word-pool';
+import {
+  HARD_WORDS_SPAN,
+  hardWordOrder,
+  pickHardWords,
+  spreadIndexes,
+  type HardTally,
+} from '../events/hard-words.logic';
 import {
   BANK_SIZE,
   DUNGEON_MODES,
@@ -35,6 +48,7 @@ import {
   dungeonXp,
   floorIntroMs,
   RUN_INTRO_MS,
+  hardWordsOfRun,
   hashSeed,
   issueQuestion,
   newRun,
@@ -45,6 +59,7 @@ import {
   type AnswerOutcome,
   type BankEntry,
   type DungeonMode,
+  isDesperate,
   type DungeonQuestion,
   type PublicQuestion,
   type RunState,
@@ -69,6 +84,12 @@ type Session = {
   } | null;
   last: AnswerOutcome | null;
   result: DungeonResult | null;
+  /**
+   * The floor to beat, read when the run started: today's leading floor in the
+   * day's dungeon, the learner's own best in a free run. Missing on runs stored
+   * before 2026-11-27.
+   */
+  recordFloor?: number | null;
 };
 
 export type DungeonResult = {
@@ -88,6 +109,12 @@ export type DungeonResult = {
   record: boolean;
   /** Place on today's board (day's dungeon only). */
   dailyRank: number | null;
+  /**
+   * The learner's hard flashcard words asked in this run: right the first
+   * time out of asked (free dungeon only; counts, never the words). Missing
+   * on results stored before 2026-11-26.
+   */
+  hardWords?: HardTally;
 };
 
 export type DungeonView = {
@@ -123,6 +150,12 @@ export type DungeonView = {
   last: AnswerOutcome | null;
   stats: { answered: number; correct: number; bossesDown: number };
   result: DungeonResult | null;
+  /** At or under a quarter of health: right answers hit harder. */
+  desperate: boolean;
+  /** The run's one last breath (a lethal hit leaves 1 health) is still unused. */
+  lastBreathLeft: boolean;
+  /** The floor to beat and whose it is; null when there is none yet. */
+  record: { floor: number; whose: 'today' | 'mine' } | null;
 };
 
 const SESSION_TTL_S = 60 * 60;
@@ -210,7 +243,14 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         'Hôm nay bạn đã vào Hầm hôm nay rồi. Mai quay lại nhé, hoặc thử Hầm tự do.',
       );
     const seed = daily?.seed ?? hashSeed(randomUUID());
-    const bank = await this.buildBank(seed);
+    // The day's dungeon asks everyone the same (its board compares floors);
+    // only a free run brings in the learner's own hard words (owner 2026-11-26).
+    // The learner day of the hard words (rule B) follows the server's clock.
+    const at = new Date(Date.now());
+    const bank = await this.buildBank(
+      seed,
+      daily ? [] : await this.hardWordIds(userId, at),
+    );
     if (bank.length < MIN_BANK)
       throw new BadRequestException(
         'Chưa đủ từ vựng để mở hầm. Vui lòng thử lại sau.',
@@ -255,6 +295,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       question: null,
       last: null,
       result: null,
+      recordFloor: await this.recordToBeat(userId, mode, now),
     };
     this.ask(session, RUN_INTRO_MS);
     try {
@@ -277,6 +318,12 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         'Không mở được hầm, Bánh Mì đã được hoàn lại.',
       );
     }
+    if (!daily)
+      await this.rememberHardWords(
+        userId,
+        at,
+        bank.filter((e) => e.oftenForgotten).map((e) => e.choice.wordId),
+      );
     return this.view(session);
   }
 
@@ -317,6 +364,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         bankIndex,
         value,
         Math.max(0, Date.now() - issuedAt),
+        Boolean(session.bank[bankIndex]?.oftenForgotten),
       );
       session.run = step.run;
       session.last = step.outcome;
@@ -444,19 +492,84 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
   // ------------------------------------------------------------------ inside
 
   /**
+   * The learner's hard flashcard words, due ones first (thesis supervisor
+   * 2026-11-26). A run never fails to open because this read failed.
+   */
+  private async hardWordIds(userId: number, now: Date): Promise<number[]> {
+    try {
+      const rows = await loadHardWords(this.prisma, userId);
+      return hardWordOrder(
+        rows,
+        now,
+        Math.random,
+        await this.hardWordsShownToday(userId, now),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] hard words of user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return [];
+    }
+  }
+
+  /** Rule B (owner 2026-11-27): the hard words already put into a game today. */
+  private async hardWordsShownToday(
+    userId: number,
+    now: Date,
+  ): Promise<Set<number>> {
+    try {
+      return await hardWordsShownToday(this.redis, userId, now);
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] hard words shown today to user ${userId} not read: ${(err as Error)?.message}`,
+      );
+      return new Set();
+    }
+  }
+
+  /** Notes the hard words this game was given; a failure only means they may come again today. */
+  private async rememberHardWords(
+    userId: number,
+    now: Date,
+    entryIds: number[],
+  ): Promise<void> {
+    try {
+      await markHardWordsShown(this.redis, userId, now, entryIds);
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] hard words shown to user ${userId} not kept: ${(err as Error)?.message}`,
+      );
+    }
+  }
+
+  /**
    * The run's questions. Words are sorted by id first: the database returns
    * them in no set order, and the day's dungeon must ask everyone the same.
+   * `hardIds` (free runs only): up to six of the learner's hard words are
+   * asked within the first 20 questions; without them the bank is unchanged.
    */
-  private async buildBank(seed: number): Promise<BankEntry[]> {
+  private async buildBank(
+    seed: number,
+    hardIds: readonly number[] = [],
+  ): Promise<BankEntry[]> {
     const make = (pool: ArenaWord[]) => {
       const words = [...pool].sort((a, b) => a.id - b.id);
       const byId = new Map(words.map((w) => [w.id, w]));
       const rng = seededRng(seed);
-      return buildArenaQuestions(words, BANK_SIZE, rng)
+      const hard = pickHardWords(words, hardIds);
+      const places = spreadIndexes(hard.length, HARD_WORDS_SPAN);
+      const hardSet = new Set(hard.map((w) => w.id));
+      const questions = hard.length
+        ? buildArenaQuestions(words, BANK_SIZE, rng, {
+            pinned: new Map(places.map((place, k) => [place, hard[k].id])),
+          })
+        : buildArenaQuestions(words, BANK_SIZE, rng);
+      return questions
         .filter((q) => byId.has(q.id))
         .map((q) => ({
           choice: choiceQuestion(q, rng),
           typed: typedQuestion(byId.get(q.id)!, words),
+          ...(hardSet.has(q.id) ? { oftenForgotten: true } : {}),
         }));
     };
     let bank = make(await loadDeckWords(this.prisma));
@@ -492,6 +605,36 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       select: { id: true },
     });
     return row !== null;
+  }
+
+  /**
+   * The floor a new run tries to pass: the deepest anyone went in today's
+   * dungeon, or the learner's own best free run. A failure here never stops a
+   * run from opening.
+   */
+  private async recordToBeat(
+    userId: number,
+    mode: DungeonMode,
+    now: Date,
+  ): Promise<number | null> {
+    try {
+      if (mode === 'free') return await this.best(userId, 'free');
+      const top = await this.prisma.learnerEvent.findFirst({
+        where: {
+          type: EVENT.daily,
+          createdAt: { gte: vietnamDayStart(now) },
+          user: { role: Role.STUDENT },
+        },
+        orderBy: { value: 'desc' },
+        select: { value: true },
+      });
+      return top?.value ?? null;
+    } catch (err) {
+      this.logger.warn(
+        `[Dungeon] could not read the record to beat: ${String(err)}`,
+      );
+      return null;
+    }
   }
 
   private async best(
@@ -573,6 +716,7 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
       xp,
       record: before === null || run.floor > before,
       dailyRank,
+      hardWords: hardWordsOfRun(run),
     };
     session.question = null;
     await this.save(session, RESULT_TTL_S);
@@ -635,6 +779,15 @@ export class DungeonService implements OnModuleInit, OnModuleDestroy {
         bossesDown: run.bossesDown,
       },
       result: session.result,
+      desperate: isDesperate(run.hp, run.maxHp),
+      lastBreathLeft: !run.lastBreathUsed,
+      record:
+        typeof session.recordFloor === 'number' && session.recordFloor > 0
+          ? {
+              floor: session.recordFloor,
+              whose: session.mode === 'daily' ? 'today' : 'mine',
+            }
+          : null,
     };
   }
 

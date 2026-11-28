@@ -1,4 +1,6 @@
 /** What the CMS may read from an uploaded document. No I/O. */
+import { legacyPracticeLevel } from '../subscription/practice-level';
+
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCUMENT_MAX_CHARS = 20_000;
 export const DOCUMENT_MAX_DECKS = 6;
@@ -31,6 +33,7 @@ export type VocabDeckCandidate = {
     word?: string;
     pos?: string;
     meaning?: string;
+    ipaUs?: string;
     exampleEn?: string;
     exampleVi?: string;
   }>;
@@ -52,7 +55,8 @@ export function normalizeVocabDecks(
     .map((deck) => ({
       title: (deck.title ?? '').trim(),
       description: (deck.description ?? '').trim(),
-      level: (deck.level ?? '').trim(),
+      // A practice level; an old CEFR answer is read the same way.
+      level: legacyPracticeLevel(deck.level) ?? '',
       words: (deck.words ?? [])
         .filter((row) => row.word?.trim() && row.meaning?.trim())
         .filter((row) => {
@@ -66,6 +70,8 @@ export function normalizeVocabDecks(
           word: row.word!.trim(),
           pos: (row.pos ?? '').trim(),
           meaning: row.meaning!.trim(),
+          // A deck is published only when every word has its phonetics.
+          ipaUs: (row.ipaUs ?? '').trim().slice(0, 80),
           exampleEn: (row.exampleEn ?? '').trim(),
           exampleVi: (row.exampleVi ?? '').trim(),
           known: known.has(key(row.word!)),

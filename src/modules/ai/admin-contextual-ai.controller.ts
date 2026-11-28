@@ -57,6 +57,7 @@ import {
   withoutAvoided,
   normalizeVocabDecks,
 } from './document-import.logic';
+import { aiAvoidList, withoutAvoidedItems } from './ai-avoid.logic';
 import { GrammarDraftRejected } from '../grammar/grammar-full-draft.logic';
 
 @ApiTags('Admin Contextual AI')
@@ -116,13 +117,24 @@ export class AdminContextualAiController {
   })
   async suggestGrammarQuestions(@Body() dto: SuggestGrammarQuestionsDto) {
     try {
-      return await this.aiService.suggestGrammarQuestions({
+      const avoid = aiAvoidList(dto.avoid);
+      const suggestion = await this.aiService.suggestGrammarQuestions({
         topicTitle: dto.topicTitle,
         level: dto.level,
         theory: dto.theory,
         keyFormula: dto.keyFormula,
         count: dto.count || 3,
+        avoid,
       });
+      // "Tạo câu khác": a question the draft already has is never offered again.
+      return {
+        ...suggestion,
+        candidates: withoutAvoidedItems(
+          suggestion.candidates ?? [],
+          (candidate) => String(candidate.question ?? ''),
+          avoid,
+        ),
+      };
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       const msg = error?.message || '';
@@ -162,11 +174,22 @@ export class AdminContextualAiController {
   })
   async suggestReadingQuestions(@Body() dto: SuggestReadingQuestionsDto) {
     try {
-      return await this.aiService.suggestReadingQuestions({
+      const avoid = aiAvoidList(dto.avoid);
+      const suggestion = await this.aiService.suggestReadingQuestions({
         passage: dto.passage,
         level: dto.level,
         count: dto.count || 3,
+        avoid,
       });
+      // "Tạo câu khác": a question the draft already has is never offered again.
+      return {
+        ...suggestion,
+        candidates: withoutAvoidedItems(
+          suggestion.candidates ?? [],
+          (candidate) => String(candidate.prompt ?? ''),
+          avoid,
+        ),
+      };
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       const msg = error?.message || '';
@@ -188,6 +211,7 @@ export class AdminContextualAiController {
         level: dto.level,
         grammarFocus: dto.grammarFocus,
         vocabularyFocus: dto.vocabularyFocus,
+        difficulty: dto.difficulty,
         count: dto.count || 5,
       });
     } catch (error: any) {
@@ -262,6 +286,8 @@ export class AdminContextualAiController {
         kind: dto.kind,
         count: dto.count || 5,
         sourceText: dto.sourceText,
+        brief: dto.brief,
+        avoid: aiAvoidList(dto.avoid),
       });
     } catch (error: any) {
       if (
@@ -554,6 +580,7 @@ export class AdminContextualAiController {
         level: dto.level,
         context: dto.context,
         count: dto.count || 15,
+        avoid: aiAvoidList(dto.avoid),
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;

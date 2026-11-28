@@ -6,7 +6,7 @@ import {
 describe('Writing learner-visible content contract', () => {
   const email = {
     skill: 'WRITING',
-    level: 'A2',
+    level: 'BASIC',
     taskType: 'SHORT_MESSAGE',
     prompt: 'Viết 40–60 từ.',
     wordRange: [40, 60],
@@ -29,7 +29,7 @@ describe('Writing learner-visible content contract', () => {
   it('keeps everything a learner needs to answer', () => {
     expect(learnerVisibleTaskContent(email)).toEqual({
       skill: 'WRITING',
-      level: 'A2',
+      level: 'BASIC',
       taskType: 'SHORT_MESSAGE',
       prompt: 'Viết 40–60 từ.',
       wordRange: [40, 60],

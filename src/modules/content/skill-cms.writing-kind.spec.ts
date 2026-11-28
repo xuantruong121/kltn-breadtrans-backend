@@ -85,6 +85,7 @@ describe('SkillCmsService.get writing kind', () => {
         update: jest.fn().mockResolvedValue({ id: 9 }),
       },
       submission: { count: jest.fn().mockResolvedValue(0) },
+      toeicWritingSetItem: { count: jest.fn().mockResolvedValue(0) },
     };
     const service = new SkillCmsService(prisma as any);
     await service.create(

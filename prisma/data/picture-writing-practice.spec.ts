@@ -1,6 +1,6 @@
 import { pictureTaskIssues } from '../../src/modules/writing/practice-writing-grading';
 import {
-  parseCefrRange,
+  legacyPracticeLevel,
   requiredPracticePlan,
 } from '../../src/modules/subscription/practice-level';
 import { createHash } from 'node:crypto';
@@ -30,9 +30,9 @@ describe('picture writing content (Viết câu theo tranh)', () => {
 
   it('A2 is free, B1 needs PLUS, and the stored flag agrees', () => {
     const plans = PICTURE_WRITING_EXERCISES.map((exercise) => {
-      const range = parseCefrRange(exercise.title);
-      expect(range).not.toBeNull();
-      const plan = requiredPracticePlan('WRITING', range!);
+      const level = legacyPracticeLevel(exercise.title);
+      expect(level).not.toBeNull();
+      const plan = requiredPracticePlan('WRITING', level!);
       expect(exercise.isPremiumContent).toBe(plan !== 'FREE');
       return plan;
     });
@@ -76,9 +76,9 @@ describe('picture writing, second batch (2026-11-24)', () => {
 
   it('adds twenty tasks: three free A2 sets and one PLUS B1 set', () => {
     const plans = PICTURE_WRITING_MORE_EXERCISES.map((exercise) => {
-      const range = parseCefrRange(exercise.title);
-      expect(range).not.toBeNull();
-      const plan = requiredPracticePlan('WRITING', range!);
+      const level = legacyPracticeLevel(exercise.title);
+      expect(level).not.toBeNull();
+      const plan = requiredPracticePlan('WRITING', level!);
       expect(exercise.isPremiumContent).toBe(plan !== 'FREE');
       return plan;
     });

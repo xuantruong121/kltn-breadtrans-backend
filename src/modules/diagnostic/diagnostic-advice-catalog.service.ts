@@ -25,7 +25,6 @@ import { LearningPathService } from '../learning-path/learning-path.service';
 import {
   advancedPracticePlan,
   isDictationContent,
-  parseCefrRange,
   planSatisfies,
   type PracticePlan,
   type PracticeSkill,
@@ -59,13 +58,12 @@ const QUIZ_KINDS: Partial<
 /** Same matrix as the content access services (practice-level.ts). */
 function practicePlanFor(
   skill: PracticeSkill,
-  title: string,
+  level: PracticeLevel | null,
   isPremiumContent: boolean,
   bilingualContent: unknown = null,
 ): PracticePlan {
-  const range = parseCefrRange(title);
-  if (range)
-    return requiredPracticePlan(skill, range, {
+  if (level)
+    return requiredPracticePlan(skill, level, {
       dictation: isDictationContent(bilingualContent),
     });
   return isPremiumContent ? advancedPracticePlan(skill) : 'FREE';
@@ -125,7 +123,7 @@ export function recommendationResource(r: {
       requirement: null,
       lockedBy: null,
       setKey: new URLSearchParams(query).get('set'),
-      cefrLevel: null,
+      practiceLevel: null,
     };
   }
   const kind = QUIZ_KIND_OF_SKILL[r.skill];
@@ -200,6 +198,7 @@ export class DiagnosticAdviceCatalogService {
           id: true,
           title: true,
           type: true,
+          practiceLevel: true,
           isPremiumContent: true,
           bilingualContent: true,
         },
@@ -258,7 +257,7 @@ export class DiagnosticAdviceCatalogService {
         else {
           const required = practicePlanFor(
             quizKind.skill,
-            quiz.title,
+            quiz.practiceLevel,
             quiz.isPremiumContent,
             quiz.bilingualContent,
           );
@@ -287,7 +286,9 @@ export class DiagnosticAdviceCatalogService {
         else {
           const required = practicePlanFor(
             'SPEAKING',
-            exercise.title,
+            exercise.practiceSet?.scope === 'EXAM_INTERNAL'
+              ? null
+              : (exercise.practiceSet?.level ?? null),
             exercise.isPremiumContent,
           );
           const locked =
@@ -305,7 +306,7 @@ export class DiagnosticAdviceCatalogService {
           title: exercise.title,
           route: `/speaking/${exercise.id}`,
           setKey: exercise.practiceSetId,
-          cefrLevel: exercise.practiceSet?.level ?? null,
+          practiceLevel: exercise.practiceSet?.level ?? null,
           ...lock,
         });
       }

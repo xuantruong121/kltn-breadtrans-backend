@@ -9,6 +9,7 @@ import {
   getBusinessWeekStart,
   isPastBusinessRollover,
 } from '../common/time/business-time.util';
+import { OFF_MIDNIGHT_CRON } from '../common/time/off-midnight-cron';
 import { SystemJobsService } from './system-jobs.service';
 import { missedTimedJobs } from './timed-catch-up.logic';
 
@@ -79,21 +80,46 @@ export class SystemJobsScheduler implements OnModuleInit {
 
   // Every hour: each learner is reminded at the hour they usually study
   // (20:00 without a habit). This replaced the fixed 20:00 streak reminder.
-  @Cron('0 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  // The midnight-hour run is at 00:02 (OFF_MIDNIGHT_CRON); the key keeps the
+  // hour, so the two methods never share a run.
+  @Cron(OFF_MIDNIGHT_CRON.hourly, { timeZone: BUSINESS_TIMEZONE })
   async enqueueStudyReminder(): Promise<void> {
+    await this.studyReminder();
+  }
+
+  @Cron(OFF_MIDNIGHT_CRON.hourlyAfterMidnight, { timeZone: BUSINESS_TIMEZONE })
+  async enqueueStudyReminderAfterMidnight(): Promise<void> {
+    await this.studyReminder();
+  }
+
+  private async studyReminder(): Promise<void> {
     const now = new Date();
     await this.jobs.enqueueStudyReminder(
       `${getBusinessDayKey(now)}-${Math.floor(now.getTime() / 3_600_000)}`,
     );
   }
 
-  @Cron('*/5 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutes, { timeZone: BUSINESS_TIMEZONE })
   async enqueueVocabularyReview(): Promise<void> {
     await this.jobs.enqueueVocabularyReview(getBusinessFiveMinuteKey());
   }
 
-  @Cron('*/5 * * * *', { timeZone: BUSINESS_TIMEZONE })
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutesAfterMidnight, {
+    timeZone: BUSINESS_TIMEZONE,
+  })
+  async enqueueVocabularyReviewAfterMidnight(): Promise<void> {
+    await this.jobs.enqueueVocabularyReview(getBusinessFiveMinuteKey());
+  }
+
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutes, { timeZone: BUSINESS_TIMEZONE })
   async enqueueExamWritingGrading(): Promise<void> {
+    await this.jobs.enqueueExamWritingGrading(getBusinessFiveMinuteKey());
+  }
+
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutesAfterMidnight, {
+    timeZone: BUSINESS_TIMEZONE,
+  })
+  async enqueueExamWritingGradingAfterMidnight(): Promise<void> {
     await this.jobs.enqueueExamWritingGrading(getBusinessFiveMinuteKey());
   }
 
@@ -110,8 +136,9 @@ export class SystemJobsScheduler implements OnModuleInit {
     await this.jobs.enqueueAccountPurge(getBusinessDayKey(new Date()));
   }
 
-  // Daily off-site copy (owner 2026-11-16: daily, not hourly), two minutes
-  // after the 00:00 dump; the dump takes a few seconds.
+  // Daily off-site copy (owner 2026-11-16: daily, not hourly), one minute
+  // after the 00:01 dump (BACKUP_AT, moved off 00:00 on 2026-11-27); the dump
+  // takes a few seconds.
   @Cron('2 0 * * *', { timeZone: BUSINESS_TIMEZONE })
   async enqueueDatabaseBackupR2Sync(): Promise<void> {
     await this.jobs.enqueueDatabaseBackupR2Sync(

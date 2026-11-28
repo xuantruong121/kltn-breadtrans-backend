@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { levelFields } from '../learning-path/level-access.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  type PracticeLevel,
   QuizPublicationStatus,
   QuizType,
   Role,
   TopicCategory,
 } from '@prisma/client';
 import { QuizContentAccessService } from '../quiz/quiz-content-access.service';
+import { legacyPracticeLevel } from '../subscription/practice-level';
 import {
   resolveReadingCorrectOption,
   READING_MICRO_SKILLS,
@@ -189,43 +191,13 @@ export function isReadingSubmissionComplete(
   );
 }
 
-/** Resolves authoritative CEFR level for a reading practice topic. */
-export function resolveReadingTopicLevel(
-  name: string,
-): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' {
-  const upper = (name || '').toUpperCase();
-  if (upper.includes('B1') || upper.includes('B2')) {
-    return 'INTERMEDIATE';
-  }
-  if (upper.includes('C1') || upper.includes('C2')) {
-    return 'ADVANCED';
-  }
-  return 'BEGINNER';
-}
-
-export type ReadingExerciseLevel = string;
-
-function resolveReadingExerciseLevel(
-  title: string,
-  questions: Array<{ content: unknown }>,
-): ReadingExerciseLevel {
-  const firstStructuredLevel = questions
-    .map((question) => readContent(question.content).level)
-    .find(
-      (level): level is string =>
-        typeof level === 'string' && level.trim().length > 0,
-    );
-  const raw = (firstStructuredLevel ?? title).toUpperCase();
-  const match = raw.match(/\b(A1|A2|B1|B2|C1|C2)\b/);
-  return match?.[1] ?? resolveReadingTopicLevel(raw);
-}
-
-function resolveReadingExerciseDifficulty(level: ReadingExerciseLevel) {
-  if (level.includes('C1') || level.includes('C2') || level === 'ADVANCED')
-    return 'ADVANCED';
-  if (level.includes('B1') || level.includes('B2') || level === 'INTERMEDIATE')
-    return 'INTERMEDIATE';
-  return 'BASIC';
+/**
+ * The practice level of a reading topic. Topics are still named by the old
+ * bands ("Reading A1–A2", "Reading B1–B2", "Reading C1"); a name with no band
+ * reads as Cơ bản.
+ */
+export function resolveReadingTopicLevel(name: string): PracticeLevel {
+  return legacyPracticeLevel(name) ?? 'BASIC';
 }
 
 function resolveReadingExerciseMicroSkills(
@@ -272,6 +244,7 @@ export class ReadingService {
         title: true,
         description: true,
         type: true,
+        practiceLevel: true,
         practiceTopicId: true,
         isPremiumContent: true,
         timeLimit: true,
@@ -341,14 +314,16 @@ export class ReadingService {
           isLocked: false,
           requiredPlan: 'FREE' as const,
         };
-        const level = resolveReadingExerciseLevel(quiz.title, quiz.questions);
+        // The quiz's own practice level (owner 2026-11-27); Cơ bản for the
+        // rare quiz saved without one.
+        const level: PracticeLevel = quiz.practiceLevel ?? 'BASIC';
 
         return {
           quizId: quiz.id,
           title: quiz.title,
           description: quiz.description,
           level,
-          difficulty: resolveReadingExerciseDifficulty(level),
+          difficulty: level,
           questionCount: questionIds.length,
           estimatedMinutes: quiz.timeLimit,
           parentTopicId: quiz.practiceTopicId,
@@ -359,7 +334,6 @@ export class ReadingService {
           isLocked: access.isLocked,
           ...levelFields(access),
           requiredPlan: access.requiredPlan ?? 'FREE',
-          cefrLevel: 'cefrLevel' in access ? access.cefrLevel : null,
           completionStatus: isComplete
             ? 'COMPLETED'
             : completedQuestionCount > 0

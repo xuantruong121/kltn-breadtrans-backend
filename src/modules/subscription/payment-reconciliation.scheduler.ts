@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { BUSINESS_TIMEZONE } from '../../common/time/business-time.util';
+import { OFF_MIDNIGHT_CRON } from '../../common/time/off-midnight-cron';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { SepayTransactionProvider } from './sepay-transaction.provider';
 
@@ -12,8 +14,21 @@ export class PaymentReconciliationScheduler {
     private readonly reconciliation: PaymentReconciliationService,
   ) {}
 
-  @Cron('*/5 * * * *')
+  // Every five minutes, never at 00:00 (OFF_MIDNIGHT_CRON): hour 0 runs at
+  // 00:02, then 00:05 onwards.
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutes, { timeZone: BUSINESS_TIMEZONE })
   async reconcileRecentTransactions(): Promise<void> {
+    await this.reconcile();
+  }
+
+  @Cron(OFF_MIDNIGHT_CRON.everyFiveMinutesAfterMidnight, {
+    timeZone: BUSINESS_TIMEZONE,
+  })
+  async reconcileRecentTransactionsAfterMidnight(): Promise<void> {
+    await this.reconcile();
+  }
+
+  private async reconcile(): Promise<void> {
     if (
       process.env.SEPAY_RECONCILIATION_ENABLED !== 'true' ||
       !process.env.SEPAY_API_TOKEN?.trim()

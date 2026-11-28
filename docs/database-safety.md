@@ -55,8 +55,9 @@ docker compose up -d postgres postgres-shadow postgres-backup postgres-drill red
 ```
 
 The backup service waits for `postgres` to report healthy, then dumps once a
-day at 00:00 Vietnam time (`BACKUP_AT`, `BACKUP_UTC_OFFSET_MINUTES`; owner
-2026-11-16, was every 6 hours) and prunes dumps older than 14 days
+day at 00:01 Vietnam time (`BACKUP_AT`, `BACKUP_UTC_OFFSET_MINUTES`; owner
+2026-11-16, was every 6 hours; 00:00 until 2026-11-27, when every scheduled
+job moved off midnight) and prunes dumps older than 14 days
 (`BACKUP_RETENTION_DAYS`). The backend copies new dumps to the R2 backup
 bucket at 00:02 every day, at backend start, and at minute 20 of any hour in
 which a local dump is not yet uploaded (that check reads only local files).
@@ -70,12 +71,12 @@ the machine is powered off.
 Scheduling is driven by the newest **verified** automatic dump found in the
 backup directory, not by container uptime, so:
 
-- while the host is up, one verified backup a day at 00:00 Vietnam time;
+- while the host is up, one verified backup a day at 00:01 Vietnam time;
 - after host downtime, if there is no verified automatic backup since the most
-  recent 00:00, one runs immediately once Postgres is ready (a machine switched
+  recent 00:01, one runs immediately once Postgres is ready (a machine switched
   on at 08:00 gets that day's backup at about 08:00);
 - a container restart on a day that already has its backup adds none; the
-  worker sleeps until the next 00:00.
+  worker sleeps until the next 00:01.
 
 ### Restore drill
 

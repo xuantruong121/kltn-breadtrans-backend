@@ -21,11 +21,9 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { QuizPublicationStatus } from '@prisma/client';
-import {
-  SPEAKING_EXERCISE_DIFFICULTIES,
-  SPEAKING_TASK_TYPES,
-} from '../speaking/speaking-contract';
+import { type PracticeLevel, QuizPublicationStatus } from '@prisma/client';
+import { SPEAKING_TASK_TYPES } from '../speaking/speaking-contract';
+import { PRACTICE_LEVELS } from '../subscription/practice-level';
 import { WRITING_KINDS, type WritingKind } from './skill-cms-list';
 
 /** Accepts a string or a plain JSON object (never an array). */
@@ -74,8 +72,8 @@ export class SkillContentDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
-  level?: string;
+  @IsIn([...PRACTICE_LEVELS])
+  level?: PracticeLevel;
 
   @IsOptional()
   @IsInt()
@@ -141,8 +139,8 @@ export class SkillContentDto {
   audioUrl?: string;
 
   @IsOptional()
-  @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
-  difficulty?: string;
+  @IsIn([...PRACTICE_LEVELS])
+  difficulty?: PracticeLevel;
 }
 
 export class SkillQuestionDto {
@@ -234,8 +232,8 @@ export class ListeningQuestionContentDto {
   accent?: 'US' | 'UK';
 
   @IsOptional()
-  @IsString()
-  level?: string;
+  @IsIn([...PRACTICE_LEVELS])
+  level?: PracticeLevel;
 
   @IsOptional()
   @IsIn(['LISTENING'])
@@ -292,8 +290,8 @@ export class WritingQuestionDto {
   taskType?: string;
 
   @IsOptional()
-  @IsString()
-  level?: string;
+  @IsIn([...PRACTICE_LEVELS])
+  level?: PracticeLevel;
 
   @IsOptional()
   @IsString()
@@ -383,8 +381,8 @@ export class SpeakingExerciseDto {
   targetText!: string;
 
   @IsOptional()
-  @IsIn([...SPEAKING_EXERCISE_DIFFICULTIES])
-  difficulty?: string;
+  @IsIn([...PRACTICE_LEVELS])
+  difficulty?: PracticeLevel;
 
   @IsOptional()
   @IsString()

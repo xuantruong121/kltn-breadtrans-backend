@@ -1,3 +1,4 @@
+import { PRACTICE_LEVELS } from '../../subscription/practice-level';
 import {
   IsNotEmpty,
   IsString,
@@ -26,8 +27,11 @@ import {
 
 // C2 too (owner 2026-11-22): the CMS level select offers it, and a C2
 // draft was refused with 400 in every AI form.
-const CONTENT_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
-const GRAMMAR_LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const;
+/** Every AI draft takes one of the four practice levels (owner 2026-11-27). */
+const CONTENT_LEVELS = PRACTICE_LEVELS;
+const GRAMMAR_LEVELS = PRACTICE_LEVELS;
+const TOEIC_PART5_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+export type ToeicPart5Difficulty = (typeof TOEIC_PART5_DIFFICULTIES)[number];
 
 export class SuggestVocabWordDto {
   @IsNotEmpty({ message: 'Từ vựng không được để trống' })
@@ -67,6 +71,14 @@ export class SuggestGrammarQuestionsDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   keyFormula?: string;
 
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
+
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })
   @Min(1, { message: 'Số lượng câu hỏi tối thiểu là 1' })
@@ -83,7 +95,7 @@ export class SuggestReadingPassageDto {
 
   @IsNotEmpty({ message: 'Cấp độ bài đọc không được để trống' })
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level: string;
@@ -109,10 +121,18 @@ export class SuggestReadingQuestionsDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
+
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
 
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })
@@ -130,7 +150,7 @@ export class SuggestToeicPart5Dto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   level?: string;
@@ -144,6 +164,13 @@ export class SuggestToeicPart5Dto {
   @IsString({ message: 'Trọng tâm từ vựng phải là chuỗi ký tự' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   vocabularyFocus?: string;
+
+  /** The exam's own difficulty, so new items match the test (owner 2026-11-25). */
+  @IsOptional()
+  @IsIn(TOEIC_PART5_DIFFICULTIES, {
+    message: 'Độ khó phải là easy, medium hoặc hard',
+  })
+  difficulty?: ToeicPart5Difficulty;
 
   @IsOptional()
   @IsInt({ message: 'Số lượng câu hỏi phải là số nguyên' })
@@ -173,7 +200,7 @@ export class SuggestListeningContentDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -203,7 +230,7 @@ export class SuggestListeningQuestionsDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -227,7 +254,7 @@ export class SuggestWritingTaskDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -397,7 +424,7 @@ export class SuggestListeningFullDraftDto {
 
   @IsOptional()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level?: string;
 
@@ -462,6 +489,12 @@ export class SuggestWritingFullDraftDto {
   @MaxLength(20000)
   sourceText?: string;
 
+  /** The admin's own description: the situation the tasks play out (owner 2026-11-25). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brief?: string;
+
   @IsNotEmpty({ message: 'Cần nhập chủ đề' })
   @IsString()
   @MaxLength(300)
@@ -469,7 +502,7 @@ export class SuggestWritingFullDraftDto {
 
   @IsNotEmpty()
   @IsIn(CONTENT_LEVELS, {
-    message: 'Cấp độ phải thuộc A1, A2, B1, B2, C1 hoặc C2',
+    message: 'Cấp độ phải là Mất gốc, Cơ bản, Trung cấp hoặc Nâng cao',
   })
   level: string;
 
@@ -477,6 +510,14 @@ export class SuggestWritingFullDraftDto {
     message: 'AI chỉ soạn bài Viết email hoặc Dịch câu',
   })
   kind: 'EMAIL' | 'TRANSLATION';
+
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
 
   @IsOptional()
   @IsInt()
@@ -490,6 +531,14 @@ export class SuggestVocabFullDraftDto {
   @IsNotEmpty()
   @IsString()
   topic: string;
+
+  /** Items the draft already holds: a "Tạo câu khác" answer never repeats them (owner 2026-11-25). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  avoid?: string[];
 
   @IsOptional()
   @IsIn(GRAMMAR_LEVELS)

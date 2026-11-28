@@ -37,6 +37,11 @@ export class EmailService {
         : null;
   }
 
+  /** False for a test domain nobody owns: mail there is dropped (see send). */
+  canDeliver(to: string): boolean {
+    return !isSkippedRecipient(to, this.skipDomains);
+  }
+
   private async send(to: string, subject: string, html: string): Promise<void> {
     if (isSkippedRecipient(to, this.skipDomains)) {
       // The in-app notification is still created by the caller; only the mail is dropped.

@@ -1,154 +1,193 @@
 import {
-  cefrSpan,
-  levelGroup,
-  levelLabel,
+  CEFR_LEVELS,
   isDictationContent,
+  isPracticeLevel,
+  keepTitleHead,
+  legacyPracticeLevel,
   listeningTitleLabel,
   parseCefrRange,
+  practiceLevelLabel,
+  practiceLevelRank,
+  PRACTICE_LEVELS,
   relabelTitleHead,
-  titleWithLevel,
-  practiceRequiresPlus,
   requiredPracticePlan,
+  type PracticePlan,
+  type PracticeSkill,
 } from './practice-level';
 
-describe('titleWithLevel', () => {
-  it('adds the tag access reads to an untagged title', () => {
-    const title = titleWithLevel('Ordering office supplies', 'C1', 'Writing');
-    expect(title).toBe('Writing C1 — Ordering office supplies');
-    expect(parseCefrRange(title)).toEqual({ min: 'C1', max: 'C1' });
-  });
+/**
+ * Every level tag stored before 2026-11-27, as the migration met them in
+ * kltn_db (titles, speaking set levels, deck levels), plus the legacy ranges
+ * the speaking contract allowed.
+ */
+const OLD_TAGS = [
+  'A1',
+  'A1-A2',
+  'A1–A2',
+  'A2',
+  'A1-B1',
+  'A2-B1',
+  'A2-B2',
+  'B1',
+  'B1-B2',
+  'B2',
+  'B1-C1',
+  'B2-C1',
+  'B2–C1',
+  'C1',
+  'C1-C2',
+  'C2',
+];
 
-  it('replaces the tag when another level is picked', () => {
-    expect(titleWithLevel('Reading A2 — Notices', 'B2', 'Reading')).toBe(
-      'Reading B2 — Notices',
-    );
-  });
+/** The plan matrix as it was written on CEFR ranges (owner 2026-10-30). */
+function oldPlan(
+  skill: PracticeSkill,
+  tag: string,
+  dictation = false,
+): PracticePlan {
+  const range = parseCefrRange(tag)!;
+  const at = (level: string) =>
+    CEFR_LEVELS.indexOf(range.max) >=
+    CEFR_LEVELS.indexOf(level as (typeof CEFR_LEVELS)[number]);
+  if (skill === 'READING') return 'FREE';
+  if (skill === 'LISTENING') return dictation && at('B1') ? 'PLUS' : 'FREE';
+  if (at('C1')) return 'PRO';
+  return at('B1') ? 'PLUS' : 'FREE';
+}
 
-  it('keeps a title already at that level', () => {
-    expect(titleWithLevel('Nghe chép A2 — Du lịch', 'A2', 'Listening')).toBe(
-      'Nghe chép A2 — Du lịch',
-    );
-  });
-
-  it('never shrinks a range the picked level sits inside', () => {
-    expect(titleWithLevel('Reading A1–A2 — Everyday', 'A1', 'Reading')).toBe(
-      'Reading A1–A2 — Everyday',
-    );
-  });
-
-  it('replaces a range when the level is outside it', () => {
-    expect(titleWithLevel('Reading A1–A2 — Everyday', 'C1', 'Reading')).toBe(
-      'Reading C1 — Everyday',
-    );
-  });
-
-  it('does not read a level out of the name of the lesson', () => {
-    expect(titleWithLevel('Road to B2 fluency', 'A2', 'Reading')).toBe(
-      'Reading A2 — Road to B2 fluency',
-    );
-  });
-
-  it('leaves the title alone without a known level', () => {
-    expect(titleWithLevel(' Bài đọc ', '', 'Reading')).toBe('Bài đọc');
-    expect(titleWithLevel('Bài đọc', 'ALL', 'Reading')).toBe('Bài đọc');
-  });
-});
-
-describe('practice level policy (A1/A2 free, B1+ PLUS)', () => {
-  it('reads only the explicit CEFR tag at the head of a title or level', () => {
-    expect(parseCefrRange('Listening B1 — Work & Meetings')).toEqual({
-      min: 'B1',
-      max: 'B1',
-    });
-    expect(parseCefrRange('Reading A1–A2 — Everyday Texts')).toEqual({
-      min: 'A1',
-      max: 'A2',
-    });
-    expect(parseCefrRange('Nghe chép A2 — Du lịch và chỉ đường')).toEqual({
-      min: 'A2',
-      max: 'A2',
-    });
-    expect(parseCefrRange('B1-C1')).toEqual({ min: 'B1', max: 'C1' });
-    // A level mentioned after the separator is not the item's level.
-    expect(parseCefrRange('TOEIC Speaking — Read Aloud B2 style')).toBeNull();
-    expect(parseCefrRange('Viết câu theo tranh — Tủ tài liệu')).toBeNull();
-    expect(parseCefrRange(null)).toBeNull();
-  });
-
-  it('A1/A2 are free; anything reaching B1 needs PLUS', () => {
-    expect(practiceRequiresPlus({ min: 'A1', max: 'A2' })).toBe(false);
-    expect(practiceRequiresPlus({ min: 'B1', max: 'B1' })).toBe(true);
-    expect(practiceRequiresPlus({ min: 'A2', max: 'B1' })).toBe(true);
-    expect(practiceRequiresPlus({ min: 'C1', max: 'C2' })).toBe(true);
-  });
-
-  it('groups and labels; a range across groups has no single group', () => {
-    expect(levelGroup({ min: 'A1', max: 'A2' })).toBe('BASIC');
-    expect(levelGroup({ min: 'B1', max: 'B2' })).toBe('INTERMEDIATE');
-    expect(levelGroup({ min: 'C1', max: 'C1' })).toBe('ADVANCED');
-    expect(levelGroup({ min: 'A2', max: 'B1' })).toBeNull();
-    expect(levelLabel({ min: 'A1', max: 'A2' })).toBe('Cơ bản · A1–A2');
-    expect(levelLabel({ min: 'B1', max: 'B1' })).toBe('Trung cấp · B1');
-    expect(levelLabel({ min: 'B2', max: 'C1' })).toBeNull();
-  });
-
-  it('exposes one level string per item, or null without a tag', () => {
-    expect(cefrSpan(parseCefrRange('Writing B1 — Professional Email'))).toBe(
-      'B1',
-    );
-    expect(cefrSpan(parseCefrRange('Writing B2–C1 — Argument'))).toBe('B2-C1');
-    expect(cefrSpan(parseCefrRange('A1-A2'))).toBe('A1-A2');
-    expect(cefrSpan(parseCefrRange('Untitled'))).toBeNull();
-  });
-});
-
-describe('plan matrix (owner 2026-10-30)', () => {
-  const r = (v: string) => parseCefrRange(v)!;
+describe('legacyPracticeLevel (the migration table, owner 2026-11-27)', () => {
   it.each([
-    ['READING', 'C2', false, 'FREE'],
-    ['LISTENING', 'C1', false, 'FREE'],
-    ['LISTENING', 'A2', true, 'FREE'],
-    ['LISTENING', 'B1', true, 'PLUS'],
-    ['LISTENING', 'C2', true, 'PLUS'],
-    ['SPEAKING', 'A1-A2', false, 'FREE'],
-    ['SPEAKING', 'B1-B2', false, 'PLUS'],
-    ['WRITING', 'B2-C1', false, 'PRO'],
-    ['WRITING', 'C2', false, 'PRO'],
-  ] as const)('%s %s (dictation %s) -> %s', (skill, level, dictation, plan) => {
-    expect(requiredPracticePlan(skill, r(level), { dictation })).toBe(plan);
+    ['A1', 'STARTER'],
+    ['A1-A2', 'STARTER'],
+    ['A1–A2', 'STARTER'],
+    ['A2', 'BASIC'],
+    ['A1-B1', 'INTERMEDIATE'],
+    ['A2-B1', 'INTERMEDIATE'],
+    ['A2-B2', 'INTERMEDIATE'],
+    ['B1', 'INTERMEDIATE'],
+    ['B1-B2', 'INTERMEDIATE'],
+    ['B2', 'INTERMEDIATE'],
+    ['B1-C1', 'ADVANCED'],
+    ['B2–C1', 'ADVANCED'],
+    ['C1', 'ADVANCED'],
+    ['C2', 'ADVANCED'],
+    ['BEGINNER', 'BASIC'],
+    ['INTERMEDIATE', 'INTERMEDIATE'],
+    ['STARTER', 'STARTER'],
+    ['Listening B1 — Workplace Conversations', 'INTERMEDIATE'],
+    ['Reading A1–A2 — Everyday Texts', 'STARTER'],
+    ['Writing B2–C1 — Argument & Problem Solving', 'ADVANCED'],
+  ])('%s → %s', (value, level) => {
+    expect(legacyPracticeLevel(value)).toBe(level);
   });
 
-  it('recognises dictation only from the stored mode', () => {
-    expect(isDictationContent({ mode: 'DICTATION' })).toBe(true);
-    expect(isDictationContent({ mode: 'DIALOGUE' })).toBe(false);
-    expect(isDictationContent(null)).toBe(false);
+  it('reads nothing from a value without a level', () => {
+    expect(legacyPracticeLevel('Viết câu theo tranh — Giao hàng')).toBeNull();
+    expect(legacyPracticeLevel('')).toBeNull();
+    expect(legacyPracticeLevel(null)).toBeNull();
+  });
+
+  it('only reads the head of a title', () => {
+    expect(legacyPracticeLevel('Office tasks — B2 vocabulary')).toBeNull();
   });
 });
 
-describe('Listening title head by form (owner 2026-11-24)', () => {
-  it('names the form chosen', () => {
+describe('requiredPracticePlan on practice levels', () => {
+  it.each([
+    ['READING', 'ADVANCED', false, 'FREE'],
+    ['LISTENING', 'ADVANCED', false, 'FREE'],
+    ['LISTENING', 'BASIC', true, 'FREE'],
+    ['LISTENING', 'INTERMEDIATE', true, 'PLUS'],
+    ['LISTENING', 'ADVANCED', true, 'PLUS'],
+    ['SPEAKING', 'STARTER', false, 'FREE'],
+    ['SPEAKING', 'BASIC', false, 'FREE'],
+    ['SPEAKING', 'INTERMEDIATE', false, 'PLUS'],
+    ['SPEAKING', 'ADVANCED', false, 'PRO'],
+    ['WRITING', 'BASIC', false, 'FREE'],
+    ['WRITING', 'INTERMEDIATE', false, 'PLUS'],
+    ['WRITING', 'ADVANCED', false, 'PRO'],
+  ] as const)('%s %s (dictation %s) → %s', (skill, level, dictation, plan) => {
+    expect(requiredPracticePlan(skill, level, { dictation })).toBe(plan);
+  });
+
+  // The owner's 2026-11-27 decision: no item changes plan in the move. The
+  // three items reaching C1 from B1 or B2 keep PRO; only their level lock
+  // moves from Trung cấp to Nâng cao.
+  const SKILLS: Array<[PracticeSkill, boolean]> = [
+    ['READING', false],
+    ['LISTENING', false],
+    ['LISTENING', true],
+    ['SPEAKING', false],
+    ['WRITING', false],
+  ];
+  it.each(OLD_TAGS)(
+    'gives a %s item the plan the CEFR matrix gave it, for every skill',
+    (tag) => {
+      const level = legacyPracticeLevel(tag)!;
+      for (const [skill, dictation] of SKILLS)
+        expect({
+          skill,
+          dictation,
+          plan: requiredPracticePlan(skill, level, { dictation }),
+        }).toEqual({ skill, dictation, plan: oldPlan(skill, tag, dictation) });
+    },
+  );
+});
+
+describe('practice level helpers', () => {
+  it('orders and names the four levels', () => {
+    expect([...PRACTICE_LEVELS]).toEqual([
+      'STARTER',
+      'BASIC',
+      'INTERMEDIATE',
+      'ADVANCED',
+    ]);
+    expect(PRACTICE_LEVELS.map(practiceLevelRank)).toEqual([0, 1, 2, 3]);
+    expect(practiceLevelLabel('STARTER')).toBe('Mất gốc');
+    expect(practiceLevelLabel('ADVANCED')).toBe('Nâng cao');
+    expect(practiceLevelLabel(null)).toBeNull();
+  });
+
+  it('recognises only the four levels', () => {
+    expect(isPracticeLevel('BASIC')).toBe(true);
+    expect(isPracticeLevel('BEGINNER')).toBe(false);
+    expect(isPracticeLevel('B1')).toBe(false);
+  });
+});
+
+describe('titles', () => {
+  it('names a listening lesson by its form', () => {
     expect(listeningTitleLabel('DIALOGUE')).toBe('Hội thoại');
     expect(listeningTitleLabel('DICTATION')).toBe('Nghe chép');
     expect(listeningTitleLabel('COMPREHENSION')).toBe('Nghe hiểu');
     expect(listeningTitleLabel(undefined)).toBe('Listening');
   });
 
-  it('relabels the head and keeps its level and the title', () => {
-    expect(
-      relabelTitleHead('Listening A2 — Giao tiếp hằng ngày', 'Nghe hiểu'),
-    ).toBe('Nghe hiểu A2 — Giao tiếp hằng ngày');
-    expect(relabelTitleHead('Hội thoại B1-B2 — Work', 'Nghe chép')).toBe(
-      'Nghe chép B1-B2 — Work',
+  it('swaps the head word and keeps the old level head', () => {
+    expect(relabelTitleHead('Listening A2 — Work', 'Nghe hiểu')).toBe(
+      'Nghe hiểu A2 — Work',
     );
-    // No level head: left as it is.
-    expect(relabelTitleHead('Giao tiếp hằng ngày', 'Nghe hiểu')).toBe(
-      'Giao tiếp hằng ngày',
-    );
+    expect(relabelTitleHead('Work day', 'Nghe hiểu')).toBe('Work day');
   });
 
-  it('the level still decides access after relabelling', () => {
+  it('keeps an old title head on edit, which titles are looked up by', () => {
+    expect(keepTitleHead('Listening B1 — Workplace', 'Workplace calls')).toBe(
+      'Listening B1 — Workplace calls',
+    );
     expect(
-      parseCefrRange(relabelTitleHead('Listening B1 — Work', 'Nghe chép')),
-    ).toEqual({ min: 'B1', max: 'B1' });
+      keepTitleHead('Listening B1 — Workplace', 'Nghe chép B1 — Calls'),
+    ).toBe('Nghe chép B1 — Calls');
+    expect(keepTitleHead('Thư phản hồi — Dời lịch họp', 'Dời lịch')).toBe(
+      'Dời lịch',
+    );
+    expect(keepTitleHead('Work day', 'Work days')).toBe('Work days');
+  });
+});
+
+describe('isDictationContent', () => {
+  it('reads the listening mode from the quiz metadata', () => {
+    expect(isDictationContent({ mode: 'DICTATION' })).toBe(true);
+    expect(isDictationContent({ mode: 'DIALOGUE' })).toBe(false);
+    expect(isDictationContent(null)).toBe(false);
   });
 });

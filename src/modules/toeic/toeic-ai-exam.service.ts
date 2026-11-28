@@ -51,6 +51,7 @@ import {
   plannedGroupIssue,
   questionContentIssue,
   languageIssue,
+  lrPartCoverage,
   type PlannedTraits,
   questionsToAvoid,
   readingGroupIssue,
@@ -771,6 +772,8 @@ export class ToeicAiExamService implements OnModuleInit, OnModuleDestroy {
       })),
       flaggedCount,
       appliedCandidateKeys,
+      // Questions each planned Part needs and has, for the short-Part warning.
+      partCoverage: lrPartCoverage(request?.plan, lrGroups),
     };
   }
 

@@ -5,12 +5,17 @@ import { ReadingModule } from '../reading/reading.module';
 import { QuizModule } from '../quiz/quiz.module';
 import { SpeakingModule } from '../speaking/speaking.module';
 import { AdaptiveDailyPracticeService } from './adaptive-daily-practice.service';
+import { LearningSummaryService } from './learning-summary.service';
 
 import { LocationModule } from '../location/location.module';
 
 @Module({
   imports: [ReadingModule, QuizModule, SpeakingModule, LocationModule],
-  providers: [UserService, AdaptiveDailyPracticeService],
+  providers: [
+    UserService,
+    AdaptiveDailyPracticeService,
+    LearningSummaryService,
+  ],
   controllers: [UserController],
 })
 export class UserModule {}

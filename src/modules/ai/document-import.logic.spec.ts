@@ -139,11 +139,11 @@ describe('document import logic', () => {
           description: 'Nghe và chép lại.',
           sentences: [...english(21), 'Câu tiếng Việt không được giữ lại.'],
         },
-        { topic: 'đặt lịch hẹn', level: 'A2', count: 20 },
+        { topic: 'đặt lịch hẹn', level: 'BASIC', count: 20 },
       );
       expect(draft).toMatchObject({
         title: 'Đặt lịch hẹn',
-        level: 'A2',
+        level: 'BASIC',
         mode: 'DICTATION',
         questions: [],
       });

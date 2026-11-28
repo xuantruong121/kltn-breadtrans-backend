@@ -22,6 +22,7 @@ import {
   ApiQuery,
   ApiResponse,
 } from '@nestjs/swagger';
+import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -50,10 +51,16 @@ export class AdminController {
     private readonly dictionaryService: AdminDictionaryService,
     private readonly retentionMetrics: RetentionMetricsService,
     private readonly aiReviewCosts: AiReviewCostsService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get('dashboard-stats')
   @ApiOperation({ summary: 'Lay thong ke tong quan cho Admin Dashboard' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'range 30d|6m|12m (mac dinh 30d), theo ngay/thang gio Viet Nam. activeStudents chi dem hoc vien co lam bai hoac hoat dong hoc trong khoang, khong dem dang nhap. stats.previous va finance.previous la cung so do cua ky truoc (30 ngay / 6 / 12 thang truoc do). newStudentsWithDiagnostic: hoc vien moi da hoan thanh bai danh gia dau vao (chi dem, khong co trinh do). finance.plansEndingSoon: hoc vien co goi tra phi het han trong 7 ngay ma khong co goi nao sau do. waitingSince: thoi diem cua muc cho lau nhat moi hang Can xu ly. gamification.flow: Banh Mi hoc vien nhan (issued) va tieu (spent) trong khoang, tinh rong theo tung nguon (cuoc, tra lai, thang cung mot tro choi; mua va hoan tien), adminAdjusted la quan tri vien dieu chinh, tach rieng; khong tinh SEED_FIXTURE, LEGACY_RECONCILIATION. Doanh thu (finance) va luot doi qua (gamification.totalOrders/approvedOrders) tinh trong khoang da chon; pendingOrders, totalBreads, activeSubscriptionsCount la hien tai. monthlyTrends.activityCount gom bai nop, bai noi, ngu phap, luyen de, noi dung, danh gia dau vao. contentBreakdown: vocabDecks, grammarTopics, listeningLessons, readingLessons, writingLessons, speakingSets (chi luyen ky nang), exams, mediaTopics.',
+  })
   getDashboardStats(@Query('range') range?: string) {
     return this.adminService.getDashboardStats(range);
   }
@@ -90,6 +97,21 @@ export class AdminController {
   @ApiResponse({ status: 409, description: 'Email đã tồn tại.' })
   createUser(@Body() dto: CreateUserDto) {
     return this.adminService.createUser(dto);
+  }
+
+  @Post('users/:id/send-password-reset')
+  @ApiOperation({
+    summary:
+      'Admin gui email dat lai mat khau cho nguoi dung (lien ket mot lan, 15 phut)',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'status: SENT da gui | COOLDOWN gui qua gan nhau (1 phut) | UNDELIVERABLE email thuoc mien thu nghiem, khong nhan duoc thu | EMAIL_FAILED loi gui thu.',
+  })
+  @ApiResponse({ status: 404, description: 'Nguoi dung khong ton tai.' })
+  sendPasswordReset(@Param('id', ParseIntPipe) id: number) {
+    return this.authService.sendPasswordResetForAdmin(id);
   }
 
   @Patch('users/:id')
@@ -223,7 +245,11 @@ export class AdminController {
   @ApiQuery({ name: 'pageSize', required: false })
   @ApiQuery({ name: 'q', required: false })
   @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'level', required: false, description: 'A1..C2 hoac NONE' })
+  @ApiQuery({
+    name: 'level',
+    required: false,
+    description: 'STARTER, BASIC, INTERMEDIATE, ADVANCED hoac NONE',
+  })
   @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'PUBLISHED'] })
   @ApiQuery({
     name: 'sort',

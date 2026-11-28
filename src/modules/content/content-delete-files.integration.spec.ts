@@ -176,7 +176,12 @@ describeWithIsolatedDatabase('content delete removes its own R2 files', () => {
     setIds.push(setId, copyId);
     for (const id of [setId, copyId])
       await prisma.speakingPracticeSet.create({
-        data: { id, title: 'QA delete files', description: '', level: 'A1' },
+        data: {
+          id,
+          title: 'QA delete files',
+          description: '',
+          level: 'STARTER',
+        },
       });
     const exercise = (practiceSetId: string, order: number) =>
       prisma.speakingExercise.create({
