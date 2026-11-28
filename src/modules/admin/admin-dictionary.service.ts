@@ -12,7 +12,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   assertNotANumber,
   entryDataFromWord,
+  entryTakenMessage,
   headwordOf,
+  isUniqueViolation,
   posOf,
 } from '../vocab/dictionary-entry';
 import {
@@ -137,19 +139,26 @@ export class AdminDictionaryService {
     const headword = headwordOf(dto.word);
     const pos = posOf(dto.pos);
     await this.assertFree(headword, pos);
-    return this.prisma.dictionaryEntry.create({
-      data: {
-        ...(entryDataFromWord(dto) as Prisma.DictionaryEntryCreateInput),
-        headword,
-        displayWord: dto.word.trim(),
-        pos,
-        meaningVi: dto.meaning.trim(),
-        source: DictionaryEntrySource.CURATED,
-        status: DictionaryEntryStatus.APPROVED,
-        reviewedAt: new Date(),
-        reviewedBy: adminId,
-      },
-    });
+    try {
+      return await this.prisma.dictionaryEntry.create({
+        data: {
+          ...(entryDataFromWord(dto) as Prisma.DictionaryEntryCreateInput),
+          headword,
+          displayWord: dto.word.trim(),
+          pos,
+          meaningVi: dto.meaning.trim(),
+          source: DictionaryEntrySource.CURATED,
+          status: DictionaryEntryStatus.APPROVED,
+          reviewedAt: new Date(),
+          reviewedBy: adminId,
+        },
+      });
+    } catch (error) {
+      // A second request for the same word got past assertFree first.
+      if (isUniqueViolation(error))
+        throw new ConflictException(entryTakenMessage(dto.word.trim(), pos));
+      throw error;
+    }
   }
 
   /**
@@ -231,8 +240,6 @@ export class AdminDictionaryService {
       where: { headword_pos: { headword, pos } },
     });
     if (taken)
-      throw new ConflictException(
-        `"${taken.displayWord}" (${pos}) đã có trong kho từ điển.`,
-      );
+      throw new ConflictException(entryTakenMessage(taken.displayWord, pos));
   }
 }

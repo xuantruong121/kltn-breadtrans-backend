@@ -111,17 +111,82 @@ export class AiDictionaryProvider implements DictionaryProvider {
   }
 }
 
+/**
+ * A pronunciation address the browser can open: protocol-relative ("//host/x")
+ * becomes https, anything that is not http(s) is dropped.
+ */
+export function normalizeAudioUrl(
+  raw: string | null | undefined,
+): string | null {
+  const value = (raw ?? '').trim();
+  if (!value) return null;
+  const url = value.startsWith('//') ? `https:${value}` : value;
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
+const AUDIO_CHECK_TIMEOUT_MS = 1500;
+const AUDIO_VERDICT_TTL_MS = 60 * 60 * 1000;
+const audioVerdicts = new Map<string, { playable: boolean; at: number }>();
+
+/** For tests: forget what was learned about audio addresses. */
+export const forgetAudioVerdicts = () => audioVerdicts.clear();
+
+/**
+ * The address when it really serves audio, otherwise null (owner 2026-11-28:
+ * the public dictionary hands out pronunciation addresses that answer 404, and
+ * the admin form showed a dead 00:00 player). An answer, even a 404, is
+ * remembered for an hour; no answer in time is not, so the next lookup asks
+ * again.
+ */
+export async function playableAudioUrl(
+  raw: string | null | undefined,
+  options: { fetchImpl?: typeof fetch; now?: () => number } = {},
+): Promise<string | null> {
+  const url = normalizeAudioUrl(raw);
+  if (!url) return null;
+  const now = options.now ?? Date.now;
+  const known = audioVerdicts.get(url);
+  if (known && now() - known.at < AUDIO_VERDICT_TTL_MS)
+    return known.playable ? url : null;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AUDIO_CHECK_TIMEOUT_MS);
+  try {
+    let response = await fetchImpl(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    // A host that refuses HEAD is asked for the first byte instead.
+    if (response.status === 405 || response.status === 501)
+      response = await fetchImpl(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        signal: controller.signal,
+      });
+    const type = response.headers.get('content-type') ?? '';
+    const playable = response.ok && /^audio\//i.test(type);
+    audioVerdicts.set(url, { playable, at: now() });
+    return playable ? url : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Adapter for the public Free Dictionary API. Provider JSON never crosses the domain boundary. */
 export class DictionaryApiDevProvider implements DictionaryProvider {
   private readonly baseUrl =
     process.env.DICTIONARY_API_BASE_URL ||
     'https://api.dictionaryapi.dev/api/v2/entries/en';
 
+  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+
   async lookup(word: string): Promise<ProviderDictionaryEntry[]> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);
     try {
-      const response = await fetch(
+      const response = await this.fetchImpl(
         `${this.baseUrl.replace(/\/$/, '')}/${encodeURIComponent(word)}`,
         { signal: controller.signal },
       );
@@ -130,7 +195,11 @@ export class DictionaryApiDevProvider implements DictionaryProvider {
         throw new Error(`Dictionary provider HTTP ${response.status}`);
       const payload: unknown = await response.json();
       if (!Array.isArray(payload)) return [];
-      return payload.flatMap((entry: unknown) => this.normalizeEntry(entry));
+      const entries = payload.flatMap((entry: unknown) =>
+        this.normalizeEntry(entry),
+      );
+      await this.keepPlayableAudio(entries);
+      return entries;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Dictionary provider timeout');
@@ -138,6 +207,36 @@ export class DictionaryApiDevProvider implements DictionaryProvider {
       throw error;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Audio addresses the provider gave that do not serve audio are dropped; the
+   * phonetics stay. Every address is asked once, all at the same time.
+   */
+  private async keepPlayableAudio(entries: ProviderDictionaryEntry[]) {
+    const urls = new Set<string>();
+    for (const entry of entries)
+      for (const raw of [entry.audioUs, entry.audioUk]) {
+        const url = normalizeAudioUrl(raw);
+        if (url) urls.add(url);
+      }
+    const verdicts = new Map<string, string | null>(
+      await Promise.all(
+        [...urls].map(
+          async (url) =>
+            [
+              url,
+              await playableAudioUrl(url, { fetchImpl: this.fetchImpl }),
+            ] as const,
+        ),
+      ),
+    );
+    for (const entry of entries) {
+      entry.audioUs =
+        verdicts.get(normalizeAudioUrl(entry.audioUs) ?? '') ?? null;
+      entry.audioUk =
+        verdicts.get(normalizeAudioUrl(entry.audioUk) ?? '') ?? null;
     }
   }
 

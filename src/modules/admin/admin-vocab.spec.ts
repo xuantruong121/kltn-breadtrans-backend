@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 const entryRow = (overrides: Record<string, unknown> = {}) => ({
@@ -161,6 +162,49 @@ describe('AdminService vocab decks', () => {
       build(prisma).addVocabWord(3, { word: 'agenda', meaning: 'x' }),
     ).rejects.toThrow('đã có trong bộ này');
     expect(prisma.vocabWord.create).not.toHaveBeenCalled();
+  });
+
+  // The add button pressed twice: both requests pass the checks above and the
+  // second hits the unique key. It must answer 409 like the checks, not 500.
+  const uniqueViolation = () =>
+    Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+
+  it('answers 409, not 500, when a parallel request took the new word first', async () => {
+    const prisma = addPrisma();
+    prisma.dictionaryEntry.create.mockRejectedValue(uniqueViolation());
+    const attempt = build(prisma).addVocabWord(3, {
+      word: 'Agenda',
+      meaning: 'chương trình họp',
+    });
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toThrow(
+      '"Agenda" (noun) đã có trong kho từ điển.',
+    );
+    expect(prisma.vocabWord.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 when a parallel request linked the word to the deck first', async () => {
+    const prisma = addPrisma(entryRow({ id: 9 }));
+    prisma.vocabWord.create.mockRejectedValue(uniqueViolation());
+    const attempt = build(prisma).addVocabWord(3, {
+      word: 'agenda',
+      meaning: 'x',
+    });
+    await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+    await expect(attempt).rejects.toThrow(
+      '"agenda" (noun) đã có trong bộ này.',
+    );
+    expect(prisma.vocabTopic.update).not.toHaveBeenCalled();
+  });
+
+  it('lets any other database error through unchanged', async () => {
+    const prisma = addPrisma();
+    prisma.dictionaryEntry.create.mockRejectedValue(
+      new Error('connection lost'),
+    );
+    await expect(
+      build(prisma).addVocabWord(3, { word: 'agenda', meaning: 'x' }),
+    ).rejects.toThrow('connection lost');
   });
 });
 

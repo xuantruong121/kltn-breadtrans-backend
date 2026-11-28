@@ -13,6 +13,20 @@ export type DeckWordWithEntry = VocabWord & { entry: DictionaryEntry };
 export const headwordOf = (word: string) =>
   word.trim().replace(/\s+/g, ' ').toLowerCase();
 
+/**
+ * Two requests for the same word can both pass the "is it taken" check and
+ * race into the unique key; the loser gets this 409, like the check's, not a
+ * bare 500 (owner 2026-11-28: the add button was pressed twice).
+ */
+export const isUniqueViolation = (error: unknown) =>
+  (error as { code?: string } | null)?.code === 'P2002';
+
+export const entryTakenMessage = (displayWord: string, pos: string) =>
+  `"${displayWord}" (${pos}) đã có trong kho từ điển.`;
+
+export const wordInDeckMessage = (displayWord: string, pos: string) =>
+  `"${displayWord}" (${pos}) đã có trong bộ này.`;
+
 /** Flashcards teach words; a bare number ("10", "9:00") is not one. */
 export function assertNotANumber(word?: string) {
   if (word && /^\d+([.,:]\d+)*$/.test(word.trim()))
