@@ -2,6 +2,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   DictionaryEntrySource,
@@ -9,6 +11,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DictionaryLookupService } from '../vocab/dictionary-lookup.service';
 import {
   assertNotANumber,
   entryDataFromWord,
@@ -74,7 +77,20 @@ export function dictionaryListWhere(
  */
 @Injectable()
 export class AdminDictionaryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly lookup?: DictionaryLookupService,
+  ) {}
+
+  /**
+   * The external dictionary's phonetics for a word, for the word form's
+   * "Lấy phiên âm". Reads and writes nothing in the store (see phoneticsFor).
+   */
+  phonetics(word: string, pos?: string) {
+    if (!this.lookup)
+      throw new ServiceUnavailableException('Chưa tra được từ điển lúc này.');
+    return this.lookup.phoneticsFor(word, pos);
+  }
 
   async list(query: DictionaryListQuery) {
     const page = Math.max(1, Math.floor(Number(query.page) || 1));

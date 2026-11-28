@@ -17,6 +17,12 @@ export interface ProviderDictionaryEntry {
   }>;
   audioUs: string | null;
   audioUk: string | null;
+  /**
+   * True when that accent's phonetics is the dictionary's one general
+   * phonetics (no US or UK tag of its own), not a phonetics of that accent.
+   */
+  ipaUsShared?: boolean;
+  ipaUkShared?: boolean;
 }
 
 export interface DictionaryProvider {
@@ -283,6 +289,10 @@ export class DictionaryApiDevProvider implements DictionaryProvider {
           typeof item.partOfSpeech === 'string' ? item.partOfSpeech : null,
         ipaUs: usPhonetic?.text || genericIpa || firstWithText?.text || null,
         ipaUk: ukPhonetic?.text || genericIpa || firstWithText?.text || null,
+        ipaUsShared:
+          !usPhonetic?.text && Boolean(genericIpa || firstWithText?.text),
+        ipaUkShared:
+          !ukPhonetic?.text && Boolean(genericIpa || firstWithText?.text),
         audioUs: usPhonetic?.audio || firstWithAudio?.audio || null,
         audioUk: ukPhonetic?.audio || firstWithAudio?.audio || null,
         definitions: definitions.map((definition: unknown) => {

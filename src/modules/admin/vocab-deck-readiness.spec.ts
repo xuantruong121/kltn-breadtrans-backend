@@ -40,7 +40,7 @@ describe('vocab deck readiness: the editor checklist on the server', () => {
     ).toEqual([
       'phiên âm 1/3 từ',
       'câu ví dụ 2/3 từ',
-      'ít nhất 4 nghĩa khác nhau cho bước Trắc nghiệm',
+      'có ít nhất 4 từ khác nghĩa nhau',
     ]);
     expect(
       vocabDeckProblems({
@@ -77,7 +77,7 @@ describe('vocab deck readiness: the editor checklist on the server', () => {
     );
     const page = (await service.getVocabTopics({ page: '1' })) as any;
     expect(page.items.map((d: any) => [d.id, d.publishProblems])).toEqual([
-      [2, ['ít nhất 4 nghĩa khác nhau cho bước Trắc nghiệm']],
+      [2, ['có ít nhất 4 từ khác nghĩa nhau']],
       [1, []],
     ]);
     expect(prisma.vocabWord.findMany).toHaveBeenCalledWith(

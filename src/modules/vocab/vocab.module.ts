@@ -11,6 +11,6 @@ import { GamificationModule } from '../gamification/gamification.module';
   imports: [PrismaModule, AiModule, SubscriptionModule, GamificationModule],
   controllers: [VocabController],
   providers: [VocabService, DictionaryLookupService],
-  exports: [VocabService],
+  exports: [VocabService, DictionaryLookupService],
 })
 export class VocabModule {}

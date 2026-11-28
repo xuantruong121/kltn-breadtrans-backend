@@ -178,6 +178,24 @@ export class AdminController {
     });
   }
 
+  // Declared before dictionary/:id, or "phonetics" would be read as an id.
+  @Get('dictionary/phonetics')
+  @ApiOperation({
+    summary:
+      'Admin: Phien am US/UK va audio cua mot tu theo tu dien ngoai, khong ghi gi vao kho',
+  })
+  @ApiQuery({ name: 'word', required: true })
+  @ApiQuery({ name: 'pos', required: false })
+  @ApiResponse({
+    status: 200,
+    description:
+      'found, unavailable, ipaUs, ipaUk, usIsShared, ukIsShared, audioUs, audioUk',
+  })
+  @ApiResponse({ status: 400, description: 'Khong phai mot tu hop le' })
+  dictionaryPhonetics(@Query('word') word: string, @Query('pos') pos?: string) {
+    return this.dictionaryService.phonetics(word, pos);
+  }
+
   @Get('dictionary/:id')
   @ApiOperation({ summary: 'Admin: Mot muc tu dien va cac bo dang dung no' })
   @ApiResponse({ status: 404, description: 'Khong co muc nay' })

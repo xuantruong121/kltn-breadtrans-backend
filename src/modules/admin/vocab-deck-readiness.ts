@@ -54,8 +54,8 @@ export function vocabDeckProblems(deck: {
   if (withIpa < total) missing.push(`phiên âm ${withIpa}/${total} từ`);
   if (withExample < total) missing.push(`câu ví dụ ${withExample}/${total} từ`);
   if (distinctMeanings < QUIZ_MEANINGS)
-    missing.push(
-      `ít nhất ${QUIZ_MEANINGS} nghĩa khác nhau cho bước Trắc nghiệm`,
-    );
+    // The quiz takes its 3 wrong answers from the meanings of the deck's other
+    // words, so the condition is on the deck's words, not on a field.
+    missing.push(`có ít nhất ${QUIZ_MEANINGS} từ khác nghĩa nhau`);
   return missing;
 }
