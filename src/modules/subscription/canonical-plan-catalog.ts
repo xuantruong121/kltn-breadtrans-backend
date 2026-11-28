@@ -108,9 +108,11 @@ const sameFeatures = (actual: PlanFeatureKey[], expected: PlanFeatureKey[]) =>
 /**
  * Make the current commercial catalog deterministic without rewriting rows
  * referenced by purchases or subscriptions. Historical versions remain intact;
- * a replacement version is created only when the current contract (price,
- * term, features) differs. The display text of the current version (name and
- * description) is not part of the contract: it is updated in place.
+ * a replacement version is created only when a term has no selling version or
+ * the selling one grants different features. The table's price is the starting
+ * price only: a price the admin changed is kept. The display text of the
+ * current version (name and description) is not part of the contract: it is
+ * updated in place.
  */
 export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
   const now = new Date();
@@ -154,10 +156,14 @@ export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
         include: { entitlements: { where: { enabled: true } } },
         orderBy: { version: 'desc' },
       });
+      // The price is not part of the match (owner 2026-11-28): once the admin
+      // changed it from the admin page, running the seed again must not put the
+      // table's price back. The price below is the table's only for a term
+      // that has no selling version yet.
+      const sellingPrice = current[0]?.priceVnd ?? null;
       const matching = current.find(
         (version) =>
           version.durationDays === spec.durationDays &&
-          version.priceVnd === spec.priceVnd &&
           version.currency === 'VND' &&
           sameFeatures(
             version.entitlements.map((item) => item.featureKey),
@@ -207,7 +213,8 @@ export async function ensureCanonicalPlanCatalog(prisma: PrismaClient) {
           displayName: spec.versionName,
           description: spec.description,
           durationDays: spec.durationDays,
-          priceVnd: spec.priceVnd,
+          // New grants on a term already on sale keep the price it sells at.
+          priceVnd: sellingPrice ?? spec.priceVnd,
           currency: 'VND',
           status: PlanVersionStatus.PUBLISHED,
           isCurrent: true,

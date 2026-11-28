@@ -104,11 +104,28 @@ export class PlanCatalogAdminService {
       });
       const version = (latest?.version ?? 0) + 1;
       // A new price must not lose what the plan grants: start from the
-      // current version, and the admin changes only what differs.
-      const current = await tx.planVersion.findFirst({
-        where: { planId: plan!.id, isCurrent: true },
-        include: { entitlements: true },
-      });
+      // current version, and the admin changes only what differs. A plan sells
+      // one current version per term, so the one of the same term comes first
+      // (a draft of 180 days must not take the name of the 30-day version).
+      const currentInclude = { entitlements: true } as const;
+      const sameTerm = dto.durationDays
+        ? await tx.planVersion.findFirst({
+            where: {
+              planId: plan!.id,
+              isCurrent: true,
+              durationDays: dto.durationDays,
+            },
+            orderBy: { version: 'desc' },
+            include: currentInclude,
+          })
+        : null;
+      const current =
+        sameTerm ??
+        (await tx.planVersion.findFirst({
+          where: { planId: plan!.id, isCurrent: true },
+          orderBy: { version: 'desc' },
+          include: currentInclude,
+        }));
       this.subscriptionService.validatePlanVersionInput({
         version,
         durationDays: dto.durationDays,
@@ -347,6 +364,107 @@ export class PlanCatalogAdminService {
       return row;
     });
     return this.toVersionDto(published, published.plan.code);
+  }
+
+  /**
+   * Change the price of one term of PLUS or PRO in one step (owner
+   * 2026-11-28): the admin sees "sửa giá", not drafts and versions. Underneath
+   * a price is never edited in place, because purchases point at the version
+   * they bought: a new version of the same term is created from the selling
+   * one (name, description, what it grants) and takes its place, atomically.
+   * The other terms of the plan are not touched.
+   */
+  async changePrice(
+    planCode: string,
+    durationDays: number,
+    priceVnd: number,
+    adminUserId: number,
+  ): Promise<PlanVersionAdminDto> {
+    const plan = await this.prisma.plan.findUnique({
+      where: { code: planCode.toUpperCase() },
+    });
+    this.assertPaidPlan(plan?.code, plan?.status);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      await this.lockPlan(tx, plan!.id);
+      const selling = await tx.planVersion.findFirst({
+        where: {
+          planId: plan!.id,
+          durationDays,
+          isCurrent: true,
+          status: PlanVersionStatus.PUBLISHED,
+        },
+        include: { entitlements: true },
+      });
+      if (!selling) {
+        throw new NotFoundException(
+          `Gói ${plan!.code} chưa có mức ${durationDays} ngày đang bán.`,
+        );
+      }
+      if (selling.priceVnd === priceVnd) {
+        throw new ConflictException('Giá mới trùng với giá đang bán.');
+      }
+      if (!selling.entitlements.length) {
+        // The same guard as publish (audit #19): a price must not lose the grants.
+        throw new ConflictException(
+          'Mức này chưa có quyền lợi nên chưa đổi giá được.',
+        );
+      }
+      const latest = await tx.planVersion.aggregate({
+        where: { planId: plan!.id },
+        _max: { version: true },
+      });
+      const version = (latest._max.version ?? 0) + 1;
+      this.subscriptionService.validatePlanVersionInput({
+        version,
+        durationDays,
+        priceVnd,
+        currency: selling.currency,
+        status: PlanVersionStatus.PUBLISHED,
+        isCurrent: true,
+      });
+      if (priceVnd <= 0) {
+        throw new ConflictException('Giá bán phải lớn hơn 0.');
+      }
+      await tx.planVersion.updateMany({
+        where: {
+          planId: plan!.id,
+          durationDays,
+          isCurrent: true,
+        },
+        data: { isCurrent: false, status: PlanVersionStatus.RETIRED },
+      });
+      const now = new Date();
+      const row = await tx.planVersion.create({
+        data: {
+          planId: plan!.id,
+          version,
+          displayName: selling.displayName,
+          description: selling.description,
+          durationDays,
+          priceVnd,
+          currency: selling.currency,
+          status: PlanVersionStatus.PUBLISHED,
+          isCurrent: true,
+          effectiveFrom: now,
+          publishedAt: now,
+          entitlements: {
+            create: selling.entitlements.map((entitlement) => ({
+              featureKey: entitlement.featureKey,
+              enabled: entitlement.enabled,
+              limitValue: entitlement.limitValue,
+              unit: entitlement.unit,
+              period: entitlement.period,
+              scope: entitlement.scope ?? Prisma.JsonNull,
+            })),
+          },
+        },
+        include: { plan: true, entitlements: true },
+      });
+      this.audit(adminUserId, 'CHANGE_PRICE', row.id, row.plan.code);
+      return row;
+    });
+    return this.toVersionDto(created, created.plan.code);
   }
 
   async retire(id: number, adminUserId: number): Promise<PlanVersionAdminDto> {

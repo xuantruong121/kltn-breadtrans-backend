@@ -14,6 +14,7 @@ import {
   IsPositive,
   IsString,
   IsIn,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -53,6 +54,16 @@ export class CreatePlanVersionDto {
 }
 
 export class UpdatePlanVersionDto extends PartialType(CreatePlanVersionDto) {}
+
+/** The new selling price of one term of a plan. */
+export class ChangePlanPriceDto {
+  @ApiProperty({ example: 350000, minimum: 1, maximum: 100000000 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100_000_000)
+  priceVnd!: number;
+}
 
 export class CreatePlanEntitlementDto {
   @ApiProperty({ enum: PlanFeatureKey })

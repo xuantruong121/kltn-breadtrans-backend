@@ -125,4 +125,94 @@ describe('ensureCanonicalPlanCatalog', () => {
     });
     expect(results.every((r) => !r.createdVersion)).toBe(true);
   });
+
+  // The seed must not put the table's price back over one the admin changed
+  // from the admin page (owner 2026-11-28).
+  const planIdOf = (code: string) =>
+    code === 'FREE' ? 1 : code === 'PLUS' ? 2 : 3;
+  const runSeed = async (
+    shape: (spec: (typeof CANONICAL_PLAN_CATALOG)[number], v: any) => any,
+  ) => {
+    const versions = CANONICAL_PLAN_CATALOG.map((spec, i) =>
+      shape(spec, {
+        id: 100 + i,
+        planId: planIdOf(spec.code),
+        version: 1,
+        displayName: spec.versionName,
+        description: spec.description,
+        durationDays: spec.durationDays,
+        priceVnd: spec.priceVnd,
+        currency: 'VND',
+        entitlements: spec.features.map((featureKey) => ({ featureKey })),
+      }),
+    ).filter(Boolean);
+    const tx = {
+      plan: {
+        upsert: jest.fn(({ where }: any) =>
+          Promise.resolve({ id: planIdOf(where.code) }),
+        ),
+      },
+      planVersion: {
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            versions.filter(
+              (v: any) =>
+                v.planId === where.planId &&
+                v.durationDays === where.durationDays,
+            ),
+          ),
+        ),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 900, version: 9 }),
+        aggregate: jest.fn().mockResolvedValue({ _max: { version: 8 } }),
+      },
+    };
+    const prisma = { $transaction: (fn: (t: typeof tx) => unknown) => fn(tx) };
+    const results = await ensureCanonicalPlanCatalog(prisma as any);
+    return { tx, results };
+  };
+
+  it('keeps a price the admin changed: no new version, nothing rewritten', async () => {
+    const { tx, results } = await runSeed((spec, v) =>
+      spec.code === 'PLUS' && spec.durationDays === 180
+        ? { ...v, priceVnd: 350_000 }
+        : v,
+    );
+    expect(tx.planVersion.create).not.toHaveBeenCalled();
+    expect(tx.planVersion.updateMany).not.toHaveBeenCalled();
+    expect(tx.planVersion.update).not.toHaveBeenCalled();
+    expect(results.every((r) => !r.createdVersion)).toBe(true);
+  });
+
+  it('a term whose grants differ gets a new version at the price it sells at', async () => {
+    const { tx, results } = await runSeed((spec, v) =>
+      spec.code === 'PRO' && spec.durationDays === 90
+        ? { ...v, priceVnd: 390_000, entitlements: [] }
+        : v,
+    );
+    expect(tx.planVersion.create).toHaveBeenCalledTimes(1);
+    expect(tx.planVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          durationDays: 90,
+          priceVnd: 390_000,
+          version: 9,
+        }),
+      }),
+    );
+    expect(results.filter((r) => r.createdVersion)).toHaveLength(1);
+  });
+
+  it('a term with no selling version starts at the table price', async () => {
+    const { tx } = await runSeed((spec, v) =>
+      spec.code === 'PLUS' && spec.durationDays === 90 ? null : v,
+    );
+    expect(tx.planVersion.create).toHaveBeenCalledTimes(1);
+    expect(tx.planVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ durationDays: 90, priceVnd: 186_000 }),
+      }),
+    );
+  });
 });

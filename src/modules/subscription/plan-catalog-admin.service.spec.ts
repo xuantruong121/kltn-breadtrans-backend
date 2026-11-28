@@ -306,6 +306,213 @@ describe('PlanCatalogAdminService', () => {
     expect(tx.planVersion.update).not.toHaveBeenCalled();
   });
 
+  it('a draft of a term starts from the version of that term, not from any current one', async () => {
+    const prisma = makePrisma();
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      planVersion: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({ version: 4 })
+          .mockResolvedValueOnce({
+            displayName: 'BreadTrans Plus — 180 ngày',
+            description: 'Thời hạn 180 ngày',
+            entitlements: [],
+          }),
+        create: jest.fn().mockResolvedValue(draft({ version: 5 })),
+      },
+    };
+    prisma.plan.findUnique.mockResolvedValue(plan);
+    prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+    const service = new PlanCatalogAdminService(
+      prisma as never,
+      new SubscriptionService(prisma as never),
+    );
+
+    await service.createDraft(
+      'plus',
+      { priceVnd: 350000, durationDays: 180 },
+      7,
+    );
+
+    expect(tx.planVersion.findFirst).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { planId: plan.id, isCurrent: true, durationDays: 180 },
+      }),
+    );
+    expect(tx.planVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          displayName: 'BreadTrans Plus — 180 ngày',
+          durationDays: 180,
+        }),
+      }),
+    );
+  });
+
+  describe('changePrice (owner 2026-11-28)', () => {
+    const entitlement = {
+      id: 9,
+      planVersionId: 103,
+      featureKey: 'PREMIUM_LISTENING',
+      enabled: true,
+      limitValue: null,
+      unit: 'CONTENT_ACCESS',
+      period: null,
+      scope: null,
+    };
+    const selling = (overrides: Record<string, unknown> = {}) =>
+      draft({
+        id: 103,
+        version: 4,
+        displayName: 'BreadTrans Plus — 180 ngày',
+        description: 'Thời hạn 180 ngày',
+        durationDays: 180,
+        priceVnd: 331000,
+        status: PlanVersionStatus.PUBLISHED,
+        isCurrent: true,
+        entitlements: [entitlement],
+        ...overrides,
+      });
+    const setup = (
+      current: unknown = selling(),
+      planRow: Record<string, unknown> = plan,
+    ) => {
+      const prisma = makePrisma();
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        planVersion: {
+          findFirst: jest.fn().mockResolvedValue(current),
+          aggregate: jest.fn().mockResolvedValue({ _max: { version: 5 } }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          create: jest.fn().mockImplementation(({ data }: any) =>
+            Promise.resolve(
+              draft({
+                ...data,
+                id: 108,
+                entitlements: [entitlement],
+              }),
+            ),
+          ),
+        },
+      };
+      prisma.plan.findUnique.mockResolvedValue(planRow);
+      prisma.$transaction.mockImplementation((fn: any) => fn(tx));
+      const service = new PlanCatalogAdminService(
+        prisma as never,
+        new SubscriptionService(prisma as never),
+      );
+      return { service, tx, prisma };
+    };
+
+    it('puts a new version of the same term on sale and retires only that term', async () => {
+      const { service, tx } = setup();
+
+      const result = await service.changePrice('plus', 180, 350000, 7);
+
+      expect(result.priceVnd).toBe(350000);
+      expect(result.version).toBe(6);
+      expect(result.isCurrent).toBe(true);
+      expect(tx.planVersion.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            planId: plan.id,
+            durationDays: 180,
+            isCurrent: true,
+            status: PlanVersionStatus.PUBLISHED,
+          },
+        }),
+      );
+      // The old version of that term only; the 30 and 90 day terms stay on sale.
+      expect(tx.planVersion.updateMany).toHaveBeenCalledWith({
+        where: { planId: plan.id, durationDays: 180, isCurrent: true },
+        data: { isCurrent: false, status: PlanVersionStatus.RETIRED },
+      });
+      expect(tx.planVersion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            version: 6,
+            durationDays: 180,
+            priceVnd: 350000,
+            displayName: 'BreadTrans Plus — 180 ngày',
+            description: 'Thời hạn 180 ngày',
+            status: PlanVersionStatus.PUBLISHED,
+            isCurrent: true,
+            entitlements: {
+              create: [
+                expect.objectContaining({
+                  featureKey: 'PREMIUM_LISTENING',
+                  enabled: true,
+                  unit: 'CONTENT_ACCESS',
+                }),
+              ],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('locks the plan first, retires the old version before the new one is created', async () => {
+      const { service, tx } = setup();
+      await service.changePrice('plus', 180, 350000, 7);
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.planVersion.findFirst.mock.invocationCallOrder[0],
+      );
+      expect(
+        tx.planVersion.updateMany.mock.invocationCallOrder[0],
+      ).toBeLessThan(tx.planVersion.create.mock.invocationCallOrder[0]);
+    });
+
+    it('refuses the price already on sale and writes nothing', async () => {
+      const { service, tx } = setup();
+      await expect(service.changePrice('plus', 180, 331000, 7)).rejects.toThrow(
+        'trùng với giá đang bán',
+      );
+      expect(tx.planVersion.updateMany).not.toHaveBeenCalled();
+      expect(tx.planVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a term that is not on sale', async () => {
+      const { service, tx } = setup(null);
+      await expect(service.changePrice('plus', 365, 500000, 7)).rejects.toThrow(
+        'chưa có mức 365 ngày đang bán',
+      );
+      expect(tx.planVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('protects the FREE plan', async () => {
+      const { service, tx } = setup(selling(), { ...plan, code: 'FREE' });
+      await expect(service.changePrice('FREE', 180, 1000, 7)).rejects.toThrow(
+        'Gói Free được bảo vệ',
+      );
+      expect(tx.planVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('does not lose what the plan grants: a term with no grants is refused', async () => {
+      const { service, tx } = setup(selling({ entitlements: [] }));
+      await expect(service.changePrice('plus', 180, 350000, 7)).rejects.toThrow(
+        'chưa có quyền lợi',
+      );
+      expect(tx.planVersion.updateMany).not.toHaveBeenCalled();
+      expect(tx.planVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a price of zero or a fraction before anything is written', async () => {
+      const zero = setup();
+      await expect(zero.service.changePrice('plus', 180, 0, 7)).rejects.toThrow(
+        'lớn hơn 0',
+      );
+      expect(zero.tx.planVersion.create).not.toHaveBeenCalled();
+
+      const fraction = setup();
+      await expect(
+        fraction.service.changePrice('plus', 180, 1000.5, 7),
+      ).rejects.toThrow('số nguyên');
+      expect(fraction.tx.planVersion.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('rejects a draft from the reusable purchasability guard', async () => {
     const prisma = makePrisma();
     prisma.planVersion.findUnique.mockResolvedValue(draft());
